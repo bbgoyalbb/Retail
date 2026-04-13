@@ -20,18 +20,15 @@ export default function ItemsManager() {
   const loadItems = useCallback(() => {
     const params = { limit: 2000 };
     if (nameFilter) params.name = nameFilter;
+    if (orderFilter) params.order_no = orderFilter;
     getItems(params).then(res => setAllItems(res.data.items)).catch(console.error);
-  }, [nameFilter]);
+  }, [nameFilter, orderFilter]);
 
   useEffect(() => { loadItems(); }, [loadItems]);
 
   // Group items by reference
   const grouped = {};
   allItems.forEach(item => {
-    if (orderFilter && item.order_no !== orderFilter && item.order_no !== "N/A") {
-      if (item.order_no !== orderFilter) return;
-    }
-    if (orderFilter && item.order_no !== orderFilter) return;
     const ref = item.ref;
     if (!grouped[ref]) grouped[ref] = { ref, name: item.name, date: item.date, items: [], totals: { fabric: 0, tailoring: 0, embroidery: 0, addon: 0 } };
     grouped[ref].items.push(item);
