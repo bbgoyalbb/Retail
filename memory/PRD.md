@@ -4,8 +4,8 @@
 Convert a complete VBA Excel retail fabric/tailoring business management system (with 7 VBA UserForms, modules, and real transaction data) into a full web application.
 
 ## Architecture
-- **Backend**: FastAPI (Python) + MongoDB (Motor async driver)
-- **Frontend**: React 19 + Tailwind CSS + Phosphor Icons
+- **Backend**: FastAPI (Python) + MongoDB (Motor async driver) + ReportLab (PDF)
+- **Frontend**: React 19 + Tailwind CSS + Phosphor Icons + Recharts
 - **Database**: MongoDB with collections: `items`, `advances`
 - **Design**: Organic & Earthy theme (Manrope + IBM Plex Sans fonts)
 
@@ -18,50 +18,64 @@ Convert a complete VBA Excel retail fabric/tailoring business management system 
 6. Payment Settlements (pro-rata distribution)
 7. Daybook (daily reconciliation with tally/untally)
 8. Labour Payments (tailoring & embroidery)
+9. Item editing and deletion
+10. PDF invoice generation
+11. Search & filtering across all records
+12. Reports & analytics
 
 ## User Personas
 - **Shop Owner**: Primary user, manages all operations
 - **Staff**: Enters bills, tracks orders
 
-## What's Been Implemented (Jan 2026)
+## What's Been Implemented
+
+### Session 1 (Jan 2026) - MVP
 - [x] Full backend API with 19+ endpoints
 - [x] Data seeded from Excel (261 items, 9 advances)
-- [x] Dashboard with KPIs (revenue, pending amounts, job status)
-- [x] New Bill creation with multi-item support, payment modes, settle/advance
-- [x] Tailoring Orders - assign article types, order numbers, delivery dates
-- [x] Add-ons - accessories management (Bow, Tie, Cufflinks, etc.)
-- [x] Job Work Tracker - Kanban board for tailoring & embroidery progress
-- [x] Payment Settlements - by customer/order, pro-rata distribution, advance usage
-- [x] Daybook - daily reconciliation with tally/untally functionality
-- [x] Labour Payments - pay tailoring & embroidery labour by karigar
-- [x] Responsive sidebar navigation
-- [x] Data imported from Excel VBA workbook
+- [x] Dashboard with KPIs
+- [x] New Bill creation
+- [x] Tailoring Orders
+- [x] Add-ons management
+- [x] Job Work Tracker (Kanban)
+- [x] Payment Settlements
+- [x] Daybook reconciliation
+- [x] Labour Payments
+
+### Session 2 (Jan 2026) - Feature Expansion
+- [x] Item editing (inline edit with save/cancel)
+- [x] Item deletion (with confirmation modal)
+- [x] PDF invoice generation (ReportLab, downloadable per reference)
+- [x] Global search with advanced filters (customer, date range, amount, payment/tailoring status)
+- [x] Reports & Analytics:
+  - Revenue charts (daily/weekly/monthly bar + line)
+  - Customer ranking table
+  - Payment mode pie chart
+  - Article type distribution
+  - Detailed revenue breakdown cards
 
 ## Testing
-- Backend: 19/19 API tests passed (100%)
-- Frontend: All navigation, forms, integration tests passed (100%)
+- Backend: 32/32 API tests passed (100%)
+- Frontend: All core functionality working (95%+)
 
 ## Prioritized Backlog
 ### P0 (Critical)
-- None remaining for MVP
+- None remaining
 
 ### P1 (High Priority)
-- PDF invoice/bill generation
-- Search/filter across all items
-- Edit existing items inline
-- Delete items with confirmation
-- Order number auto-generation
+- Bulk edit/update items
+- Data export to Excel/CSV
+- Order number auto-generation in tailoring
 
 ### P2 (Nice to Have)
-- Report generation (daily, weekly, monthly)
-- Customer profile pages with history
+- Customer profile pages with full history
 - SMS/WhatsApp notifications for delivery dates
-- Data export to Excel
 - Multi-user authentication
 - Audit trail / activity log
+- Print-friendly bill layout
+- Dashboard date range filtering
 
 ## Next Tasks
-1. Implement item editing and deletion
-2. Add search across all items
-3. PDF bill generation
-4. Reports & analytics page
+1. Data export to Excel/CSV
+2. Customer profile pages
+3. Multi-user authentication
+4. Print-friendly layouts
