@@ -725,6 +725,28 @@ async def move_jobwork(req: StatusUpdateRequest):
 
     return {"message": f"{updated} items moved to {req.new_status}"}
 
+class EmbMoveRequest(BaseModel):
+    item_ids: List[str]
+    new_status: str
+    emb_labour_amount: Optional[float] = None
+    emb_customer_amount: Optional[float] = None
+
+@api_router.post("/jobwork/move-emb")
+async def move_embroidery(req: EmbMoveRequest):
+    updated = 0
+    for item_id in req.item_ids:
+        update_fields = {"embroidery_status": req.new_status}
+        if req.emb_labour_amount is not None and req.emb_labour_amount > 0:
+            update_fields["emb_labour_amount"] = req.emb_labour_amount
+        if req.emb_customer_amount is not None and req.emb_customer_amount > 0:
+            update_fields["embroidery_amount"] = req.emb_customer_amount
+            update_fields["embroidery_pending"] = req.emb_customer_amount
+            update_fields["embroidery_pay_mode"] = "Pending"
+        result = await db.items.update_one({"id": item_id}, {"$set": update_fields})
+        if result.modified_count > 0:
+            updated += 1
+    return {"message": f"{updated} embroidery items updated"}
+
 @api_router.get("/jobwork/filters")
 async def get_jobwork_filters():
     order_nos = await db.items.distinct("order_no", {"order_no": {"$ne": "N/A"}})
@@ -1178,8 +1200,9 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
     from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
     items = await db.items.find({"ref": ref_id}, {"_id": 0}).to_list(100)
     if not items:
@@ -1188,110 +1211,265 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
     advances = await db.advances.find({"ref": ref_id}, {"_id": 0}).to_list(50)
 
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=15*mm, bottomMargin=15*mm, leftMargin=15*mm, rightMargin=15*mm)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=12*mm, bottomMargin=12*mm, leftMargin=12*mm, rightMargin=12*mm)
 
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('CustomTitle', parent=styles['Title'], fontSize=18, textColor=colors.HexColor('#C86B4D'), spaceAfter=3*mm)
-    subtitle_style = ParagraphStyle('CustomSubtitle', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#6C6760'))
-    heading_style = ParagraphStyle('CustomHeading', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#2D2A26'), spaceBefore=6*mm)
+    title_style = ParagraphStyle('Title', parent=styles['Title'], fontSize=16, textColor=colors.HexColor('#C86B4D'), spaceAfter=1*mm, alignment=TA_CENTER)
+    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#6C6760'), alignment=TA_CENTER)
+    heading_style = ParagraphStyle('Heading', parent=styles['Heading2'], fontSize=10, textColor=colors.HexColor('#2D2A26'), spaceBefore=4*mm, spaceAfter=2*mm)
+    small_style = ParagraphStyle('Small', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#6C6760'))
+    right_style = ParagraphStyle('Right', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT)
+    bold_style = ParagraphStyle('Bold', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#2D2A26'))
 
     elements = []
+    hdr_fill = colors.HexColor('#F5F3EE')
+    brand = colors.HexColor('#C86B4D')
+    txt = colors.HexColor('#2D2A26')
+    grey = colors.HexColor('#6C6760')
+    border_c = colors.HexColor('#EBE8E1')
 
-    # Header
-    elements.append(Paragraph("Retail Book", title_style))
-    elements.append(Paragraph("Fabric & Tailoring", subtitle_style))
-    elements.append(Spacer(1, 5*mm))
+    # ---- HEADER ----
+    elements.append(Paragraph("NARWANA AGENCIES", title_style))
+    elements.append(Paragraph("Jasmeet Nagar, Near Kalka Chowk, Ambala City, Pin: 134003, Haryana", subtitle_style))
+    elements.append(Paragraph("Mobile: 9467902343, 7056212655 | GSTIN: 06ADMPG9353K1Z4", subtitle_style))
+    elements.append(Spacer(1, 3*mm))
+    elements.append(HRFlowable(width="100%", thickness=0.5, color=brand))
+    elements.append(Spacer(1, 3*mm))
 
-    # Invoice Info
+    # ---- INVOICE INFO ----
     customer_name = items[0].get("name", "N/A")
     order_date = items[0].get("date", "N/A")
-
     info_data = [
-        ["Customer:", customer_name, "Reference:", ref_id],
-        ["Date:", order_date, "Items:", str(len(items))],
+        ["Invoice Ref:", ref_id, "Date:", order_date],
+        ["Customer:", customer_name, "Items:", str(len(items))],
     ]
-    info_table = Table(info_data, colWidths=[60, 170, 60, 170])
+    info_table = Table(info_data, colWidths=[55, 180, 55, 170])
     info_table.setStyle(TableStyle([
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#2D2A26')),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+        ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (0,0), (-1,-1), txt),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
     ]))
     elements.append(info_table)
-    elements.append(Spacer(1, 5*mm))
+    elements.append(Spacer(1, 3*mm))
 
-    # Items Table
-    elements.append(Paragraph("Items", heading_style))
-    table_data = [["#", "Item/Barcode", "Price", "Qty", "Disc%", "Fabric Amt", "Article", "Status"]]
+    # ---- GST CALCULATION HELPERS ----
+    GST_RATE = 5.0
 
-    grand_total = 0
+    def calc_gst(inclusive_amount):
+        base = round(inclusive_amount / (1 + GST_RATE / 100), 2)
+        gst = round(inclusive_amount - base, 2)
+        return base, gst
+
+    # ---- SECTION 1: FABRIC ITEMS (with GST) ----
+    elements.append(Paragraph("A. Fabric Items", heading_style))
+    fab_headers = ["#", "Article", "Item/Barcode", "Price/m", "Qty", "Disc%", "Amount", "Base Amt", "GST (5%)"]
+    fab_data = [fab_headers]
+    fab_total = 0
+    fab_gst_total = 0
+
     for i, item in enumerate(items, 1):
-        fab_amt = item.get("fabric_amount", 0)
-        grand_total += fab_amt
-        table_data.append([
-            str(i),
-            str(item.get("barcode", ""))[:20],
-            f"Rs.{item.get('price', 0):,.0f}",
-            f"{item.get('qty', 0)}",
-            f"{item.get('discount', 0)}%",
-            f"Rs.{fab_amt:,.0f}",
-            str(item.get("article_type", "N/A")),
-            "Settled" if str(item.get("fabric_pay_mode", "")).startswith("Settled") else "Pending",
+        amt = item.get("fabric_amount", 0)
+        fab_total += amt
+        base, gst = calc_gst(amt)
+        fab_gst_total += gst
+        art = item.get("article_type", "N/A")
+        fab_data.append([
+            str(i), art if art != "N/A" else "-", str(item.get("barcode",""))[:18],
+            f"{item.get('price',0):,.0f}", f"{item.get('qty',0)}", f"{item.get('discount',0):.0f}%",
+            f"{amt:,.0f}", f"{base:,.2f}", f"{gst:,.2f}"
         ])
 
-    table_data.append(["", "", "", "", "", f"Rs.{grand_total:,.0f}", "", ""])
+    fab_base_total = round(fab_total - fab_gst_total, 2)
+    fab_data.append(["", "", "", "", "", "TOTAL", f"{fab_total:,.0f}", f"{fab_base_total:,.2f}", f"{fab_gst_total:,.2f}"])
 
-    items_table = Table(table_data, colWidths=[25, 110, 60, 35, 35, 70, 65, 55])
-    items_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F5F3EE')),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#2D2A26')),
-        ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#EBE8E1')),
-        ('ALIGN', (2, 0), (5, -1), 'RIGHT'),
-        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-        ('LINEABOVE', (0, -1), (-1, -1), 1, colors.HexColor('#2D2A26')),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
+    fab_table = Table(fab_data, colWidths=[18, 55, 95, 45, 30, 30, 55, 55, 50])
+    fab_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), hdr_fill),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 7),
+        ('TEXTCOLOR', (0,0), (-1,-1), txt),
+        ('GRID', (0,0), (-1,-2), 0.3, border_c),
+        ('LINEABOVE', (0,-1), (-1,-1), 0.8, txt),
+        ('ALIGN', (3,0), (-1,-1), 'RIGHT'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
     ]))
-    elements.append(items_table)
+    elements.append(fab_table)
 
-    # Payment Summary
-    elements.append(Spacer(1, 5*mm))
-    elements.append(Paragraph("Payment Summary", heading_style))
+    # ---- SECTION 2: TAILORING (if any) ----
+    tail_items = [i for i in items if i.get("tailoring_status") not in ("N/A", None, "")]
+    if tail_items:
+        elements.append(Paragraph("B. Tailoring", heading_style))
+        tail_data = [["#", "Article", "Order#", "Delivery", "Tailoring Amt", "Labour Amt", "Payment"]]
+        tail_total = 0
+        for idx, ti in enumerate(tail_items, 1):
+            t_amt = ti.get("tailoring_amount", 0)
+            tail_total += t_amt
+            pay_mode = ti.get("tailoring_pay_mode", "N/A")
+            status = "Settled" if str(pay_mode).startswith("Settled") else pay_mode
+            tail_data.append([
+                str(idx), ti.get("article_type",""), ti.get("order_no",""),
+                ti.get("delivery_date",""), f"{t_amt:,.0f}", f"{ti.get('labour_amount',0):,.0f}", status
+            ])
+        tail_data.append(["", "", "", "", f"{tail_total:,.0f}", "", ""])
+        tail_table = Table(tail_data, colWidths=[18, 70, 50, 65, 70, 60, 100])
+        tail_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), hdr_fill),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 7),
+            ('GRID', (0,0), (-1,-2), 0.3, border_c),
+            ('LINEABOVE', (0,-1), (-1,-1), 0.8, txt),
+            ('ALIGN', (4,0), (5,-1), 'RIGHT'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3),
+        ]))
+        elements.append(tail_table)
 
-    total_received = sum(item.get("fabric_received", 0) for item in items)
-    total_pending = sum(item.get("fabric_pending", 0) for item in items)
-    total_tail = sum(item.get("tailoring_amount", 0) for item in items)
-    total_tail_received = sum(item.get("tailoring_received", 0) for item in items)
+    # ---- SECTION 3: EMBROIDERY (if any) ----
+    emb_items = [i for i in items if i.get("embroidery_status") not in ("N/A", "Not Required", None, "")]
+    if emb_items:
+        elements.append(Paragraph("C. Embroidery", heading_style))
+        emb_data = [["#", "Article", "Status", "Karigar", "Amount", "Payment"]]
+        emb_total = 0
+        for idx, ei in enumerate(emb_items, 1):
+            e_amt = ei.get("embroidery_amount", 0)
+            emb_total += e_amt
+            emb_data.append([
+                str(idx), ei.get("article_type",""), ei.get("embroidery_status",""),
+                ei.get("karigar","N/A"), f"{e_amt:,.0f}",
+                "Settled" if str(ei.get("embroidery_pay_mode","")).startswith("Settled") else ei.get("embroidery_pay_mode","N/A")
+            ])
+        emb_data.append(["", "", "", "", f"{emb_total:,.0f}", ""])
+        emb_table = Table(emb_data, colWidths=[18, 70, 70, 80, 60, 130])
+        emb_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), hdr_fill),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 7),
+            ('GRID', (0,0), (-1,-2), 0.3, border_c),
+            ('LINEABOVE', (0,-1), (-1,-1), 0.8, txt),
+            ('ALIGN', (4,0), (4,-1), 'RIGHT'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3),
+        ]))
+        elements.append(emb_table)
 
-    pay_data = [
-        ["Category", "Amount", "Received", "Pending"],
-        ["Fabric", f"Rs.{grand_total:,.0f}", f"Rs.{total_received:,.0f}", f"Rs.{total_pending:,.0f}"],
-        ["Tailoring", f"Rs.{total_tail:,.0f}", f"Rs.{total_tail_received:,.0f}", f"Rs.{total_tail - total_tail_received:,.0f}"],
-    ]
+    # ---- SECTION 4: ADD-ONS (if any) ----
+    addon_items = [i for i in items if i.get("addon_desc") not in ("N/A", None, "")]
+    if addon_items:
+        elements.append(Paragraph("D. Add-ons", heading_style))
+        add_data = [["#", "Article", "Add-ons", "Amount", "Payment"]]
+        add_total = 0
+        for idx, ai in enumerate(addon_items, 1):
+            a_amt = ai.get("addon_amount", 0)
+            add_total += a_amt
+            add_data.append([
+                str(idx), ai.get("article_type",""), ai.get("addon_desc",""), f"{a_amt:,.0f}",
+                "Settled" if str(ai.get("addon_pay_mode","")).startswith("Settled") else ai.get("addon_pay_mode","N/A")
+            ])
+        add_data.append(["", "", "", f"{add_total:,.0f}", ""])
+        add_table = Table(add_data, colWidths=[18, 70, 180, 60, 100])
+        add_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), hdr_fill),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 7),
+            ('GRID', (0,0), (-1,-2), 0.3, border_c),
+            ('LINEABOVE', (0,-1), (-1,-1), 0.8, txt),
+            ('ALIGN', (3,0), (3,-1), 'RIGHT'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3),
+        ]))
+        elements.append(add_table)
 
+    # ---- SECTION 5: ADVANCES ----
     total_adv = sum(a.get("amount", 0) for a in advances)
     if total_adv != 0:
-        pay_data.append(["Advances", "", f"Rs.{total_adv:,.0f}", ""])
+        elements.append(Paragraph("E. Advances", heading_style))
+        adv_data = [["Date", "Amount", "Mode"]]
+        for a in advances:
+            adv_data.append([a.get("date",""), f"{a.get('amount',0):,.0f}", a.get("mode","")])
+        adv_data.append(["Net Advance", f"{total_adv:,.0f}", ""])
+        adv_table = Table(adv_data, colWidths=[120, 80, 230])
+        adv_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), hdr_fill),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 7),
+            ('GRID', (0,0), (-1,-2), 0.3, border_c),
+            ('LINEABOVE', (0,-1), (-1,-1), 0.8, txt),
+            ('ALIGN', (1,0), (1,-1), 'RIGHT'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3),
+        ]))
+        elements.append(adv_table)
 
-    pay_table = Table(pay_data, colWidths=[100, 100, 100, 100])
-    pay_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F5F3EE')),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#2D2A26')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#EBE8E1')),
-        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
+    # ---- PAYMENT SUMMARY ----
+    elements.append(Spacer(1, 4*mm))
+    elements.append(HRFlowable(width="100%", thickness=0.5, color=brand))
+    elements.append(Paragraph("Payment Summary", heading_style))
+
+    fab_received = sum(i.get("fabric_received", 0) for i in items)
+    fab_pending = sum(i.get("fabric_pending", 0) for i in items if i.get("fabric_pay_mode") == "Pending")
+    tail_total_amt = sum(i.get("tailoring_amount", 0) for i in items)
+    tail_received = sum(i.get("tailoring_received", 0) for i in items)
+    tail_pending_amt = sum(i.get("tailoring_pending", 0) for i in items if i.get("tailoring_pay_mode") == "Pending")
+    emb_total_amt = sum(i.get("embroidery_amount", 0) for i in items)
+    emb_received = sum(i.get("embroidery_received", 0) for i in items)
+    emb_pending_amt = sum(i.get("embroidery_pending", 0) for i in items if i.get("embroidery_pay_mode") == "Pending")
+    addon_total_amt = sum(i.get("addon_amount", 0) for i in items)
+    addon_received = sum(i.get("addon_received", 0) for i in items)
+    addon_pending_amt = sum(i.get("addon_pending", 0) for i in items if i.get("addon_pay_mode") == "Pending")
+
+    grand_total = fab_total + tail_total_amt + emb_total_amt + addon_total_amt
+    total_received = fab_received + tail_received + emb_received + addon_received
+    total_pending = fab_pending + tail_pending_amt + emb_pending_amt + addon_pending_amt
+    net_with_advance = total_pending - max(total_adv, 0)
+
+    sum_data = [
+        ["Category", "Total", "Received", "Pending"],
+        ["Fabric (incl. GST 5%)", f"{fab_total:,.0f}", f"{fab_received:,.0f}", f"{fab_pending:,.0f}"],
+        ["Tailoring", f"{tail_total_amt:,.0f}", f"{tail_received:,.0f}", f"{tail_pending_amt:,.0f}"],
+        ["Embroidery", f"{emb_total_amt:,.0f}", f"{emb_received:,.0f}", f"{emb_pending_amt:,.0f}"],
+        ["Add-ons", f"{addon_total_amt:,.0f}", f"{addon_received:,.0f}", f"{addon_pending_amt:,.0f}"],
+        ["", "", "", ""],
+        ["GRAND TOTAL", f"{grand_total:,.0f}", f"{total_received:,.0f}", f"{total_pending:,.0f}"],
+    ]
+    if total_adv > 0:
+        sum_data.append(["Less: Advance", "", f"{total_adv:,.0f}", ""])
+        sum_data.append(["NET PAYABLE", "", "", f"{net_with_advance:,.0f}"])
+
+    sum_table = Table(sum_data, colWidths=[120, 90, 90, 90])
+    sum_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), hdr_fill),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('GRID', (0,0), (-1,4), 0.3, border_c),
+        ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
+        ('FONTNAME', (0,6), (-1,6), 'Helvetica-Bold'),
+        ('LINEABOVE', (0,6), (-1,6), 0.8, txt),
+        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (3,-1), (3,-1), brand),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3),
     ]))
-    elements.append(pay_table)
+    elements.append(sum_table)
 
-    # Footer
-    elements.append(Spacer(1, 10*mm))
-    elements.append(Paragraph(f"Generated on {datetime.now().strftime('%d-%m-%Y %H:%M')}", subtitle_style))
+    # ---- TERMS & CONDITIONS ----
+    elements.append(Spacer(1, 6*mm))
+    elements.append(HRFlowable(width="100%", thickness=0.3, color=border_c))
+    elements.append(Spacer(1, 2*mm))
+    terms = [
+        "1. All prices are inclusive of GST @ 5%.",
+        "2. Goods once sold will not be taken back or exchanged.",
+        "3. Tailoring orders are subject to delivery timelines agreed at the time of order.",
+        "4. Advance payments are non-refundable and adjusted against the final bill.",
+        "5. Any dispute is subject to Ambala jurisdiction.",
+    ]
+    for t in terms:
+        elements.append(Paragraph(t, small_style))
+
+    elements.append(Spacer(1, 4*mm))
+    elements.append(Paragraph(f"Generated on {datetime.now().strftime('%d-%m-%Y %H:%M')} | Thank you for your business!", subtitle_style))
 
     doc.build(elements)
     buffer.seek(0)

@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { key: "daybook", label: "Daybook", icon: BookOpen, path: "/daybook" },
   { key: "labour", label: "Labour Payments", icon: UsersThree, path: "/labour" },
   { key: "divider", label: "divider" },
-  { key: "items", label: "Manage Items", icon: Table, path: "/items" },
+  { key: "items", label: "Manage Orders", icon: Table, path: "/items" },
   { key: "search", label: "Search", icon: MagnifyingGlass, path: "/search" },
   { key: "reports", label: "Reports", icon: ChartBar, path: "/reports" },
   { key: "data", label: "Data Manager", icon: Database, path: "/data" },

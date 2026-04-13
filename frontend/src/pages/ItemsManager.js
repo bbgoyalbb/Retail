@@ -1,50 +1,65 @@
 import { useState, useEffect, useCallback } from "react";
 import { getItems, getCustomers, updateItem, deleteItem, getInvoiceUrl } from "@/api";
-import { PencilSimple, Trash, FloppyDisk, X, FilePdf, CaretLeft, CaretRight } from "@phosphor-icons/react";
+import { PencilSimple, Trash, FloppyDisk, X, FilePdf, CaretDown, CaretRight, MagnifyingGlass } from "@phosphor-icons/react";
 
 export default function ItemsManager() {
-  const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(0);
+  const [allItems, setAllItems] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [nameFilter, setNameFilter] = useState("");
-  const [refFilter, setRefFilter] = useState("");
-  const [page, setPage] = useState(0);
+  const [orderFilter, setOrderFilter] = useState("");
+  const [expanded, setExpanded] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
   const [message, setMessage] = useState(null);
   const [delConfirm, setDelConfirm] = useState(null);
-  const PAGE_SIZE = 30;
+  const [sortKey, setSortKey] = useState("date");
+  const [sortDir, setSortDir] = useState("desc");
 
   useEffect(() => { getCustomers().then(res => setCustomers(res.data)).catch(() => {}); }, []);
 
   const loadItems = useCallback(() => {
-    const params = { limit: PAGE_SIZE, skip: page * PAGE_SIZE };
+    const params = { limit: 2000 };
     if (nameFilter) params.name = nameFilter;
-    if (refFilter) params.ref = refFilter;
-    getItems(params).then(res => {
-      setItems(res.data.items);
-      setTotal(res.data.total);
-    }).catch(console.error);
-  }, [page, nameFilter, refFilter]);
+    getItems(params).then(res => setAllItems(res.data.items)).catch(console.error);
+  }, [nameFilter]);
 
   useEffect(() => { loadItems(); }, [loadItems]);
 
-  const startEdit = (item) => {
-    setEditingId(item.id);
-    setEditData({ ...item });
-  };
+  // Group items by reference
+  const grouped = {};
+  allItems.forEach(item => {
+    if (orderFilter && item.order_no !== orderFilter && item.order_no !== "N/A") {
+      if (item.order_no !== orderFilter) return;
+    }
+    if (orderFilter && item.order_no !== orderFilter) return;
+    const ref = item.ref;
+    if (!grouped[ref]) grouped[ref] = { ref, name: item.name, date: item.date, items: [], totals: { fabric: 0, tailoring: 0, embroidery: 0, addon: 0 } };
+    grouped[ref].items.push(item);
+    grouped[ref].totals.fabric += item.fabric_amount || 0;
+    grouped[ref].totals.tailoring += item.tailoring_amount || 0;
+    grouped[ref].totals.embroidery += item.embroidery_amount || 0;
+    grouped[ref].totals.addon += item.addon_amount || 0;
+  });
 
+  const refs = Object.values(grouped).sort((a, b) => {
+    const va = a[sortKey] || ""; const vb = b[sortKey] || "";
+    const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+    return sortDir === "desc" ? -cmp : cmp;
+  });
+
+  const orderNos = [...new Set(allItems.map(i => i.order_no).filter(o => o && o !== "N/A"))].sort();
+
+  const toggleExpand = (ref) => setExpanded(prev => ({ ...prev, [ref]: !prev[ref] }));
+  const startEdit = (item) => { setEditingId(item.id); setEditData({ ...item }); };
   const cancelEdit = () => { setEditingId(null); setEditData({}); };
 
   const saveEdit = async () => {
     try {
       await updateItem(editingId, editData);
-      setMessage({ type: "success", text: "Item updated successfully" });
+      setMessage({ type: "success", text: "Item updated" });
       setEditingId(null);
       loadItems();
-    } catch (err) {
-      setMessage({ type: "error", text: "Failed to update item" });
-    }
+    } catch (err) { setMessage({ type: "error", text: "Failed to update" }); }
     setTimeout(() => setMessage(null), 3000);
   };
 
@@ -54,153 +69,145 @@ export default function ItemsManager() {
       setMessage({ type: "success", text: "Item deleted" });
       setDelConfirm(null);
       loadItems();
-    } catch (err) {
-      setMessage({ type: "error", text: "Failed to delete" });
-    }
+    } catch (err) { setMessage({ type: "error", text: "Failed" }); }
     setTimeout(() => setMessage(null), 3000);
   };
 
-  const fmt = (n) => new Intl.NumberFormat('en-IN').format(Math.round(n || 0));
-  const totalPages = Math.ceil(total / PAGE_SIZE);
-
-  const EditCell = ({ field, type = "text", width = "w-20" }) => {
-    if (editingId !== editData.id) return null;
-    return (
-      <input
-        type={type}
-        value={editData[field] ?? ""}
-        onChange={e => setEditData(prev => ({ ...prev, [field]: type === "number" ? parseFloat(e.target.value) || 0 : e.target.value }))}
-        className={`${width} px-1.5 py-1 text-xs border border-[var(--brand)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]`}
-      />
-    );
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("desc"); }
   };
+
+  const fmt = (n) => n ? new Intl.NumberFormat('en-IN').format(Math.round(n)) : "-";
 
   return (
     <div data-testid="items-manager-page" className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-light tracking-tight">Manage Items</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">Edit, delete, and download invoices for all records</p>
+        <h1 className="font-heading text-3xl font-light tracking-tight">Manage Orders</h1>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">View, edit and manage all orders grouped by reference</p>
       </div>
 
       {message && (
-        <div data-testid="items-message" className={`p-3 border rounded-sm text-sm ${message.type === 'success' ? 'bg-[#455D4A10] border-[var(--success)] text-[var(--success)]' : 'bg-[#9E473D10] border-[var(--error)] text-[var(--error)]'}`}>
-          {message.text}
-        </div>
+        <div className={`p-3 border rounded-sm text-sm ${message.type === 'success' ? 'bg-[#455D4A10] border-[var(--success)] text-[var(--success)]' : 'bg-[#9E473D10] border-[var(--error)] text-[var(--error)]'}`}>{message.text}</div>
       )}
 
       {/* Filters */}
       <div className="bg-white border border-[var(--border-subtle)] p-4 rounded-sm flex flex-wrap gap-3 items-center">
-        <select data-testid="items-customer-filter" value={nameFilter} onChange={e => { setNameFilter(e.target.value); setPage(0); }} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
+        <select data-testid="orders-customer-filter" value={nameFilter} onChange={e => setNameFilter(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
           <option value="">All Customers</option>
           {customers.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <input data-testid="items-ref-filter" value={refFilter} onChange={e => { setRefFilter(e.target.value); setPage(0); }} placeholder="Filter by Ref..." className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] w-40" />
-        <span className="ml-auto text-xs text-[var(--text-secondary)]">{total} records</span>
+        <select data-testid="orders-order-filter" value={orderFilter} onChange={e => setOrderFilter(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
+          <option value="">All Order Nos</option>
+          {orderNos.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+        <span className="ml-auto text-xs text-[var(--text-secondary)]">{refs.length} references, {allItems.length} items</span>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation */}
       {delConfirm && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setDelConfirm(null)}>
           <div data-testid="delete-confirm-modal" className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm mx-4" onClick={e => e.stopPropagation()}>
             <h3 className="font-heading text-lg font-medium mb-2">Delete Item?</h3>
-            <p className="text-sm text-[var(--text-secondary)] mb-4">This action cannot be undone. Item: <span className="font-mono">{delConfirm.barcode}</span></p>
+            <p className="text-sm text-[var(--text-secondary)] mb-4">Item: <span className="font-mono">{delConfirm.barcode}</span></p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setDelConfirm(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">Cancel</button>
-              <button data-testid="confirm-delete-btn" onClick={() => handleDelete(delConfirm.id)} className="px-4 py-2 text-sm bg-[var(--error)] text-white rounded-sm hover:opacity-90">Delete</button>
+              <button onClick={() => setDelConfirm(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm">Cancel</button>
+              <button data-testid="confirm-delete-btn" onClick={() => handleDelete(delConfirm.id)} className="px-4 py-2 text-sm bg-[var(--error)] text-white rounded-sm">Delete</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Table */}
-      <div className="bg-white border border-[var(--border-subtle)] rounded-sm overflow-x-auto">
-        <table className="w-full" data-testid="items-table">
-          <thead>
-            <tr className="bg-[var(--bg)]">
-              {["Date", "Customer", "Ref", "Item", "Price", "Qty", "Disc%", "Amount", "Tailoring", "Article", "Payment", "Actions"].map(h => (
-                <th key={h} className="text-left px-3 py-2.5 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(item => (
-              <tr key={item.id} className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D05] transition-colors">
-                <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">
-                  {editingId === item.id ? <EditCell field="date" width="w-24" /> : item.date}
-                </td>
-                <td className="px-3 py-2 text-sm max-w-[140px] truncate">{item.name}</td>
-                <td className="px-3 py-2 font-mono text-xs">{item.ref}</td>
-                <td className="px-3 py-2 text-sm max-w-[120px] truncate">
-                  {editingId === item.id ? <EditCell field="barcode" width="w-24" /> : item.barcode}
-                </td>
-                <td className="px-3 py-2 font-mono text-xs text-right">
-                  {editingId === item.id ? <EditCell field="price" type="number" width="w-16" /> : `₹${fmt(item.price)}`}
-                </td>
-                <td className="px-3 py-2 font-mono text-xs text-right">
-                  {editingId === item.id ? <EditCell field="qty" type="number" width="w-14" /> : item.qty}
-                </td>
-                <td className="px-3 py-2 font-mono text-xs text-right">
-                  {editingId === item.id ? <EditCell field="discount" type="number" width="w-14" /> : `${item.discount}%`}
-                </td>
-                <td className="px-3 py-2 font-mono text-xs text-right font-medium">₹{fmt(item.fabric_amount)}</td>
-                <td className="px-3 py-2">
-                  <span className={`text-xs ${item.tailoring_status === 'N/A' ? 'text-[var(--text-secondary)]' : item.tailoring_status === 'Delivered' ? 'text-[var(--success)]' : 'text-[var(--warning)]'}`}>
-                    {item.tailoring_status}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-xs">{item.article_type !== 'N/A' ? item.article_type : '-'}</td>
-                <td className="px-3 py-2">
-                  <span className={`inline-flex items-center gap-1 text-xs ${item.fabric_pay_mode?.startsWith('Settled') ? 'text-[var(--success)]' : 'text-[var(--warning)]'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${item.fabric_pay_mode?.startsWith('Settled') ? 'bg-[var(--success)]' : 'bg-[var(--warning)]'}`} />
-                    {item.fabric_pay_mode?.startsWith('Settled') ? 'Settled' : 'Pending'}
-                  </span>
-                </td>
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-1">
-                    {editingId === item.id ? (
-                      <>
-                        <button data-testid={`save-edit-${item.id}`} onClick={saveEdit} className="p-1 text-[var(--success)] hover:bg-[#455D4A10] rounded-sm" title="Save">
-                          <FloppyDisk size={16} />
-                        </button>
-                        <button onClick={cancelEdit} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm" title="Cancel">
-                          <X size={16} />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button data-testid={`edit-${item.id}`} onClick={() => startEdit(item)} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm" title="Edit">
-                          <PencilSimple size={16} />
-                        </button>
-                        <button data-testid={`delete-${item.id}`} onClick={() => setDelConfirm(item)} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm" title="Delete">
-                          <Trash size={16} />
-                        </button>
-                        <a href={getInvoiceUrl(item.ref)} target="_blank" rel="noopener noreferrer" data-testid={`pdf-${item.id}`} className="p-1 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm" title="Download Invoice">
-                          <FilePdf size={16} />
-                        </a>
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-[var(--text-secondary)]">
-          Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
-        </p>
-        <div className="flex gap-2">
-          <button data-testid="prev-page-btn" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="p-2 border border-[var(--border-subtle)] rounded-sm disabled:opacity-30 hover:bg-[var(--bg)]">
-            <CaretLeft size={16} />
-          </button>
-          <span className="px-3 py-2 text-sm font-mono">{page + 1} / {totalPages || 1}</span>
-          <button data-testid="next-page-btn" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages - 1} className="p-2 border border-[var(--border-subtle)] rounded-sm disabled:opacity-30 hover:bg-[var(--bg)]">
-            <CaretRight size={16} />
-          </button>
+      {/* Grouped References */}
+      <div className="space-y-2">
+        {/* Header row */}
+        <div className="bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-4 py-2 flex items-center text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">
+          <span className="w-6"></span>
+          <button onClick={() => handleSort("date")} className="w-24 text-left hover:text-[var(--brand)]">Date {sortKey === 'date' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
+          <button onClick={() => handleSort("ref")} className="w-28 text-left hover:text-[var(--brand)]">Ref {sortKey === 'ref' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
+          <button onClick={() => handleSort("name")} className="flex-1 text-left hover:text-[var(--brand)]">Customer {sortKey === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
+          <span className="w-20 text-right">Fabric</span>
+          <span className="w-20 text-right">Tailoring</span>
+          <span className="w-20 text-right">Emb.</span>
+          <span className="w-20 text-right">Add-on</span>
+          <span className="w-16 text-center">Items</span>
+          <span className="w-10"></span>
         </div>
+
+        {refs.map(group => (
+          <div key={group.ref} className="bg-white border border-[var(--border-subtle)] rounded-sm overflow-hidden">
+            {/* Collapsed Reference Row */}
+            <div className="px-4 py-3 flex items-center cursor-pointer hover:bg-[#C86B4D05] transition-colors" onClick={() => toggleExpand(group.ref)}>
+              <span className="w-6 text-[var(--text-secondary)]">{expanded[group.ref] ? <CaretDown size={14} /> : <CaretRight size={14} />}</span>
+              <span className="w-24 font-mono text-xs">{group.date}</span>
+              <span className="w-28 font-mono text-xs text-[var(--brand)] font-medium">{group.ref}</span>
+              <span className="flex-1 text-sm font-medium truncate">{group.name}</span>
+              <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.fabric)}</span>
+              <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.tailoring)}</span>
+              <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.embroidery)}</span>
+              <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.addon)}</span>
+              <span className="w-16 text-center font-mono text-xs">{group.items.length}</span>
+              <a href={getInvoiceUrl(group.ref)} target="_blank" rel="noopener noreferrer" className="w-10 text-center" onClick={e => e.stopPropagation()}>
+                <FilePdf size={16} className="text-[var(--brand)] hover:text-[var(--brand-hover)] inline" />
+              </a>
+            </div>
+
+            {/* Expanded Detail Rows */}
+            {expanded[group.ref] && (
+              <div className="border-t border-[var(--border-subtle)]">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-[var(--bg)]">
+                      {["Barcode", "Price", "Qty", "Disc%", "Fabric Amt", "Article", "Order#", "Delivery", "Tail. Amt", "Emb. Amt", "Add-on", "Actions"].map(h => (
+                        <th key={h} className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.items.map(item => (
+                      <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D05]">
+                        <td className="px-3 py-2 text-xs max-w-[100px] truncate">
+                          {editingId === item.id ? <input value={editData.barcode||""} onChange={e => setEditData(p=>({...p, barcode: e.target.value}))} className="w-20 px-1 py-0.5 text-xs border border-[var(--brand)] rounded-sm" /> : item.barcode}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs">
+                          {editingId === item.id ? <input type="number" value={editData.price||""} onChange={e => setEditData(p=>({...p, price: parseFloat(e.target.value)||0}))} className="w-14 px-1 py-0.5 text-xs border border-[var(--brand)] rounded-sm" /> : `₹${fmt(item.price)}`}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs">
+                          {editingId === item.id ? <input type="number" step="0.1" value={editData.qty||""} onChange={e => setEditData(p=>({...p, qty: parseFloat(e.target.value)||0}))} className="w-12 px-1 py-0.5 text-xs border border-[var(--brand)] rounded-sm" /> : item.qty}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs">
+                          {editingId === item.id ? <input type="number" value={editData.discount||""} onChange={e => setEditData(p=>({...p, discount: parseFloat(e.target.value)||0}))} className="w-10 px-1 py-0.5 text-xs border border-[var(--brand)] rounded-sm" /> : (item.discount ? `${item.discount}%` : "-")}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs font-medium">₹{fmt(item.fabric_amount)}</td>
+                        <td className="px-3 py-2 text-xs">{item.article_type !== "N/A" ? item.article_type : "-"}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{item.order_no !== "N/A" ? item.order_no : "-"}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{item.delivery_date !== "N/A" ? item.delivery_date : "-"}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{item.tailoring_amount ? `₹${fmt(item.tailoring_amount)}` : "-"}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{item.embroidery_amount ? `₹${fmt(item.embroidery_amount)}` : "-"}</td>
+                        <td className="px-3 py-2 text-xs max-w-[80px] truncate">{item.addon_desc !== "N/A" ? item.addon_desc : "-"}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-0.5">
+                            {editingId === item.id ? (
+                              <>
+                                <button onClick={saveEdit} className="p-1 text-[var(--success)] hover:bg-[#455D4A10] rounded-sm"><FloppyDisk size={14} /></button>
+                                <button onClick={cancelEdit} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm"><X size={14} /></button>
+                              </>
+                            ) : (
+                              <>
+                                <button onClick={() => startEdit(item)} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm"><PencilSimple size={14} /></button>
+                                <button onClick={() => setDelConfirm(item)} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"><Trash size={14} /></button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
