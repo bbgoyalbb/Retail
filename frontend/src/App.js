@@ -13,6 +13,7 @@ import LabourPayments from "@/pages/LabourPayments";
 import ItemsManager from "@/pages/ItemsManager";
 import SearchPage from "@/pages/SearchPage";
 import Reports from "@/pages/Reports";
+import DataManager from "@/pages/DataManager";
 import { seedData } from "@/api";
 
 function AppShell() {
@@ -26,8 +27,8 @@ function AppShell() {
   return (
     <div className="flex h-screen overflow-hidden" data-testid="app-shell">
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} currentPage={currentPage} setCurrentPage={setCurrentPage} />
-      <main className={`flex-1 overflow-y-auto transition-all duration-200 ${sidebarOpen ? 'ml-0' : 'ml-0'}`}>
-        <div className="p-6 lg:p-8 max-w-[1600px] mx-auto">
+      <main className={`flex-1 overflow-y-auto transition-all duration-200`}>
+        <div className="p-4 pt-14 sm:p-6 sm:pt-6 lg:p-8 max-w-[1600px] mx-auto">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/new-bill" element={<NewBill />} />
@@ -40,6 +41,7 @@ function AppShell() {
             <Route path="/items" element={<ItemsManager />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/data" element={<DataManager />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

@@ -2,7 +2,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   House, Receipt, Scissors, PlusCircle, Kanban,
   CurrencyDollar, BookOpen, UsersThree, List, X,
-  MagnifyingGlass, Table, ChartBar, FilePdf
+  MagnifyingGlass, Table, ChartBar, FilePdf, Database
 } from "@phosphor-icons/react";
 
 const NAV_ITEMS = [
@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { key: "items", label: "Manage Items", icon: Table, path: "/items" },
   { key: "search", label: "Search", icon: MagnifyingGlass, path: "/search" },
   { key: "reports", label: "Reports", icon: ChartBar, path: "/reports" },
+  { key: "data", label: "Data Manager", icon: Database, path: "/data" },
 ];
 
 export default function Sidebar({ open, setOpen }) {
@@ -34,7 +35,7 @@ export default function Sidebar({ open, setOpen }) {
       {/* Mobile toggle */}
       <button
         data-testid="sidebar-toggle"
-        className="fixed top-4 left-4 z-50 lg:hidden p-2 rounded-sm bg-white border border-[var(--border-subtle)]"
+        className="fixed top-3 left-3 z-50 lg:hidden p-2.5 rounded-sm bg-white border border-[var(--border-subtle)] shadow-sm"
         onClick={() => setOpen(!open)}
       >
         {open ? <X size={20} /> : <List size={20} />}

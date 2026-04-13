@@ -51,4 +51,11 @@ export const getRevenueReport = (params) => api.get("/reports/revenue", { params
 export const getCustomerReport = () => api.get("/reports/customers");
 export const getSummaryReport = (params) => api.get("/reports/summary", { params });
 
+// Import / Export / Backup
+export const importExcel = (formData, mode) => api.post(`/import/excel?mode=${mode}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+export const exportExcelUrl = () => `${BACKEND_URL}/api/export/excel`;
+export const backupUrl = () => `${BACKEND_URL}/api/backup`;
+export const restoreBackup = (formData) => api.post("/restore", formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+export const getDbStats = () => api.get("/db/stats");
+
 export default api;

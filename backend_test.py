@@ -417,6 +417,241 @@ class RetailAPITester:
         
         return success1 and success2 and success3 and success4
 
+    def test_db_stats(self):
+        """Test database stats endpoint"""
+        success, result = self.test_api_endpoint('GET', '/db/stats')
+        self.log_test("Database Stats API", success, str(result) if not success else "")
+        
+        if success and isinstance(result, dict):
+            required_fields = ['items_count', 'advances_count']
+            missing_fields = [f for f in required_fields if f not in result]
+            if missing_fields:
+                self.log_test("DB Stats Structure", False, f"Missing fields: {missing_fields}")
+            else:
+                self.log_test("DB Stats Structure", True)
+                print(f"   📊 DB Stats - Items: {result['items_count']}, Advances: {result['advances_count']}")
+        
+        return success
+
+    def test_excel_export(self):
+        """Test Excel export functionality"""
+        url = f"{self.api_base}/export/excel"
+        try:
+            response = self.session.get(url)
+            success = response.status_code == 200
+            
+            if success:
+                # Check if it's actually an Excel file
+                content_type = response.headers.get('content-type', '')
+                content_disposition = response.headers.get('content-disposition', '')
+                
+                is_excel = (
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' in content_type or
+                    '.xlsx' in content_disposition
+                )
+                
+                if is_excel:
+                    file_size = len(response.content)
+                    self.log_test("Excel Export", True)
+                    print(f"   📊 Excel file exported, size: {file_size} bytes")
+                else:
+                    self.log_test("Excel Export", False, f"Invalid content type: {content_type}")
+                    success = False
+            else:
+                self.log_test("Excel Export", False, f"Status: {response.status_code}")
+            
+            return success
+            
+        except Exception as e:
+            self.log_test("Excel Export", False, str(e))
+            return False
+
+    def test_backup_restore(self):
+        """Test backup and restore functionality"""
+        # Test backup creation
+        backup_url = f"{self.api_base}/backup"
+        try:
+            backup_response = self.session.get(backup_url)
+            backup_success = backup_response.status_code == 200
+            
+            if backup_success:
+                # Check if it's a valid JSON backup
+                content_type = backup_response.headers.get('content-type', '')
+                is_json = 'application/json' in content_type
+                
+                if is_json:
+                    try:
+                        backup_data = backup_response.json()
+                        required_fields = ['items', 'advances', 'items_count', 'advances_count']
+                        missing_fields = [f for f in required_fields if f not in backup_data]
+                        
+                        if missing_fields:
+                            self.log_test("Backup Creation", False, f"Missing fields: {missing_fields}")
+                            return False
+                        else:
+                            backup_size = len(backup_response.content)
+                            self.log_test("Backup Creation", True)
+                            print(f"   💾 Backup created - Items: {backup_data['items_count']}, Advances: {backup_data['advances_count']}, Size: {backup_size} bytes")
+                            
+                            # Test restore functionality
+                            return self._test_restore_with_backup(backup_data)
+                    except Exception as e:
+                        self.log_test("Backup Creation", False, f"Invalid JSON: {str(e)}")
+                        return False
+                else:
+                    self.log_test("Backup Creation", False, f"Invalid content type: {content_type}")
+                    return False
+            else:
+                self.log_test("Backup Creation", False, f"Status: {backup_response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Backup Creation", False, str(e))
+            return False
+
+    def _test_restore_with_backup(self, backup_data):
+        """Test restore functionality with backup data"""
+        import tempfile
+        import json
+        
+        try:
+            # Create a temporary backup file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                json.dump(backup_data, f, indent=2, default=str)
+                temp_file_path = f.name
+            
+            # Test restore
+            restore_url = f"{self.api_base}/restore"
+            with open(temp_file_path, 'rb') as f:
+                files = {'file': ('test_backup.json', f, 'application/json')}
+                # Remove Content-Type header for file upload
+                headers = {k: v for k, v in self.session.headers.items() if k.lower() != 'content-type'}
+                response = requests.post(restore_url, files=files, headers=headers)
+            
+            # Clean up temp file
+            import os
+            os.unlink(temp_file_path)
+            
+            success = response.status_code == 200
+            if success:
+                try:
+                    result = response.json()
+                    if 'message' in result and 'items_count' in result and 'advances_count' in result:
+                        self.log_test("Backup Restore", True)
+                        print(f"   🔄 Restore completed - Items: {result['items_count']}, Advances: {result['advances_count']}")
+                    else:
+                        self.log_test("Backup Restore", False, "Invalid response structure")
+                        success = False
+                except:
+                    self.log_test("Backup Restore", False, "Invalid JSON response")
+                    success = False
+            else:
+                self.log_test("Backup Restore", False, f"Status: {response.status_code}, Response: {response.text[:200]}")
+            
+            return success
+            
+        except Exception as e:
+            self.log_test("Backup Restore", False, str(e))
+            return False
+
+    def test_excel_import(self):
+        """Test Excel import functionality"""
+        # Create a minimal test Excel file
+        try:
+            import openpyxl
+            import tempfile
+            
+            # Create a test workbook
+            wb = openpyxl.Workbook()
+            
+            # Create Item Details sheet
+            ws1 = wb.active
+            ws1.title = "Item Details"
+            
+            # Add headers (matching the expected format)
+            headers = [
+                "Date", "Name", "Ref.", "Items", "Price", "Qty", "Discount", "Fabric Amount",
+                "Tailoring?", "Article Type", "Order No.", "Delivery Date", "Tailoring Amount",
+                "Embroidery?", "Embroidery Amount", "Add-on", "Add-on Amount",
+                "Fabric Payment Mode", "Fabric Payment Date", "Fabric Pending Balance", "Fabric Payment Received",
+                "Labour Amount", "Labour Paid?", "Labour Payment Date",
+                "Tailoring Payment Mode", "Tailoring Payment Date", "Tailoring Payment Received", "Tailoring Pending Balance",
+                "Embroidery Payment Mode", "Embroidery Payment Date", "Embroidery Payment Received", "Embroidery Pending Balance",
+                "Add-On Payment Mode", "Add-On Payment Date", "Add-On Payment Received", "Add-On Pending Balance", "Karigar?"
+            ]
+            
+            for col, header in enumerate(headers, 1):
+                ws1.cell(row=1, column=col, value=header)
+            
+            # Add a test row
+            from datetime import date
+            test_row = [
+                date.today(), "TEST_IMPORT_CUSTOMER", "01/010125", "TEST_ITEM_001", 1000, 2.5, 5, 2375,
+                "N/A", "N/A", "N/A", "N/A", 0,
+                "N/A", 0, "N/A", 0,
+                "Pending", "N/A", 2375, 0,
+                0, "N/A", "N/A",
+                "N/A", "N/A", 0, 0,
+                "N/A", "N/A", 0, 0,
+                "N/A", "N/A", 0, 0, "N/A"
+            ]
+            
+            for col, value in enumerate(test_row, 1):
+                ws1.cell(row=2, column=col, value=value)
+            
+            # Create Advances sheet
+            ws2 = wb.create_sheet("Advances")
+            adv_headers = ["Advance Payment Date", "Name", "Ref", "Advance Payment Amount", "Advance Payment Mode"]
+            for col, header in enumerate(adv_headers, 1):
+                ws2.cell(row=1, column=col, value=header)
+            
+            # Add a test advance
+            adv_row = [date.today(), "TEST_IMPORT_CUSTOMER", "01/010125", 500, "Cash"]
+            for col, value in enumerate(adv_row, 1):
+                ws2.cell(row=2, column=col, value=value)
+            
+            # Save to temporary file
+            with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
+                wb.save(f.name)
+                temp_file_path = f.name
+            
+            # Test import with append mode first (safer)
+            import_url = f"{self.api_base}/import/excel?mode=append"
+            with open(temp_file_path, 'rb') as f:
+                files = {'file': ('test_import.xlsx', f, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')}
+                # Remove Content-Type header for file upload
+                headers = {k: v for k, v in self.session.headers.items() if k.lower() != 'content-type'}
+                response = requests.post(import_url, files=files, headers=headers)
+            
+            # Clean up temp file
+            import os
+            os.unlink(temp_file_path)
+            
+            success = response.status_code == 200
+            if success:
+                try:
+                    result = response.json()
+                    if 'message' in result and 'items_count' in result and 'advances_count' in result:
+                        self.log_test("Excel Import", True)
+                        print(f"   📊 Import completed - Items: {result['items_count']}, Advances: {result['advances_count']}")
+                    else:
+                        self.log_test("Excel Import", False, "Invalid response structure")
+                        success = False
+                except:
+                    self.log_test("Excel Import", False, "Invalid JSON response")
+                    success = False
+            else:
+                self.log_test("Excel Import", False, f"Status: {response.status_code}, Response: {response.text[:200]}")
+            
+            return success
+            
+        except ImportError:
+            self.log_test("Excel Import", False, "openpyxl not available for testing")
+            return False
+        except Exception as e:
+            self.log_test("Excel Import", False, str(e))
+            return False
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting VBA Retail Management API Tests")
@@ -449,6 +684,14 @@ class RetailAPITester:
         self.test_pdf_invoice()
         self.test_search_functionality()
         self.test_reports_functionality()
+        
+        # DATA MANAGEMENT FEATURES
+        print("\n📊 Testing Data Management Features:")
+        print("-" * 40)
+        self.test_db_stats()
+        self.test_excel_export()
+        self.test_backup_restore()
+        self.test_excel_import()
         
         # Print summary
         print("\n" + "=" * 60)

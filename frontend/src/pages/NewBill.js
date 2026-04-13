@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createBill, getCustomers } from "@/api";
-import { Plus, Trash, FloppyDisk, CheckCircle } from "@phosphor-icons/react";
+import { Plus, Trash, FloppyDisk, CheckCircle, Barcode } from "@phosphor-icons/react";
+import BarcodeScanner from "@/components/BarcodeScanner";
 
 const PAYMENT_MODES = ["Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer"];
 
@@ -20,6 +21,7 @@ export default function NewBill() {
   const [needsTailoring, setNeedsTailoring] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [showScanner, setShowScanner] = useState(false);
 
   useEffect(() => {
     getCustomers().then(res => setCustomers(res.data)).catch(() => {});
@@ -133,15 +135,33 @@ export default function NewBill() {
 
           {/* Add Item */}
           <h3 className="font-heading text-base font-medium pt-4">Add Items</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <input data-testid="barcode-input" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="Barcode / Item" className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" onKeyDown={e => handleKeyDown(e, () => document.getElementById('qty-input')?.focus())} />
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+            <div className="relative sm:col-span-1">
+              <input data-testid="barcode-input" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="Barcode / Item" className="w-full px-3 py-2 pr-10 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" onKeyDown={e => handleKeyDown(e, () => document.getElementById('qty-input')?.focus())} />
+              <button
+                data-testid="scan-barcode-btn"
+                onClick={() => setShowScanner(true)}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm transition-colors"
+                title="Scan barcode with camera"
+              >
+                <Barcode size={18} weight="duotone" />
+              </button>
+            </div>
             <input data-testid="qty-input" id="qty-input" value={qty} onChange={e => setQty(e.target.value)} placeholder="Qty (m)" type="number" step="0.1" className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" onKeyDown={e => handleKeyDown(e, () => document.getElementById('price-input')?.focus())} />
             <input data-testid="price-input" id="price-input" value={price} onChange={e => setPrice(e.target.value)} placeholder="Price/m" type="number" className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" onKeyDown={e => handleKeyDown(e, () => document.getElementById('discount-input')?.focus())} />
             <input data-testid="discount-input" id="discount-input" value={discount} onChange={e => setDiscount(e.target.value)} placeholder="Disc %" type="number" className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" onKeyDown={e => handleKeyDown(e, addItem)} />
-            <button data-testid="add-item-btn" onClick={addItem} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] transition-all duration-200 hover:translate-y-[-1px]">
+            <button data-testid="add-item-btn" onClick={addItem} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] transition-all duration-200 hover:translate-y-[-1px] sm:col-span-1">
               <Plus size={16} weight="bold" /> Add
             </button>
           </div>
+
+          {/* Barcode Scanner */}
+          {showScanner && (
+            <BarcodeScanner
+              onScan={(code) => { setBarcode(code); setShowScanner(false); }}
+              onClose={() => setShowScanner(false)}
+            />
+          )}
 
           {/* Items List */}
           {items.length > 0 && (
