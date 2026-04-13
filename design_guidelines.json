@@ -1,0 +1,93 @@
+{
+  "project_name": "Retail Tailoring & Fabric Business Management Dashboard",
+  "theme": "Light",
+  "archetype": "Archetype 1: Organic & Earthy",
+  "archetype_reasoning": "A tailoring shop deals with physical textiles, fabric, and craftsmen. A sterile tech dashboard feels foreign. Using warm sand, terracotta, and deep forest green creates a grounded, tactile, and trustworthy environment suitable for shop owners and karigars. The 'Control Room' density ensures high functionality.",
+  "typography": {
+    "heading_font": "Manrope",
+    "body_font": "IBM Plex Sans",
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl tracking-tight font-light",
+      "h2": "text-2xl sm:text-3xl tracking-tight font-medium",
+      "h3": "text-xl sm:text-2xl font-medium",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-sm sm:text-base leading-relaxed",
+      "labels_overlines": "text-xs uppercase tracking-[0.2em] font-semibold text-stone-500",
+      "data_numbers": "font-mono text-sm tracking-tight"
+    },
+    "rules": "Never use Inter. Headlines must be tightly tracked. Numbers in tables must use tabular-nums or monospace for alignment."
+  },
+  "colors": {
+    "background": "#F5F3EE",
+    "surface": "#FFFFFF",
+    "text_primary": "#2D2A26",
+    "text_secondary": "#6C6760",
+    "brand_primary": {
+      "DEFAULT": "#C86B4D",
+      "hover": "#B35A3E",
+      "foreground": "#FFFFFF"
+    },
+    "status": {
+      "success_tally": "#455D4A",
+      "warning_pending": "#D49842",
+      "info_active": "#5C8A9E",
+      "error": "#9E473D"
+    },
+    "border": {
+      "subtle": "#EBE8E1",
+      "strong": "#D6D1C4"
+    },
+    "rules": "The UI must feel like premium stationery or linen. Use sharp 1px borders instead of drop shadows to define boundaries. No 'muddy' grays; all grays must have warm undertones."
+  },
+  "layout_spacing": {
+    "philosophy": "The 'Control Room' Grid but with generous internal padding.",
+    "dashboard_shell": "Side navigation taking 15-20% width (hidden on mobile), main content 80-85%.",
+    "grid_system": "grid-cols-1 md:grid-cols-4 xl:grid-cols-12 gap-6",
+    "cards": "col-span-1 md:col-span-2 xl:col-span-3 for KPIs. col-span-12 or 8 for Data Tables.",
+    "padding": "Use generous padding inside bordered containers (p-6 or p-8). Keep gaps tight (gap-4 or gap-6) between containers.",
+    "radius": "rounded-sm (2px) or rounded-none to maintain a crisp, receipt/ledger-like structural feel.",
+    "shadows": "Avoid generic soft shadows. Use 1px sharp borders. For hover states, use an offset sharp shadow (e.g., 2px 2px 0px rgba(0,0,0,0.1))."
+  },
+  "components": {
+    "buttons": "Flat solid background. Text color must have 4.5:1 contrast. On hover, darken background slightly and maintain text contrast. Do not use pills; stick to rounded-sm.",
+    "cards": "Surface is pure white, 1px subtle border (#EBE8E1). No shadow. Inside padding p-6.",
+    "tables": "Shadcn UI tables heavily customized. Remove rounded corners. Header background should be subtle sand (#F5F3EE) with uppercase tracking-[0.1em] text. Rows must have a bottom border. Row hover should be a very faint terracotta tint (e.g., #C86B4D at 5% opacity).",
+    "forms_inputs": "Shadcn inputs. 1px border. On focus: ring-1 ring-terracotta (#C86B4D) and border-terracotta. No thick glowing rings.",
+    "status_badges": "Minimal. Instead of solid background pills, use an uppercase label with a colored dot preceding it (e.g., 🔴 Pending, 🟢 Reconciled) or subtle 10% opacity backgrounds with 1px borders of the same color.",
+    "tabs": "Shadcn Tabs. Do not use the default segmented control look. Use 'underline' style or clean text links with a terracotta active state."
+  },
+  "interactions_motion": {
+    "hover_states": "Buttons translate-y-[-1px] with a subtle sharp shadow. Table rows tint background.",
+    "transitions": "transition-all duration-200 ease-out.",
+    "loading": "Do not use spinning circles. Use a scanning line or skeleton loaders with a warm gradient."
+  },
+  "icons_assets": {
+    "icon_library": "@phosphor-icons/react",
+    "icon_style": "Duotone or Regular weight. Size 20px for general UI, 24px for sidebar.",
+    "media": {
+      "logo": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/f813632a-d4ef-45e5-9c67-fe9c01175218/images/dc8122dfb61f974926fbd129938ac6d035001c4207717108f9214e4b10d0e9ed.png",
+        "description": "Minimalist needle and thread geometric logo in dark terracotta on warm sand. Use for branding, sidebar header, and login screen."
+      },
+      "login_background": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/f813632a-d4ef-45e5-9c67-fe9c01175218/images/7f9698a7c2353305a7d36c432629eff68c07f81e541277deb66c4814c971039e.png",
+        "description": "Abstract close-up of woven cotton fabric in bone white. Use as a split-screen background for the login page to add texture and physical grounding."
+      }
+    }
+  },
+  "accessibility": {
+    "contrast": "All text must pass WCAG AA against its background. Terracotta and Forest Green must be dark enough to pass on white.",
+    "focus": "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-offset-1 focus-visible:ring-[#C86B4D].",
+    "testing": "CRITICAL: Every button, link, form input, and key data cell MUST have a data-testid attribute in kebab-case (e.g., data-testid='create-bill-btn')."
+  },
+  "instructions_to_main_agent": [
+    "INSTALLATION: You must install @phosphor-icons/react for the UI icons.",
+    "FILE EXTENSIONS: Ensure you use .js or .jsx for all React components (no .tsx). Modify shadcn generation if needed.",
+    "FONTS: Import 'Manrope' for headings and 'IBM Plex Sans' for body text via Google Fonts in index.css. Do NOT use Inter.",
+    "ARCHITECTURE: This is a robust dashboard. Create a layout shell with a collapsible or fixed left sidebar and a top header. The main content area should scroll independently.",
+    "COMPONENT USAGE: Rely heavily on Shadcn UI (Tables, Dialogs, Select, Forms, Tabs) but override the default Vercel-like styling to match the organic, crisp aesthetic defined in the 'colors' and 'layout_spacing' sections.",
+    "DATA HEAVY VIEWS: For views like 'Daybook', 'Job Work Tracker', and 'Payment Settlement', use wide tables (col-span-full). Do not compress them into cards. Let them breathe horizontally.",
+    "NEW BILL ENTRY: This should be an immersive view or large modal. The layout needs clear sections: Customer Info (top), Items Grid (middle), Payment/Summary (bottom).",
+    "THE TWIST: Add an subtle ASCII art or delicate SVG pattern in the 'Empty States' to make the tool feel like an artisanal ledger rather than a standard SaaS."
+  ]
+}
