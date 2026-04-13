@@ -176,7 +176,7 @@ export default function JobWork() {
         const updates = { item_ids: itemIds, new_status: "Finished" };
         if (!skips.emb_labour && values.emb_labour) updates.emb_labour_amount = parseFloat(values.emb_labour);
         if (!skips.emb_customer && values.emb_customer) updates.emb_customer_amount = parseFloat(values.emb_customer);
-        await api.post("/api/jobwork/move-emb", updates);
+        await api.post("/jobwork/move-emb", updates);
         setDialog(null);
         loadData();
       },

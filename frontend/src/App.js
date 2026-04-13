@@ -14,6 +14,7 @@ import ItemsManager from "@/pages/ItemsManager";
 import SearchPage from "@/pages/SearchPage";
 import Reports from "@/pages/Reports";
 import DataManager from "@/pages/DataManager";
+import SettingsPage from "@/pages/SettingsPage";
 import { seedData } from "@/api";
 
 function AppShell() {
@@ -42,6 +43,7 @@ function AppShell() {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/data" element={<DataManager />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

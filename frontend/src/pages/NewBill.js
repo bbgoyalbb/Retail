@@ -25,6 +25,7 @@ export default function NewBill() {
   const [lastBillRef, setLastBillRef] = useState(null);
 
   const nameRef = useRef(null);
+  const dateRef = useRef(null);
   const barcodeRef = useRef(null);
   const qtyRef = useRef(null);
   const priceRef = useRef(null);
@@ -109,12 +110,12 @@ export default function NewBill() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Customer Name</label>
-              <input ref={nameRef} data-testid="customer-name-input" list="customers-list" value={customerName} onChange={e => setCustomerName(e.target.value)} onKeyDown={e => enterNav(e, barcodeRef)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" placeholder="Customer name" />
+              <input ref={nameRef} data-testid="customer-name-input" list="customers-list" value={customerName} onChange={e => setCustomerName(e.target.value)} onKeyDown={e => enterNav(e, dateRef)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" placeholder="Customer name" />
               <datalist id="customers-list">{customers.map(c => <option key={c} value={c} />)}</datalist>
             </div>
             <div>
               <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Order Date</label>
-              <input data-testid="order-date-input" type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} onKeyDown={e => enterNav(e, barcodeRef)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" />
+              <input ref={dateRef} data-testid="order-date-input" type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} onKeyDown={e => enterNav(e, barcodeRef)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" />
             </div>
           </div>
 

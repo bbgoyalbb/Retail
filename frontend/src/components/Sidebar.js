@@ -2,7 +2,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   House, Receipt, Scissors, PlusCircle, Kanban,
   CurrencyDollar, BookOpen, UsersThree, List, X,
-  MagnifyingGlass, Table, ChartBar, FilePdf, Database
+  MagnifyingGlass, Table, ChartBar, FilePdf, Database, Gear
 } from "@phosphor-icons/react";
 
 const NAV_ITEMS = [
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { key: "search", label: "Search", icon: MagnifyingGlass, path: "/search" },
   { key: "reports", label: "Reports", icon: ChartBar, path: "/reports" },
   { key: "data", label: "Data Manager", icon: Database, path: "/data" },
+  { key: "settings", label: "Settings", icon: Gear, path: "/settings" },
 ];
 
 export default function Sidebar({ open, setOpen }) {

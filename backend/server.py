@@ -638,6 +638,80 @@ async def assign_tailoring(req: TailoringOrderRequest):
 
     return {"message": f"{updated} items assigned to order {req.order_no}"}
 
+class SplitItem(BaseModel):
+    article_type: str
+    qty: float
+    embroidery_status: str = "Not Required"
+
+class SplitTailoringRequest(BaseModel):
+    item_id: str
+    order_no: str
+    delivery_date: str
+    splits: List[SplitItem]
+
+@api_router.post("/tailoring/split")
+async def split_and_assign(req: SplitTailoringRequest):
+    item = await db.items.find_one({"id": req.item_id}, {"_id": 0})
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    original_qty = item.get("qty", 0)
+    original_price = item.get("price", 0)
+    original_discount = item.get("discount", 0)
+
+    created = 0
+    for idx, split in enumerate(req.splits):
+        rates = TAILORING_RATES.get(split.article_type, (0, 0))
+        tail_amt, labour_amt = rates
+
+        discounted_price = round(original_price - (original_price * original_discount / 100), 0)
+        split_fabric_amt = round(discounted_price * split.qty, 0)
+
+        if idx == 0:
+            # Update original item with first split
+            update = {
+                "qty": split.qty,
+                "fabric_amount": split_fabric_amt,
+                "fabric_pending": split_fabric_amt if item.get("fabric_pay_mode") == "Pending" else item.get("fabric_pending", 0),
+                "article_type": split.article_type,
+                "tailoring_status": "Pending",
+                "order_no": req.order_no,
+                "delivery_date": req.delivery_date,
+                "tailoring_amount": tail_amt,
+                "labour_amount": labour_amt,
+                "tailoring_pending": tail_amt,
+                "tailoring_pay_mode": "Pending",
+                "embroidery_status": split.embroidery_status,
+            }
+            if split.embroidery_status == "Required":
+                update["embroidery_pay_mode"] = "Pending"
+            await db.items.update_one({"id": req.item_id}, {"$set": update})
+        else:
+            # Create new items for subsequent splits
+            new_item = {**item}
+            new_item.pop("_id", None)
+            new_item["id"] = str(uuid.uuid4())
+            new_item["qty"] = split.qty
+            new_item["fabric_amount"] = split_fabric_amt
+            new_item["fabric_pending"] = split_fabric_amt if item.get("fabric_pay_mode") == "Pending" else 0
+            new_item["article_type"] = split.article_type
+            new_item["tailoring_status"] = "Pending"
+            new_item["order_no"] = req.order_no
+            new_item["delivery_date"] = req.delivery_date
+            new_item["tailoring_amount"] = tail_amt
+            new_item["labour_amount"] = labour_amt
+            new_item["tailoring_pending"] = tail_amt
+            new_item["tailoring_pay_mode"] = "Pending"
+            new_item["embroidery_status"] = split.embroidery_status
+            if split.embroidery_status == "Required":
+                new_item["embroidery_pay_mode"] = "Pending"
+            new_item["created_at"] = datetime.now(timezone.utc).isoformat()
+            await db.items.insert_one(new_item)
+
+        created += 1
+
+    return {"message": f"Item split into {created} pieces for order {req.order_no}"}
+
 # ==========================================
 # ADDONS
 # ==========================================
@@ -1300,7 +1374,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
     elements.append(fab_table)
 
     # ---- SECTION 2: TAILORING (if any) ----
-    tail_items = [i for i in items if i.get("tailoring_status") not in ("N/A", None, "")]
+    tail_items = [i for i in items if i.get("tailoring_status") not in ("N/A", None, "", "Awaiting Order") and i.get("tailoring_amount", 0) > 0]
     if tail_items:
         elements.append(Paragraph("B. Tailoring", heading_style))
         tail_data = [["#", "Article", "Order#", "Delivery", "Tailoring Amt", "Labour Amt", "Payment"]]
@@ -1426,28 +1500,30 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
     total_pending = fab_pending + tail_pending_amt + emb_pending_amt + addon_pending_amt
     net_with_advance = total_pending - max(total_adv, 0)
 
-    sum_data = [
-        ["Category", "Total", "Received", "Pending"],
-        ["Fabric (incl. GST 5%)", f"{fab_total:,.0f}", f"{fab_received:,.0f}", f"{fab_pending:,.0f}"],
-        ["Tailoring", f"{tail_total_amt:,.0f}", f"{tail_received:,.0f}", f"{tail_pending_amt:,.0f}"],
-        ["Embroidery", f"{emb_total_amt:,.0f}", f"{emb_received:,.0f}", f"{emb_pending_amt:,.0f}"],
-        ["Add-ons", f"{addon_total_amt:,.0f}", f"{addon_received:,.0f}", f"{addon_pending_amt:,.0f}"],
-        ["", "", "", ""],
-        ["GRAND TOTAL", f"{grand_total:,.0f}", f"{total_received:,.0f}", f"{total_pending:,.0f}"],
-    ]
+    sum_data = [["Category", "Total", "Received", "Pending"]]
+    sum_data.append(["Fabric (incl. GST 5%)", f"{fab_total:,.0f}", f"{fab_received:,.0f}", f"{fab_pending:,.0f}"])
+    if tail_total_amt > 0:
+        sum_data.append(["Tailoring", f"{tail_total_amt:,.0f}", f"{tail_received:,.0f}", f"{tail_pending_amt:,.0f}"])
+    if emb_total_amt > 0:
+        sum_data.append(["Embroidery", f"{emb_total_amt:,.0f}", f"{emb_received:,.0f}", f"{emb_pending_amt:,.0f}"])
+    if addon_total_amt > 0:
+        sum_data.append(["Add-ons", f"{addon_total_amt:,.0f}", f"{addon_received:,.0f}", f"{addon_pending_amt:,.0f}"])
+    sum_data.append(["", "", "", ""])
+    sum_data.append(["GRAND TOTAL", f"{grand_total:,.0f}", f"{total_received:,.0f}", f"{total_pending:,.0f}"])
     if total_adv > 0:
         sum_data.append(["Less: Advance", "", f"{total_adv:,.0f}", ""])
         sum_data.append(["NET PAYABLE", "", "", f"{net_with_advance:,.0f}"])
 
+    total_row_idx = len(sum_data) - (3 if total_adv > 0 else 1)
     sum_table = Table(sum_data, colWidths=[120, 90, 90, 90])
     sum_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), hdr_fill),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
         ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('GRID', (0,0), (-1,4), 0.3, border_c),
+        ('GRID', (0,0), (-1,total_row_idx-1), 0.3, border_c),
         ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
-        ('FONTNAME', (0,6), (-1,6), 'Helvetica-Bold'),
-        ('LINEABOVE', (0,6), (-1,6), 0.8, txt),
+        ('FONTNAME', (0,total_row_idx), (-1,total_row_idx), 'Helvetica-Bold'),
+        ('LINEABOVE', (0,total_row_idx), (-1,total_row_idx), 0.8, txt),
         ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
         ('TEXTCOLOR', (3,-1), (3,-1), brand),
         ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3),
@@ -1902,6 +1978,38 @@ async def get_db_stats():
         "advances_count": advances_count,
         "db_name": os.environ.get('DB_NAME', 'unknown'),
     }
+
+# ==========================================
+# SETTINGS
+# ==========================================
+
+DEFAULT_SETTINGS = {
+    "article_types": ARTICLE_TYPES,
+    "tailoring_rates": {k: {"tailoring": v[0], "labour": v[1]} for k, v in TAILORING_RATES.items()},
+    "payment_modes": PAYMENT_MODES,
+    "addon_items": ADDON_ITEMS,
+    "gst_rate": 5.0,
+    "firm_name": "Narwana Agencies",
+    "firm_address": "Jasmeet Nagar, Near Kalka Chowk, Ambala City, Pin: 134003, Haryana",
+    "firm_phones": "9467902343, 7056212655",
+    "firm_gstin": "06ADMPG9353K1Z4",
+}
+
+@api_router.get("/settings")
+async def get_settings():
+    settings = await db.settings.find_one({"key": "app_settings"}, {"_id": 0})
+    if not settings:
+        return DEFAULT_SETTINGS
+    settings.pop("key", None)
+    return settings
+
+@api_router.put("/settings")
+async def update_settings(data: dict):
+    data["key"] = "app_settings"
+    await db.settings.update_one({"key": "app_settings"}, {"$set": data}, upsert=True)
+    settings = await db.settings.find_one({"key": "app_settings"}, {"_id": 0})
+    settings.pop("key", None)
+    return settings
 
 # ==========================================
 # HEALTH

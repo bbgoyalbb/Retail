@@ -15,6 +15,7 @@ export const createBill = (data) => api.post("/bills", data);
 
 export const getAwaitingOrders = () => api.get("/tailoring/awaiting");
 export const assignTailoring = (data) => api.post("/tailoring/assign", data);
+export const splitTailoring = (data) => api.post("/tailoring/split", data);
 
 export const addAddons = (data) => api.post("/addons", data);
 
@@ -57,5 +58,9 @@ export const exportExcelUrl = () => `${BACKEND_URL}/api/export/excel`;
 export const backupUrl = () => `${BACKEND_URL}/api/backup`;
 export const restoreBackup = (formData) => api.post("/restore", formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const getDbStats = () => api.get("/db/stats");
+
+// Settings
+export const getSettings = () => api.get("/settings");
+export const updateSettings = (data) => api.put("/settings", data);
 
 export default api;
