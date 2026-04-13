@@ -1,15 +1,18 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import io
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, date
 from bson import ObjectId
+import re
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -99,6 +102,34 @@ class LabourPaymentRequest(BaseModel):
     labour_type: str  # "tailoring" or "embroidery"
     payment_date: str
     payment_modes: List[str]
+
+class ItemUpdateRequest(BaseModel):
+    barcode: Optional[str] = None
+    price: Optional[float] = None
+    qty: Optional[float] = None
+    discount: Optional[float] = None
+    fabric_amount: Optional[float] = None
+    name: Optional[str] = None
+    date: Optional[str] = None
+    tailoring_status: Optional[str] = None
+    article_type: Optional[str] = None
+    order_no: Optional[str] = None
+    delivery_date: Optional[str] = None
+    tailoring_amount: Optional[float] = None
+    embroidery_status: Optional[str] = None
+    embroidery_amount: Optional[float] = None
+    addon_desc: Optional[str] = None
+    addon_amount: Optional[float] = None
+    fabric_pay_mode: Optional[str] = None
+    fabric_pending: Optional[float] = None
+    fabric_received: Optional[float] = None
+    tailoring_pay_mode: Optional[str] = None
+    tailoring_pending: Optional[float] = None
+    tailoring_received: Optional[float] = None
+    embroidery_pay_mode: Optional[str] = None
+    embroidery_pending: Optional[float] = None
+    embroidery_received: Optional[float] = None
+    karigar: Optional[str] = None
 
 # ==========================================
 # HELPERS
@@ -1037,6 +1068,379 @@ async def get_advances(name: Optional[str] = None, ref: Optional[str] = None):
 async def get_order_numbers():
     orders = await db.items.distinct("order_no", {"order_no": {"$nin": ["N/A", "", None]}})
     return sorted([o for o in orders if o])
+
+# ==========================================
+# ITEM EDIT & DELETE
+# ==========================================
+
+@api_router.put("/items/{item_id}")
+async def update_item(item_id: str, req: ItemUpdateRequest):
+    item = await db.items.find_one({"id": item_id})
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    update_fields = {}
+    for field, value in req.model_dump(exclude_unset=True).items():
+        if value is not None:
+            update_fields[field] = value
+
+    # Recalculate fabric_amount if price/qty/discount changed
+    if any(f in update_fields for f in ["price", "qty", "discount"]):
+        p = update_fields.get("price", item.get("price", 0))
+        q = update_fields.get("qty", item.get("qty", 0))
+        d = update_fields.get("discount", item.get("discount", 0))
+        update_fields["fabric_amount"] = round((p - (p * d / 100)) * q, 0)
+
+    if update_fields:
+        await db.items.update_one({"id": item_id}, {"$set": update_fields})
+
+    updated = await db.items.find_one({"id": item_id}, {"_id": 0})
+    return updated
+
+@api_router.delete("/items/{item_id}")
+async def delete_item(item_id: str):
+    result = await db.items.delete_one({"id": item_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return {"message": "Item deleted"}
+
+@api_router.delete("/items/bulk/delete")
+async def bulk_delete_items(item_ids: List[str]):
+    result = await db.items.delete_many({"id": {"$in": item_ids}})
+    return {"message": f"{result.deleted_count} items deleted"}
+
+# ==========================================
+# SEARCH
+# ==========================================
+
+@api_router.get("/search")
+async def search_items(
+    q: str = "",
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    customer: Optional[str] = None,
+    status: Optional[str] = None,
+    payment_status: Optional[str] = None,
+    min_amount: Optional[float] = None,
+    max_amount: Optional[float] = None,
+    limit: int = 100,
+    skip: int = 0,
+):
+    query = {}
+
+    if q:
+        query["$or"] = [
+            {"name": {"$regex": q, "$options": "i"}},
+            {"barcode": {"$regex": q, "$options": "i"}},
+            {"ref": {"$regex": q, "$options": "i"}},
+            {"article_type": {"$regex": q, "$options": "i"}},
+            {"order_no": {"$regex": q, "$options": "i"}},
+            {"karigar": {"$regex": q, "$options": "i"}},
+            {"addon_desc": {"$regex": q, "$options": "i"}},
+        ]
+
+    if customer and customer != "All":
+        query["name"] = customer
+
+    if date_from:
+        query.setdefault("date", {})["$gte"] = date_from
+    if date_to:
+        query.setdefault("date", {})["$lte"] = date_to
+
+    if status and status != "All":
+        if status in ["Pending", "Stitched", "Delivered", "Awaiting Order", "N/A"]:
+            query["tailoring_status"] = status
+        elif status in ["Required", "In Progress", "Finished", "Not Required"]:
+            query["embroidery_status"] = status
+
+    if payment_status and payment_status != "All":
+        if payment_status == "Settled":
+            query["fabric_pay_mode"] = {"$regex": "^Settled", "$options": "i"}
+        elif payment_status == "Pending":
+            query["fabric_pay_mode"] = "Pending"
+
+    if min_amount is not None:
+        query.setdefault("fabric_amount", {})["$gte"] = min_amount
+    if max_amount is not None:
+        query.setdefault("fabric_amount", {})["$lte"] = max_amount
+
+    items = await db.items.find(query, {"_id": 0}).sort("date", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.items.count_documents(query)
+    return {"items": items, "total": total}
+
+# ==========================================
+# PDF INVOICE GENERATION
+# ==========================================
+
+@api_router.get("/invoice")
+async def generate_invoice(ref_id: str = Query(..., alias="ref")):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    items = await db.items.find({"ref": ref_id}, {"_id": 0}).to_list(100)
+    if not items:
+        raise HTTPException(status_code=404, detail="No items found for this reference")
+
+    advances = await db.advances.find({"ref": ref_id}, {"_id": 0}).to_list(50)
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=15*mm, bottomMargin=15*mm, leftMargin=15*mm, rightMargin=15*mm)
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('CustomTitle', parent=styles['Title'], fontSize=18, textColor=colors.HexColor('#C86B4D'), spaceAfter=3*mm)
+    subtitle_style = ParagraphStyle('CustomSubtitle', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#6C6760'))
+    heading_style = ParagraphStyle('CustomHeading', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#2D2A26'), spaceBefore=6*mm)
+
+    elements = []
+
+    # Header
+    elements.append(Paragraph("Retail Book", title_style))
+    elements.append(Paragraph("Fabric & Tailoring", subtitle_style))
+    elements.append(Spacer(1, 5*mm))
+
+    # Invoice Info
+    customer_name = items[0].get("name", "N/A")
+    order_date = items[0].get("date", "N/A")
+
+    info_data = [
+        ["Customer:", customer_name, "Reference:", ref_id],
+        ["Date:", order_date, "Items:", str(len(items))],
+    ]
+    info_table = Table(info_data, colWidths=[60, 170, 60, 170])
+    info_table.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#2D2A26')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 5*mm))
+
+    # Items Table
+    elements.append(Paragraph("Items", heading_style))
+    table_data = [["#", "Item/Barcode", "Price", "Qty", "Disc%", "Fabric Amt", "Article", "Status"]]
+
+    grand_total = 0
+    for i, item in enumerate(items, 1):
+        fab_amt = item.get("fabric_amount", 0)
+        grand_total += fab_amt
+        table_data.append([
+            str(i),
+            str(item.get("barcode", ""))[:20],
+            f"Rs.{item.get('price', 0):,.0f}",
+            f"{item.get('qty', 0)}",
+            f"{item.get('discount', 0)}%",
+            f"Rs.{fab_amt:,.0f}",
+            str(item.get("article_type", "N/A")),
+            "Settled" if str(item.get("fabric_pay_mode", "")).startswith("Settled") else "Pending",
+        ])
+
+    table_data.append(["", "", "", "", "", f"Rs.{grand_total:,.0f}", "", ""])
+
+    items_table = Table(table_data, colWidths=[25, 110, 60, 35, 35, 70, 65, 55])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F5F3EE')),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#2D2A26')),
+        ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#EBE8E1')),
+        ('ALIGN', (2, 0), (5, -1), 'RIGHT'),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('LINEABOVE', (0, -1), (-1, -1), 1, colors.HexColor('#2D2A26')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(items_table)
+
+    # Payment Summary
+    elements.append(Spacer(1, 5*mm))
+    elements.append(Paragraph("Payment Summary", heading_style))
+
+    total_received = sum(item.get("fabric_received", 0) for item in items)
+    total_pending = sum(item.get("fabric_pending", 0) for item in items)
+    total_tail = sum(item.get("tailoring_amount", 0) for item in items)
+    total_tail_received = sum(item.get("tailoring_received", 0) for item in items)
+
+    pay_data = [
+        ["Category", "Amount", "Received", "Pending"],
+        ["Fabric", f"Rs.{grand_total:,.0f}", f"Rs.{total_received:,.0f}", f"Rs.{total_pending:,.0f}"],
+        ["Tailoring", f"Rs.{total_tail:,.0f}", f"Rs.{total_tail_received:,.0f}", f"Rs.{total_tail - total_tail_received:,.0f}"],
+    ]
+
+    total_adv = sum(a.get("amount", 0) for a in advances)
+    if total_adv != 0:
+        pay_data.append(["Advances", "", f"Rs.{total_adv:,.0f}", ""])
+
+    pay_table = Table(pay_data, colWidths=[100, 100, 100, 100])
+    pay_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F5F3EE')),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#2D2A26')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#EBE8E1')),
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(pay_table)
+
+    # Footer
+    elements.append(Spacer(1, 10*mm))
+    elements.append(Paragraph(f"Generated on {datetime.now().strftime('%d-%m-%Y %H:%M')}", subtitle_style))
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    safe_ref = ref_id.replace("/", "_")
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=invoice_{safe_ref}.pdf"}
+    )
+
+# ==========================================
+# REPORTS & ANALYTICS
+# ==========================================
+
+@api_router.get("/reports/revenue")
+async def get_revenue_report(period: str = "daily", date_from: Optional[str] = None, date_to: Optional[str] = None):
+    match_query = {}
+    if date_from:
+        match_query.setdefault("date", {})["$gte"] = date_from
+    if date_to:
+        match_query.setdefault("date", {})["$lte"] = date_to
+
+    pipeline = [
+        {"$match": match_query} if match_query else {"$match": {}},
+        {"$group": {
+            "_id": "$date",
+            "fabric_total": {"$sum": "$fabric_amount"},
+            "fabric_received": {"$sum": "$fabric_received"},
+            "tailoring_total": {"$sum": "$tailoring_amount"},
+            "tailoring_received": {"$sum": "$tailoring_received"},
+            "embroidery_total": {"$sum": "$embroidery_amount"},
+            "embroidery_received": {"$sum": "$embroidery_received"},
+            "addon_total": {"$sum": "$addon_amount"},
+            "count": {"$sum": 1},
+        }},
+        {"$sort": {"_id": 1}},
+    ]
+
+    daily = await db.items.aggregate(pipeline).to_list(1000)
+
+    if period == "weekly":
+        weekly = {}
+        for d in daily:
+            try:
+                dt = datetime.strptime(d["_id"], "%Y-%m-%d")
+                week_start = dt.strftime("%Y-W%W")
+                if week_start not in weekly:
+                    weekly[week_start] = {"_id": week_start, "fabric_total": 0, "fabric_received": 0, "tailoring_total": 0, "tailoring_received": 0, "embroidery_total": 0, "embroidery_received": 0, "addon_total": 0, "count": 0}
+                for k in ["fabric_total", "fabric_received", "tailoring_total", "tailoring_received", "embroidery_total", "embroidery_received", "addon_total", "count"]:
+                    weekly[week_start][k] += d[k]
+            except Exception:
+                pass
+        return list(weekly.values())
+
+    if period == "monthly":
+        monthly = {}
+        for d in daily:
+            month_key = d["_id"][:7] if d["_id"] else "unknown"
+            if month_key not in monthly:
+                monthly[month_key] = {"_id": month_key, "fabric_total": 0, "fabric_received": 0, "tailoring_total": 0, "tailoring_received": 0, "embroidery_total": 0, "embroidery_received": 0, "addon_total": 0, "count": 0}
+            for k in ["fabric_total", "fabric_received", "tailoring_total", "tailoring_received", "embroidery_total", "embroidery_received", "addon_total", "count"]:
+                monthly[month_key][k] += d[k]
+        return list(monthly.values())
+
+    return daily
+
+@api_router.get("/reports/customers")
+async def get_customer_report():
+    pipeline = [
+        {"$group": {
+            "_id": "$name",
+            "total_fabric": {"$sum": "$fabric_amount"},
+            "total_received": {"$sum": "$fabric_received"},
+            "total_pending": {"$sum": "$fabric_pending"},
+            "total_tailoring": {"$sum": "$tailoring_amount"},
+            "items_count": {"$sum": 1},
+            "refs": {"$addToSet": "$ref"},
+        }},
+        {"$sort": {"total_fabric": -1}},
+    ]
+    result = await db.items.aggregate(pipeline).to_list(200)
+    return [
+        {
+            "name": r["_id"],
+            "total_fabric": r["total_fabric"],
+            "total_received": r["total_received"],
+            "total_pending": r["total_pending"],
+            "total_tailoring": r["total_tailoring"],
+            "items_count": r["items_count"],
+            "refs_count": len(r["refs"]),
+        }
+        for r in result if r["_id"]
+    ]
+
+@api_router.get("/reports/summary")
+async def get_summary_report(date_from: Optional[str] = None, date_to: Optional[str] = None):
+    match_query = {}
+    if date_from:
+        match_query.setdefault("date", {})["$gte"] = date_from
+    if date_to:
+        match_query.setdefault("date", {})["$lte"] = date_to
+
+    items = await db.items.find(match_query if match_query else {}, {"_id": 0}).to_list(5000)
+    advances = await db.advances.find({}, {"_id": 0}).to_list(500)
+
+    total_fabric = sum(i.get("fabric_amount", 0) for i in items)
+    total_fabric_received = sum(i.get("fabric_received", 0) for i in items)
+    total_fabric_pending = sum(i.get("fabric_pending", 0) for i in items if i.get("fabric_pay_mode") == "Pending")
+    total_tailoring = sum(i.get("tailoring_amount", 0) for i in items)
+    total_tailoring_received = sum(i.get("tailoring_received", 0) for i in items)
+    total_tailoring_pending = sum(i.get("tailoring_pending", 0) for i in items if i.get("tailoring_pay_mode") == "Pending")
+    total_embroidery = sum(i.get("embroidery_amount", 0) for i in items)
+    total_embroidery_received = sum(i.get("embroidery_received", 0) for i in items)
+    total_addon = sum(i.get("addon_amount", 0) for i in items)
+    total_advance = sum(a.get("amount", 0) for a in advances)
+
+    # Payment mode breakdown
+    mode_counts = {}
+    for i in items:
+        mode = i.get("fabric_pay_mode", "N/A")
+        if mode.startswith("Settled"):
+            parts = mode.replace("Settled - ", "").split(", ")
+            for p in parts:
+                p = p.strip()
+                if p:
+                    mode_counts[p] = mode_counts.get(p, 0) + i.get("fabric_received", 0)
+
+    # Article type breakdown
+    article_counts = {}
+    for i in items:
+        at = i.get("article_type", "N/A")
+        if at != "N/A":
+            article_counts[at] = article_counts.get(at, 0) + 1
+
+    return {
+        "total_fabric": total_fabric,
+        "total_fabric_received": total_fabric_received,
+        "total_fabric_pending": total_fabric_pending,
+        "total_tailoring": total_tailoring,
+        "total_tailoring_received": total_tailoring_received,
+        "total_tailoring_pending": total_tailoring_pending,
+        "total_embroidery": total_embroidery,
+        "total_embroidery_received": total_embroidery_received,
+        "total_addon": total_addon,
+        "total_advance": total_advance,
+        "total_items": len(items),
+        "payment_modes": [{"mode": k, "amount": v} for k, v in sorted(mode_counts.items(), key=lambda x: -x[1])],
+        "article_types": [{"type": k, "count": v} for k, v in sorted(article_counts.items(), key=lambda x: -x[1])],
+    }
 
 # ==========================================
 # HEALTH

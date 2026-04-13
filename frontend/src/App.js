@@ -10,6 +10,9 @@ import JobWork from "@/pages/JobWork";
 import Settlements from "@/pages/Settlements";
 import Daybook from "@/pages/Daybook";
 import LabourPayments from "@/pages/LabourPayments";
+import ItemsManager from "@/pages/ItemsManager";
+import SearchPage from "@/pages/SearchPage";
+import Reports from "@/pages/Reports";
 import { seedData } from "@/api";
 
 function AppShell() {
@@ -34,6 +37,9 @@ function AppShell() {
             <Route path="/settlements" element={<Settlements />} />
             <Route path="/daybook" element={<Daybook />} />
             <Route path="/labour" element={<LabourPayments />} />
+            <Route path="/items" element={<ItemsManager />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/reports" element={<Reports />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

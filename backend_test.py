@@ -246,6 +246,177 @@ class RetailAPITester:
         
         return success
 
+    def test_item_edit_delete(self):
+        """Test item editing and deletion functionality"""
+        # First get an item to edit
+        success, result = self.test_api_endpoint('GET', '/items', params={'limit': 1})
+        if not success or not isinstance(result, dict) or not result.get('items'):
+            self.log_test("Item Edit/Delete Setup", False, "No items found to test with")
+            return False
+        
+        item = result['items'][0]
+        item_id = item['id']
+        original_price = item.get('price', 0)
+        
+        # Test item update
+        update_data = {
+            "price": original_price + 100,
+            "qty": 2.0,
+            "discount": 10.0
+        }
+        
+        success1, result1 = self.test_api_endpoint('PUT', f'/items/{item_id}', data=update_data)
+        self.log_test("Item Update (PUT)", success1, str(result1) if not success1 else "")
+        
+        if success1 and isinstance(result1, dict):
+            # Verify fabric_amount was recalculated
+            expected_fabric = (update_data['price'] - (update_data['price'] * update_data['discount'] / 100)) * update_data['qty']
+            actual_fabric = result1.get('fabric_amount', 0)
+            if abs(actual_fabric - expected_fabric) < 1:  # Allow small rounding differences
+                self.log_test("Item Update Calculation", True)
+                print(f"   💰 Fabric amount recalculated: ₹{actual_fabric}")
+            else:
+                self.log_test("Item Update Calculation", False, f"Expected ₹{expected_fabric}, got ₹{actual_fabric}")
+        
+        # Test item deletion (create a test item first to avoid deleting real data)
+        test_bill_data = {
+            "customer_name": "DELETE_TEST_CUSTOMER",
+            "date": date.today().isoformat(),
+            "payment_date": date.today().isoformat(),
+            "items": [{"barcode": "DELETE_TEST", "qty": 1, "price": 100, "discount": 0}],
+            "payment_modes": ["Cash"],
+            "amount_paid": 0,
+            "is_settled": False,
+            "needs_tailoring": False
+        }
+        
+        success2, bill_result = self.test_api_endpoint('POST', '/bills', data=test_bill_data)
+        if success2:
+            # Get the created item to delete
+            success3, items_result = self.test_api_endpoint('GET', '/items', params={'name': 'DELETE_TEST_CUSTOMER'})
+            if success3 and items_result.get('items'):
+                test_item_id = items_result['items'][0]['id']
+                success4, delete_result = self.test_api_endpoint('DELETE', f'/items/{test_item_id}')
+                self.log_test("Item Delete", success4, str(delete_result) if not success4 else "")
+                
+                # Verify item was deleted
+                success5, verify_result = self.test_api_endpoint('GET', f'/items/{test_item_id}', expected_status=404)
+                self.log_test("Item Delete Verification", success5, str(verify_result) if not success5 else "")
+                
+                return success1 and success4 and success5
+        
+        return success1
+
+    def test_pdf_invoice(self):
+        """Test PDF invoice generation"""
+        # First get a reference number to test with
+        success, result = self.test_api_endpoint('GET', '/items', params={'limit': 1})
+        if not success or not isinstance(result, dict) or not result.get('items'):
+            self.log_test("PDF Invoice Setup", False, "No items found to test with")
+            return False
+        
+        ref = result['items'][0].get('ref')
+        if not ref:
+            self.log_test("PDF Invoice Setup", False, "No reference found")
+            return False
+        
+        # Test PDF generation
+        url = f"{self.api_base}/invoice?ref={ref}"
+        try:
+            response = self.session.get(url)
+            success = response.status_code == 200 and response.headers.get('content-type') == 'application/pdf'
+            
+            if success:
+                pdf_size = len(response.content)
+                self.log_test("PDF Invoice Generation", True)
+                print(f"   📄 PDF generated for ref {ref}, size: {pdf_size} bytes")
+            else:
+                self.log_test("PDF Invoice Generation", False, 
+                            f"Status: {response.status_code}, Content-Type: {response.headers.get('content-type')}")
+            
+            return success
+            
+        except Exception as e:
+            self.log_test("PDF Invoice Generation", False, str(e))
+            return False
+
+    def test_search_functionality(self):
+        """Test search functionality"""
+        # Test basic search
+        success1, result1 = self.test_api_endpoint('GET', '/search', params={'q': 'Ambala', 'limit': 10})
+        self.log_test("Search by Query", success1, str(result1) if not success1 else "")
+        
+        if success1 and isinstance(result1, dict):
+            items = result1.get('items', [])
+            total = result1.get('total', 0)
+            print(f"   🔍 Search 'Ambala' found {len(items)} items (total: {total})")
+        
+        # Test search with filters
+        success2, result2 = self.test_api_endpoint('GET', '/search', params={
+            'q': '',
+            'customer': 'Cash',
+            'payment_status': 'Settled',
+            'limit': 10
+        })
+        self.log_test("Search with Filters", success2, str(result2) if not success2 else "")
+        
+        if success2 and isinstance(result2, dict):
+            items = result2.get('items', [])
+            total = result2.get('total', 0)
+            print(f"   🔍 Filtered search found {len(items)} items (total: {total})")
+        
+        # Test search with date range
+        success3, result3 = self.test_api_endpoint('GET', '/search', params={
+            'q': '',
+            'date_from': '2024-01-01',
+            'date_to': '2024-12-31',
+            'limit': 5
+        })
+        self.log_test("Search with Date Range", success3, str(result3) if not success3 else "")
+        
+        return success1 and success2 and success3
+
+    def test_reports_functionality(self):
+        """Test reports and analytics functionality"""
+        # Test summary report
+        success1, result1 = self.test_api_endpoint('GET', '/reports/summary')
+        self.log_test("Reports Summary", success1, str(result1) if not success1 else "")
+        
+        if success1 and isinstance(result1, dict):
+            required_fields = ['total_fabric', 'total_items', 'payment_modes', 'article_types']
+            missing_fields = [f for f in required_fields if f not in result1]
+            if missing_fields:
+                self.log_test("Reports Summary Structure", False, f"Missing fields: {missing_fields}")
+            else:
+                self.log_test("Reports Summary Structure", True)
+                print(f"   📊 Summary - Items: {result1['total_items']}, Fabric: ₹{result1['total_fabric']}")
+        
+        # Test daily revenue report
+        success2, result2 = self.test_api_endpoint('GET', '/reports/revenue', params={'period': 'daily'})
+        self.log_test("Revenue Report Daily", success2, str(result2) if not success2 else "")
+        
+        if success2 and isinstance(result2, list):
+            print(f"   📈 Daily revenue data: {len(result2)} entries")
+        
+        # Test monthly revenue report
+        success3, result3 = self.test_api_endpoint('GET', '/reports/revenue', params={'period': 'monthly'})
+        self.log_test("Revenue Report Monthly", success3, str(result3) if not success3 else "")
+        
+        if success3 and isinstance(result3, list):
+            print(f"   📈 Monthly revenue data: {len(result3)} entries")
+        
+        # Test customer report
+        success4, result4 = self.test_api_endpoint('GET', '/reports/customers')
+        self.log_test("Customer Report", success4, str(result4) if not success4 else "")
+        
+        if success4 and isinstance(result4, list):
+            print(f"   👥 Customer ranking: {len(result4)} customers")
+            if result4:
+                top_customer = result4[0]
+                print(f"   🏆 Top customer: {top_customer.get('name')} - ₹{top_customer.get('total_fabric', 0)}")
+        
+        return success1 and success2 and success3 and success4
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting VBA Retail Management API Tests")
@@ -270,6 +441,14 @@ class RetailAPITester:
         
         # Data creation test
         self.test_create_bill_flow()
+        
+        # NEW FEATURES TESTING
+        print("\n🆕 Testing New Features:")
+        print("-" * 40)
+        self.test_item_edit_delete()
+        self.test_pdf_invoice()
+        self.test_search_functionality()
+        self.test_reports_functionality()
         
         # Print summary
         print("\n" + "=" * 60)

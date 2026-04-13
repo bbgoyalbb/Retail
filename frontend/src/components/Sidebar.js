@@ -1,7 +1,8 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   House, Receipt, Scissors, PlusCircle, Kanban,
-  CurrencyDollar, BookOpen, UsersThree, List, X
+  CurrencyDollar, BookOpen, UsersThree, List, X,
+  MagnifyingGlass, Table, ChartBar, FilePdf
 } from "@phosphor-icons/react";
 
 const NAV_ITEMS = [
@@ -13,6 +14,10 @@ const NAV_ITEMS = [
   { key: "settlements", label: "Settlements", icon: CurrencyDollar, path: "/settlements" },
   { key: "daybook", label: "Daybook", icon: BookOpen, path: "/daybook" },
   { key: "labour", label: "Labour Payments", icon: UsersThree, path: "/labour" },
+  { key: "divider", label: "divider" },
+  { key: "items", label: "Manage Items", icon: Table, path: "/items" },
+  { key: "search", label: "Search", icon: MagnifyingGlass, path: "/search" },
+  { key: "reports", label: "Reports", icon: ChartBar, path: "/reports" },
 ];
 
 export default function Sidebar({ open, setOpen }) {
@@ -64,6 +69,9 @@ export default function Sidebar({ open, setOpen }) {
         {/* Nav */}
         <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
           {NAV_ITEMS.map(item => {
+            if (item.key === "divider") {
+              return <div key="divider" className="my-3 border-t border-[var(--border-subtle)]" />;
+            }
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
             return (

@@ -35,4 +35,20 @@ export const payLabour = (data) => api.post("/labour/pay", data);
 
 export const getAdvances = (params) => api.get("/advances", { params });
 
+// Edit & Delete
+export const updateItem = (id, data) => api.put(`/items/${id}`, data);
+export const deleteItem = (id) => api.delete(`/items/${id}`);
+export const bulkDeleteItems = (ids) => api.delete("/items/bulk/delete", { data: ids });
+
+// Search
+export const searchItems = (params) => api.get("/search", { params });
+
+// PDF Invoice
+export const getInvoiceUrl = (ref) => `${BACKEND_URL}/api/invoice?ref=${encodeURIComponent(ref)}`;
+
+// Reports
+export const getRevenueReport = (params) => api.get("/reports/revenue", { params });
+export const getCustomerReport = () => api.get("/reports/customers");
+export const getSummaryReport = (params) => api.get("/reports/summary", { params });
+
 export default api;
