@@ -1,81 +1,41 @@
 # Retail Book - Fabric & Tailoring Management System
 
 ## Problem Statement
-Convert a complete VBA Excel retail fabric/tailoring business management system (with 7 VBA UserForms, modules, and real transaction data) into a full web application.
+Convert a complete VBA Excel retail fabric/tailoring business management system into a full web application.
 
 ## Architecture
-- **Backend**: FastAPI (Python) + MongoDB (Motor async driver) + ReportLab (PDF)
-- **Frontend**: React 19 + Tailwind CSS + Phosphor Icons + Recharts
+- **Backend**: FastAPI (Python) + MongoDB (Motor async driver) + ReportLab (PDF) + OpenPyXL (Excel)
+- **Frontend**: React 19 + Tailwind CSS + Phosphor Icons + Recharts + html5-qrcode
 - **Database**: MongoDB with collections: `items`, `advances`
 - **Design**: Organic & Earthy theme (Manrope + IBM Plex Sans fonts)
 
-## Core Requirements
-1. Dashboard with business metrics
-2. New Bill creation (fabric sales entry)
-3. Tailoring Orders assignment
-4. Add-ons/accessories management
-5. Job Work tracking (Tailoring & Embroidery kanban)
-6. Payment Settlements (pro-rata distribution)
-7. Daybook (daily reconciliation with tally/untally)
-8. Labour Payments (tailoring & embroidery)
-9. Item editing and deletion
-10. PDF invoice generation
-11. Search & filtering across all records
-12. Reports & analytics
-
-## User Personas
-- **Shop Owner**: Primary user, manages all operations
-- **Staff**: Enters bills, tracks orders
-
 ## What's Been Implemented
 
-### Session 1 (Jan 2026) - MVP
-- [x] Full backend API with 19+ endpoints
-- [x] Data seeded from Excel (261 items, 9 advances)
-- [x] Dashboard with KPIs
-- [x] New Bill creation
-- [x] Tailoring Orders
-- [x] Add-ons management
-- [x] Job Work Tracker (Kanban)
-- [x] Payment Settlements
-- [x] Daybook reconciliation
-- [x] Labour Payments
+### Session 1 - MVP (8 core pages)
+- Dashboard, New Bill, Tailoring Orders, Add-ons, Job Work (Kanban), Settlements, Daybook, Labour Payments
 
-### Session 2 (Jan 2026) - Feature Expansion
-- [x] Item editing (inline edit with save/cancel)
-- [x] Item deletion (with confirmation modal)
-- [x] PDF invoice generation (ReportLab, downloadable per reference)
-- [x] Global search with advanced filters (customer, date range, amount, payment/tailoring status)
-- [x] Reports & Analytics:
-  - Revenue charts (daily/weekly/monthly bar + line)
-  - Customer ranking table
-  - Payment mode pie chart
-  - Article type distribution
-  - Detailed revenue breakdown cards
+### Session 2 - Feature Expansion
+- Item editing/deletion, PDF invoices, Search with filters, Reports & analytics (charts)
+
+### Session 3 - Data Management & Mobile
+- [x] Excel Upload via Browser (drag-and-drop .xlsm/.xlsx import with replace/append modes)
+- [x] Excel Export (download all data as formatted .xlsx with styled headers)
+- [x] Database Backup & Restore (JSON format, full round-trip support)
+- [x] Barcode Scanner (html5-qrcode, mobile camera integration in New Bill page)
+- [x] Mobile-optimized layout (responsive sidebar, proper padding, touch-friendly)
 
 ## Testing
-- Backend: 32/32 API tests passed (100%)
-- Frontend: All core functionality working (95%+)
+- Backend: 38/38 API tests passed (100%)
+- Frontend: 98%+ (barcode scanner needs real device for camera)
 
 ## Prioritized Backlog
-### P0 (Critical)
-- None remaining
-
-### P1 (High Priority)
-- Bulk edit/update items
-- Data export to Excel/CSV
-- Order number auto-generation in tailoring
-
-### P2 (Nice to Have)
-- Customer profile pages with full history
-- SMS/WhatsApp notifications for delivery dates
+### P1
+- Custom rates/article types from settings UI
+- Customer profiles with contact info
 - Multi-user authentication
-- Audit trail / activity log
-- Print-friendly bill layout
-- Dashboard date range filtering
 
-## Next Tasks
-1. Data export to Excel/CSV
-2. Customer profile pages
-3. Multi-user authentication
-4. Print-friendly layouts
+### P2
+- GST/Tax calculations
+- WhatsApp bill sharing
+- Delivery date alerts
+- Dark mode toggle
