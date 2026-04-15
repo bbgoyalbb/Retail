@@ -1,4 +1,3 @@
-# coderabbit test branch
 # Retail Management
 
 FastAPI + React retail and tailoring management app with billing, settlements,
