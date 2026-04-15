@@ -6,7 +6,6 @@
 
 # Dependencies
 node_modules/
-/node_modules
 /.pnp
 .pnp.js
 .yarn/install-state.gz
@@ -28,12 +27,19 @@ next-env.d.ts
 # Production builds
 /build
 dist/
-dist
 
-# Environment files (comprehensive coverage)
+# Environment files
+.env
+.env.*
+*.env
 
+# Credentials and secrets
 *token.json*
 *credentials.json*
+credentials.json
+*.pem
+*.key
+.credentials
 
 # Logs and debug files
 npm-debug.log*
@@ -44,7 +50,6 @@ dump.rdb
 
 # System files
 .DS_Store
-*.pem
 
 # Python
 __pycache__/
@@ -61,9 +66,6 @@ chainlit.md
 # Deployment
 .vercel
 
-# Data and databases
-agenthub/agents/youtube/db
-
 # Archive files and large assets
 **/*.zip
 **/*.tar.gz
@@ -75,77 +77,7 @@ agenthub/agents/youtube/db
 
 # Build caches
 .cache/
+frontend/.cache/
 
+# Test credentials
 memory/test_credentials.md
-
-# Mobile development
-android-sdk/frontend/node_modules/.cache/default-development/8.pack
-frontend/node_modules/.cache/default-development/8.pack
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
-frontend/node_modules/.cache/default-development/0.pack
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
-frontend/node_modules/.cache/default-development/4.pack
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
-frontend/node_modules/.cache/default-development/1.pack
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
-frontend/node_modules/.cache/default-development/2.pack
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
-frontend/node_modules/.cache/default-development/6.pack
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials

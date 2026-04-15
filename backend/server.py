@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Query, UploadFile, File, Header, Depends
 from fastapi.responses import StreamingResponse, JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -23,28 +23,12 @@ from data_quality import (
     repair_high_risk_data as dq_repair_high_risk_data,
 )
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI()
-
-# This tells the backend to trust EVERY request (Perfect for troubleshooting)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ... rest of your routes (like @app.get("/") etc.) follow here
-
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-mongo_url = os.environ['MONGO_URL']
+mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[os.environ.get('DB_NAME', 'retail_db')]
 
 app = FastAPI()
 
@@ -52,6 +36,13 @@ api_router = APIRouter(prefix="/api")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+_API_KEY = os.environ.get('API_KEY', '')
+
+async def require_api_key(x_api_key: Optional[str] = Header(default=None)):
+    """Dependency that enforces API key auth when API_KEY env var is set."""
+    if _API_KEY and x_api_key != _API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing X-API-Key header")
 
 # ==========================================
 # MODELS
@@ -641,9 +632,9 @@ async def seed_data():
 
     try:
         import openpyxl
-        wb_path = "/tmp/retail_book.xlsm"
+        wb_path = os.environ.get('SEED_FILE', '/tmp/retail_book.xlsm')
         if not os.path.exists(wb_path):
-            return {"message": "Excel file not found at /tmp/retail_book.xlsm"}
+            return {"message": f"Excel file not found at {wb_path}"}
 
         wb = openpyxl.load_workbook(wb_path, data_only=True)
 
@@ -2442,7 +2433,7 @@ async def export_excel():
 # DATABASE BACKUP & RESTORE
 # ==========================================
 
-@api_router.get("/backup")
+@api_router.get("/backup", dependencies=[Depends(require_api_key)])
 async def backup_database():
     items = await db.items.find({}, {"_id": 0}).to_list(50000)
     advances = await db.advances.find({}, {"_id": 0}).to_list(10000)
@@ -2466,7 +2457,7 @@ async def backup_database():
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
-@api_router.post("/restore")
+@api_router.post("/restore", dependencies=[Depends(require_api_key)])
 async def restore_database(file: UploadFile = File(...)):
     if not file.filename.endswith('.json'):
         raise HTTPException(status_code=400, detail="Please upload a .json backup file")
@@ -2523,12 +2514,12 @@ async def get_db_audit(limit: int = 100):
     safe_limit = max(1, min(limit, 500))
     return await dq_generate_data_audit(db, safe_limit)
 
-@api_router.post("/db/normalize")
+@api_router.post("/db/normalize", dependencies=[Depends(require_api_key)])
 async def normalize_db_data(limit: int = 100):
     safe_limit = max(1, min(limit, 500))
     return await dq_normalize_low_risk_data(db, safe_limit)
 
-@api_router.post("/db/repair")
+@api_router.post("/db/repair", dependencies=[Depends(require_api_key)])
 async def repair_db_data(limit: int = 100):
     safe_limit = max(1, min(limit, 500))
     return await dq_repair_high_risk_data(db, safe_limit)
@@ -2584,6 +2575,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def startup_db_client():
+    await db.items.create_index("ref")
+    await db.items.create_index("name")
+    await db.items.create_index("date")
+    await db.items.create_index("barcode")
+    await db.advances.create_index("ref")
+    await db.advances.create_index("name")
+    logger.info("MongoDB indexes ensured")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
