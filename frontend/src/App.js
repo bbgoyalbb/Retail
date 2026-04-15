@@ -22,7 +22,9 @@ function AppShell() {
   const [currentPage, setCurrentPage] = useState("dashboard");
 
   useEffect(() => {
-    seedData().catch(() => {});
+    if (process.env.REACT_APP_ENABLE_SEED === "true") {
+      seedData().catch(() => {});
+    }
   }, []);
 
   return (
