@@ -59,8 +59,6 @@ export const backupUrl = () => `${BACKEND_URL}/api/backup`;
 export const restoreBackup = (formData) => api.post("/restore", formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const getDbStats = () => api.get("/db/stats");
 export const getDbAudit = (params) => api.get("/db/audit", { params });
-export const normalizeDbData = (params) => api.post("/db/normalize", null, { params });
-export const repairDbData = (params) => api.post("/db/repair", null, { params });
 
 // Settings
 export const getSettings = () => api.get("/settings");

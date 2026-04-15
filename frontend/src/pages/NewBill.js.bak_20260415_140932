@@ -56,10 +56,6 @@ export default function NewBill() {
       setMessage({ type: "error", text: "Please enter customer name and at least one item" });
       return;
     }
-    if (isSettled && (parseFloat(amountPaid) || 0) < grandTotal) {
-      setMessage({ type: "error", text: `Settled bills require full payment of ₹${grandTotal.toLocaleString('en-IN')}` });
-      return;
-    }
     setSaving(true);
     try {
       const res = await createBill({

@@ -108,7 +108,7 @@ export default function SearchPage() {
             <div>
               <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Payment</label>
               <select data-testid="search-payment-filter" value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm">
-                {["All", "Pending", "Partially Settled", "Settled"].map(s => <option key={s} value={s}>{s}</option>)}
+                {["All", "Settled", "Pending"].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
@@ -171,21 +171,9 @@ export default function SearchPage() {
                         </span>
                       </td>
                       <td className="px-3 py-2">
-                        <span className={`inline-flex items-center gap-1 text-xs ${
-                          item.payment_status === 'Settled'
-                            ? 'text-[var(--success)]'
-                            : item.payment_status === 'Partially Settled'
-                              ? 'text-[var(--info)]'
-                              : 'text-[var(--warning)]'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            item.payment_status === 'Settled'
-                              ? 'bg-[var(--success)]'
-                              : item.payment_status === 'Partially Settled'
-                                ? 'bg-[var(--info)]'
-                                : 'bg-[var(--warning)]'
-                          }`} />
-                          {item.payment_status || 'Pending'}
+                        <span className={`inline-flex items-center gap-1 text-xs ${item.fabric_pay_mode?.startsWith('Settled') ? 'text-[var(--success)]' : 'text-[var(--warning)]'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${item.fabric_pay_mode?.startsWith('Settled') ? 'bg-[var(--success)]' : 'bg-[var(--warning)]'}`} />
+                          {item.fabric_pay_mode?.startsWith('Settled') ? 'Settled' : 'Pending'}
                         </span>
                       </td>
                       <td className="px-3 py-2">

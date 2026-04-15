@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { importExcel, exportExcelUrl, backupUrl, restoreBackup, getDbStats, getDbAudit, normalizeDbData, repairDbData } from "@/api";
+import { importExcel, exportExcelUrl, backupUrl, restoreBackup, getDbStats, getDbAudit, normalizeDbData } from "@/api";
 import { Upload, DownloadSimple, Database, ArrowsClockwise, Warning, CheckCircle, FileXls, FileCsv } from "@phosphor-icons/react";
 
 export default function DataManager() {
@@ -10,12 +10,10 @@ export default function DataManager() {
   const [restoring, setRestoring] = useState(false);
   const [auditing, setAuditing] = useState(false);
   const [normalizing, setNormalizing] = useState(false);
-  const [repairing, setRepairing] = useState(false);
   const [importMode, setImportMode] = useState("replace");
   const [dragActive, setDragActive] = useState(false);
   const [audit, setAudit] = useState(null);
   const [normalizationResult, setNormalizationResult] = useState(null);
-  const [repairResult, setRepairResult] = useState(null);
 
   const loadStats = useCallback(() => {
     getDbStats().then(res => setStats(res.data)).catch(console.error);
@@ -50,24 +48,6 @@ export default function DataManager() {
       setMessage({ type: "error", text: err.response?.data?.detail || "Normalization failed" });
     } finally {
       setNormalizing(false);
-    }
-  };
-
-  const runRepair = async () => {
-    setRepairing(true);
-    setMessage(null);
-    try {
-      const res = await repairDbData({ limit: 100 });
-      setRepairResult(res.data);
-      setAudit(res.data.audit_after);
-      setMessage({
-        type: "success",
-        text: `Repair applied. Updated ${res.data.items_updated || 0} items and created ${res.data.advances_created || 0} carry-forward advances.`,
-      });
-    } catch (err) {
-      setMessage({ type: "error", text: err.response?.data?.detail || "Repair failed" });
-    } finally {
-      setRepairing(false);
     }
   };
 
@@ -354,24 +334,6 @@ export default function DataManager() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between gap-4 p-4 bg-[#D4984208] border border-[var(--warning)] rounded-sm">
-              <div>
-                <p className="text-sm font-medium text-[var(--text-primary)]">Repair remaining overpayment issues</p>
-                <p className="text-xs text-[var(--text-secondary)] mt-1">
-                  Repairs negative pending and received-over-total cases by capping the category at its true total
-                  and carrying excess money into advances for the same reference.
-                </p>
-              </div>
-              <button
-                data-testid="run-repair-btn"
-                onClick={runRepair}
-                disabled={repairing}
-                className="px-5 py-2.5 text-sm font-medium bg-[var(--warning)] text-white rounded-sm hover:opacity-90 disabled:opacity-50"
-              >
-                {repairing ? "Repairing..." : "Repair Remaining Issues"}
-              </button>
-            </div>
-
             {audit && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-[var(--bg)] rounded-sm">
@@ -394,15 +356,6 @@ export default function DataManager() {
                 <p className="text-sm font-medium text-[var(--success)]">Last normalization result</p>
                 <p className="text-xs text-[var(--text-secondary)]">
                   Updated {normalizationResult.items_updated || 0} items and {normalizationResult.advances_updated || 0} advances.
-                </p>
-              </div>
-            )}
-
-            {repairResult && (
-              <div className="p-4 bg-[#D4984208] border border-[var(--warning)] rounded-sm space-y-2">
-                <p className="text-sm font-medium text-[var(--warning)]">Last repair result</p>
-                <p className="text-xs text-[var(--text-secondary)]">
-                  Updated {repairResult.items_updated || 0} items and created {repairResult.advances_created || 0} carry-forward advance entries.
                 </p>
               </div>
             )}
@@ -483,37 +436,6 @@ export default function DataManager() {
                             <td className="px-4 py-2.5 text-xs">{change.name || "-"}</td>
                             <td className="px-4 py-2.5 font-mono text-xs">{change.item_id || change.advance_id || change.barcode || "-"}</td>
                             <td className="px-4 py-2.5 text-xs font-mono">{JSON.stringify(change.updates)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : null}
-
-              {repairResult?.changes?.length ? (
-                <div className="bg-white border border-[var(--border-subtle)] rounded-sm overflow-hidden">
-                  <div className="p-4 border-b border-[var(--border-subtle)]">
-                    <h3 className="font-heading text-base font-medium">Sample Repair Changes</h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full" data-testid="repair-results-table">
-                      <thead>
-                        <tr className="bg-[var(--bg)]">
-                          {["Kind", "Ref", "Name", "Identifier", "Category", "Updates / Amount"].map(h => (
-                            <th key={h} className="text-left px-4 py-2.5 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {repairResult.changes.map((change, idx) => (
-                          <tr key={`${change.kind}-${change.item_id || change.ref || idx}`} className="border-b border-[var(--border-subtle)] align-top">
-                            <td className="px-4 py-2.5 text-xs">{change.kind}</td>
-                            <td className="px-4 py-2.5 font-mono text-xs">{change.ref || "-"}</td>
-                            <td className="px-4 py-2.5 text-xs">{change.name || "-"}</td>
-                            <td className="px-4 py-2.5 font-mono text-xs">{change.item_id || "-"}</td>
-                            <td className="px-4 py-2.5 text-xs">{change.category || "-"}</td>
-                            <td className="px-4 py-2.5 text-xs font-mono">{change.updates ? JSON.stringify(change.updates) : change.amount || "-"}</td>
                           </tr>
                         ))}
                       </tbody>

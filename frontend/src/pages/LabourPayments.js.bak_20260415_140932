@@ -37,7 +37,7 @@ export default function LabourPayments() {
   };
 
   const selectedTotal = items.filter(i => selected.includes(i.id)).reduce((sum, i) => {
-    return sum + (i.labour_type === "Tailoring" ? (i.labour_amount || 0) : (i.emb_labour_amount || 0));
+    return sum + (i.labour_type === "Tailoring" ? (i.labour_amount || 0) : (i.embroidery_amount || 0));
   }, 0);
 
   const toggleMode = (m) => setSelectedModes(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
@@ -67,7 +67,7 @@ export default function LabourPayments() {
   };
 
   const fmt = (n) => new Intl.NumberFormat('en-IN').format(Math.round(n || 0));
-  const totalUnpaid = items.reduce((sum, i) => sum + (i.labour_type === "Tailoring" ? (i.labour_amount || 0) : (i.emb_labour_amount || 0)), 0);
+  const totalUnpaid = items.reduce((sum, i) => sum + (i.labour_type === "Tailoring" ? (i.labour_amount || 0) : (i.embroidery_amount || 0)), 0);
 
   return (
     <div data-testid="labour-page" className="space-y-6">
@@ -133,7 +133,7 @@ All paid!`}
                   </thead>
                   <tbody>
                     {items.map((item, i) => {
-                      const amount = item.labour_type === "Tailoring" ? item.labour_amount : item.emb_labour_amount;
+                      const amount = item.labour_type === "Tailoring" ? item.labour_amount : item.embroidery_amount;
                       return (
                         <tr key={i} className={`border-b border-[var(--border-subtle)] transition-colors cursor-pointer ${selected.includes(item.id) ? 'bg-[#C86B4D08]' : 'hover:bg-[#C86B4D05]'}`}
                           onClick={() => toggleSelect(item.id)}>

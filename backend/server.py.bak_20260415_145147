@@ -14,14 +14,6 @@ import uuid
 from datetime import datetime, timezone, date
 from bson import ObjectId
 import re
-from data_quality import (
-    round_money as dq_round_money,
-    determine_payment_status as dq_determine_payment_status,
-    build_payment_mode_label as dq_build_payment_mode_label,
-    generate_data_audit as dq_generate_data_audit,
-    normalize_low_risk_data as dq_normalize_low_risk_data,
-    repair_high_risk_data as dq_repair_high_risk_data,
-)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -308,246 +300,6 @@ def analyze_payment_field(
         })
 
     return issues
-
-def normalize_payment_field(
-    item: dict,
-    amount_field: str,
-    received_field: str,
-    pending_field: str,
-    mode_field: str,
-) -> dict:
-    total = round_money(item.get(amount_field, 0))
-    received = round_money(item.get(received_field, 0))
-    pending = round_money(item.get(pending_field, 0))
-    original_mode = item.get(mode_field, "N/A") or "N/A"
-
-    if pending < 0 and abs(pending) <= 1:
-        pending = 0.0
-
-    if received < 0 and abs(received) <= 1:
-        received = 0.0
-
-    if total >= 0 and received > total and abs(received - total) <= 1:
-        received = total
-
-    if total >= 0 and pending > total and abs(pending - total) <= 1:
-        pending = total
-
-    if total > 0:
-        mismatch = round_money((received + pending) - total)
-        if abs(mismatch) <= 1:
-            if pending > 0:
-                pending = round_money(max(0, total - received))
-            else:
-                received = round_money(max(0, total - pending))
-
-    status = determine_payment_status(pending, received)
-    mode = original_mode
-    if original_mode != "N/A" or total > 0 or received > 0 or pending > 0:
-        mode = status if status != "N/A" else "N/A"
-        if status in ("Settled", "Partially Settled"):
-            mode_suffix = ""
-            if " - " in str(original_mode):
-                mode_suffix = original_mode.split(" - ", 1)[1].strip()
-            if mode_suffix:
-                mode = f"{status} - {mode_suffix}"
-
-    return {
-        received_field: received,
-        pending_field: pending,
-        mode_field: mode,
-    }
-
-async def normalize_low_risk_data(limit: int = 100) -> dict:
-    items = await db.items.find({}, {"_id": 0}).to_list(10000)
-    advances = await db.advances.find({}, {"_id": 0}).to_list(5000)
-
-    changes = []
-    items_updated = 0
-    advances_updated = 0
-
-    for item in items:
-        updates = {}
-        checks = [
-            ("fabric_amount", "fabric_received", "fabric_pending", "fabric_pay_mode"),
-            ("tailoring_amount", "tailoring_received", "tailoring_pending", "tailoring_pay_mode"),
-            ("embroidery_amount", "embroidery_received", "embroidery_pending", "embroidery_pay_mode"),
-            ("addon_amount", "addon_received", "addon_pending", "addon_pay_mode"),
-        ]
-
-        for check in checks:
-            normalized = normalize_payment_field(item, *check)
-            for field, value in normalized.items():
-                current_value = item.get(field)
-                if isinstance(value, (int, float)):
-                    changed = round_money(current_value) != round_money(value)
-                else:
-                    changed = current_value != value
-                if changed:
-                    updates[field] = value
-
-        if updates:
-            await db.items.update_one({"id": item["id"]}, {"$set": updates})
-            items_updated += 1
-            if len(changes) < limit:
-                changes.append({
-                    "kind": "item",
-                    "item_id": item.get("id"),
-                    "ref": item.get("ref"),
-                    "name": item.get("name"),
-                    "barcode": item.get("barcode"),
-                    "updates": updates,
-                })
-
-    advance_totals = {}
-    for adv in advances:
-        ref = adv.get("ref", "")
-        advance_totals[ref] = round_money(advance_totals.get(ref, 0) + round_money(adv.get("amount", 0)))
-
-    for ref, total in advance_totals.items():
-        if total < -0.01:
-            negative_entries = [a for a in advances if a.get("ref") == ref and round_money(a.get("amount", 0)) < 0 and a.get("mode") != "Adjusted"]
-            for adv in negative_entries:
-                await db.advances.update_one({"id": adv["id"]}, {"$set": {"mode": "Adjusted"}})
-                advances_updated += 1
-                if len(changes) < limit:
-                    changes.append({
-                        "kind": "advance",
-                        "advance_id": adv.get("id"),
-                        "ref": ref,
-                        "name": adv.get("name"),
-                        "updates": {"mode": "Adjusted"},
-                    })
-
-    return {
-        "items_updated": items_updated,
-        "advances_updated": advances_updated,
-        "changes": changes,
-        "audit_after": await generate_data_audit(limit),
-    }
-
-async def repair_high_risk_data(limit: int = 100) -> dict:
-    items = await db.items.find({}, {"_id": 0}).to_list(10000)
-    item_updates = 0
-    advances_created = 0
-    changes = []
-
-    for item in items:
-        updates = {}
-        carry_forwards = []
-        checks = [
-            ("fabric", "fabric_amount", "fabric_received", "fabric_pending", "fabric_pay_mode", "fabric_pay_date"),
-            ("tailoring", "tailoring_amount", "tailoring_received", "tailoring_pending", "tailoring_pay_mode", "tailoring_pay_date"),
-            ("embroidery", "embroidery_amount", "embroidery_received", "embroidery_pending", "embroidery_pay_mode", "embroidery_pay_date"),
-            ("addon", "addon_amount", "addon_received", "addon_pending", "addon_pay_mode", "addon_pay_date"),
-        ]
-
-        for label, amount_field, received_field, pending_field, mode_field, date_field in checks:
-            total = round_money(item.get(amount_field, 0))
-            received = round_money(item.get(received_field, 0))
-            pending = round_money(item.get(pending_field, 0))
-            original_mode = item.get(mode_field, "N/A") or "N/A"
-
-            if total <= 0 and received <= 0 and pending <= 0:
-                continue
-
-            excess = 0.0
-            corrected_received = received
-            corrected_pending = pending
-
-            if received > total + 0.01:
-                excess = max(excess, round_money(received - total))
-                corrected_received = total
-                corrected_pending = 0.0
-
-            if corrected_pending < -0.01:
-                excess = max(excess, round_money(-corrected_pending))
-                corrected_received = total
-                corrected_pending = 0.0
-
-            if corrected_pending >= 0 and corrected_received <= total + 0.01:
-                corrected_pending = round_money(max(0, total - corrected_received))
-
-            corrected_mode = original_mode
-            corrected_status = determine_payment_status(corrected_pending, corrected_received)
-            if corrected_status == "Pending":
-                corrected_mode = "Pending"
-            elif corrected_status in ("Settled", "Partially Settled"):
-                suffix = ""
-                if " - " in str(original_mode):
-                    suffix = original_mode.split(" - ", 1)[1].strip()
-                corrected_mode = f"{corrected_status} - {suffix}" if suffix else corrected_status
-            elif total <= 0:
-                corrected_mode = "N/A"
-
-            field_updates = {
-                received_field: corrected_received,
-                pending_field: corrected_pending,
-                mode_field: corrected_mode,
-            }
-
-            changed_fields = {}
-            for field, value in field_updates.items():
-                current_value = item.get(field)
-                if isinstance(value, (int, float)):
-                    changed = round_money(current_value) != round_money(value)
-                else:
-                    changed = current_value != value
-                if changed:
-                    changed_fields[field] = value
-                    updates[field] = value
-
-            if excess > 0.01:
-                carry_forwards.append({
-                    "category": label,
-                    "amount": excess,
-                    "date": item.get(date_field) if item.get(date_field) and item.get(date_field) != "N/A" else item.get("date"),
-                })
-                changed_fields["carry_forward"] = excess
-
-            if changed_fields and len(changes) < limit:
-                changes.append({
-                    "kind": "item_repair",
-                    "item_id": item.get("id"),
-                    "ref": item.get("ref"),
-                    "name": item.get("name"),
-                    "barcode": item.get("barcode"),
-                    "category": label,
-                    "updates": changed_fields,
-                })
-
-        if updates:
-            await db.items.update_one({"id": item["id"]}, {"$set": updates})
-            item_updates += 1
-
-        for carry in carry_forwards:
-            adv = {
-                "id": str(uuid.uuid4()),
-                "date": carry["date"] or item.get("date"),
-                "name": item.get("name", ""),
-                "ref": item.get("ref", ""),
-                "amount": carry["amount"],
-                "mode": f"Auto Carry Forward - {carry['category'].title()}",
-                "tally": False,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await db.advances.insert_one(adv)
-            advances_created += 1
-            if len(changes) < limit:
-                changes.append({
-                    "kind": "advance_created",
-                    "ref": adv["ref"],
-                    "name": adv["name"],
-                    "amount": adv["amount"],
-                    "mode": adv["mode"],
-                })
-
-    return {
-        "items_updated": item_updates,
-        "advances_created": advances_created,
-        "changes": changes,
-        "audit_after": await generate_data_audit(limit),
-    }
 
 async def generate_data_audit(limit: int = 100) -> dict:
     items = await db.items.find({}, {"_id": 0}).to_list(10000)
@@ -1362,20 +1114,20 @@ async def get_settlement_balances(name: Optional[str] = None, ref: Optional[str]
 @api_router.post("/settlements/pay")
 async def process_settlement(req: SettlementRequest):
     modes_str = ", ".join(req.payment_modes) if req.payment_modes else "Cash"
-    total_allocated = dq_round_money(
+    total_allocated = round_money(
         req.allot_fabric + req.allot_tailoring + req.allot_embroidery + req.allot_addon + req.allot_advance
     )
-    fresh_payment = dq_round_money(req.fresh_payment)
+    fresh_payment = round_money(req.fresh_payment)
 
     if total_allocated <= 0:
         raise HTTPException(status_code=400, detail="Please allocate at least some amount")
 
     current_balances = await get_settlement_balances(ref=req.ref)
     category_limits = {
-        "fabric": (dq_round_money(req.allot_fabric), dq_round_money(current_balances["fabric"])),
-        "tailoring": (dq_round_money(req.allot_tailoring), dq_round_money(current_balances["tailoring"])),
-        "embroidery": (dq_round_money(req.allot_embroidery), dq_round_money(current_balances["embroidery"])),
-        "addon": (dq_round_money(req.allot_addon), dq_round_money(current_balances["addon"])),
+        "fabric": (round_money(req.allot_fabric), round_money(current_balances["fabric"])),
+        "tailoring": (round_money(req.allot_tailoring), round_money(current_balances["tailoring"])),
+        "embroidery": (round_money(req.allot_embroidery), round_money(current_balances["embroidery"])),
+        "addon": (round_money(req.allot_addon), round_money(current_balances["addon"])),
     }
 
     for category, (allocated, limit) in category_limits.items():
@@ -1385,12 +1137,12 @@ async def process_settlement(req: SettlementRequest):
                 detail=f"Allocated {category} amount exceeds the current pending balance."
             )
 
-    available_advance = dq_round_money(current_balances["advance"])
+    available_advance = round_money(current_balances["advance"])
     advance_to_use = 0.0
     if req.use_advance:
-        advance_to_use = min(available_advance, max(0.0, dq_round_money(total_allocated - fresh_payment)))
+        advance_to_use = min(available_advance, max(0.0, round_money(total_allocated - fresh_payment)))
 
-    available_pool = dq_round_money(fresh_payment + advance_to_use)
+    available_pool = round_money(fresh_payment + advance_to_use)
     if abs(total_allocated - available_pool) > 1:
         raise HTTPException(
             status_code=400,
@@ -1411,22 +1163,22 @@ async def process_settlement(req: SettlementRequest):
         running_paid = 0
 
         for idx, item in enumerate(pending_items):
-            bal = dq_round_money(item.get(pending_field, 0))
+            bal = round_money(item.get(pending_field, 0))
             if idx == len(pending_items) - 1:
-                share = dq_round_money(total_to_pay - running_paid)
+                share = round_money(total_to_pay - running_paid)
             else:
-                share = dq_round_money((bal / total_pending) * total_to_pay) if total_pending > 0 else 0
+                share = round_money((bal / total_pending) * total_to_pay) if total_pending > 0 else 0
                 running_paid += share
 
             share = min(share, bal)
-            existing_received = dq_round_money(item.get(received_field, 0))
-            new_received = dq_round_money(existing_received + share)
-            new_balance = dq_round_money(max(0, bal - share))
+            existing_received = round_money(item.get(received_field, 0))
+            new_received = round_money(existing_received + share)
+            new_balance = round_money(max(0, bal - share))
             update = {
                 pay_date_field: req.payment_date,
                 received_field: new_received,
                 pending_field: new_balance,
-                pay_mode_field: dq_build_payment_mode_label(req.payment_modes, new_balance, new_received),
+                pay_mode_field: build_payment_mode_label(req.payment_modes, new_balance, new_received),
             }
             await db.items.update_one({"id": item["id"]}, {"$set": update})
 
@@ -1780,7 +1532,7 @@ async def search_items(
 
     items = await db.items.find(query, {"_id": 0}).sort("date", -1).skip(skip).limit(limit).to_list(limit)
     for item in items:
-        item["payment_status"] = dq_determine_payment_status(item.get("fabric_pending", 0), item.get("fabric_received", 0))
+        item["payment_status"] = determine_payment_status(item.get("fabric_pending", 0), item.get("fabric_received", 0))
     total = await db.items.count_documents(query)
     return {"items": items, "total": total}
 
@@ -2521,17 +2273,7 @@ async def get_db_stats():
 @api_router.get("/db/audit")
 async def get_db_audit(limit: int = 100):
     safe_limit = max(1, min(limit, 500))
-    return await dq_generate_data_audit(db, safe_limit)
-
-@api_router.post("/db/normalize")
-async def normalize_db_data(limit: int = 100):
-    safe_limit = max(1, min(limit, 500))
-    return await dq_normalize_low_risk_data(db, safe_limit)
-
-@api_router.post("/db/repair")
-async def repair_db_data(limit: int = 100):
-    safe_limit = max(1, min(limit, 500))
-    return await dq_repair_high_risk_data(db, safe_limit)
+    return await generate_data_audit(safe_limit)
 
 # ==========================================
 # SETTINGS
