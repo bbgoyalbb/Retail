@@ -50,8 +50,9 @@ function StatusColumn({ title, items, color, onMove, moveLabel, sortKey, onSort,
   const toggleSelect = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const handleMove = () => {
-    if (selected.length === 0) return;
-    onMove(selected);
+    const targets = selected.length > 0 ? selected : items.map(i => i.id);
+    if (targets.length === 0) return;
+    onMove(targets);
     setSelected([]);
   };
 
@@ -100,8 +101,8 @@ function StatusColumn({ title, items, color, onMove, moveLabel, sortKey, onSort,
       </div>
       {moveLabel && (
         <div className="p-3 border-t border-[var(--border-subtle)]">
-          <button data-testid={`move-${title.toLowerCase().replace(/\s/g, '-')}-btn`} onClick={handleMove} disabled={selected.length === 0} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 transition-all">
-            Move {selected.length} to {moveLabel} <ArrowRight size={14} />
+          <button data-testid={`move-${title.toLowerCase().replace(/\s/g, '-')}-btn`} onClick={handleMove} disabled={items.length === 0} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 transition-all">
+            Move {selected.length > 0 ? selected.length : `all ${items.length}`} to {moveLabel} <ArrowRight size={14} />
           </button>
         </div>
       )}
