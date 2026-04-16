@@ -1,10 +1,12 @@
 from datetime import datetime, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import List
 import uuid
 
 
 def round_money(value: float) -> float:
-    return round(float(value or 0), 2)
+    """Round a monetary value to 2 decimal places using ROUND_HALF_UP (no banker's rounding)."""
+    return float(Decimal(str(float(value or 0))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
 def determine_payment_status(pending_amount: float, received_amount: float) -> str:
