@@ -26,10 +26,10 @@ from data_quality import (
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-mongo_url = os.environ.get('MONGO_URL')
+mongo_url = os.getenv('MONGO_URL')
 if not mongo_url:
     raise RuntimeError("MONGO_URL environment variable is required. Copy backend/.env.example to backend/.env and fill in your values.")
-_db_name = os.environ.get('DB_NAME')
+_db_name = os.getenv('DB_NAME')
 if not _db_name:
     raise RuntimeError("DB_NAME environment variable is required. Copy backend/.env.example to backend/.env and fill in your values.")
 client = AsyncIOMotorClient(mongo_url)
