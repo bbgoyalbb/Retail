@@ -2223,8 +2223,10 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
   @media print {{
     body {{ padding: 0; }}
     .no-print {{ display: none !important; }}
-    @page {{ margin: 10mm 12mm; size: A4; }}
+    @page {{ margin: 10mm 12mm; size: A4; margin-top: 8mm; }}
   }}
+  /* Hide browser-injected print headers/footers (title, URL, date) */
+  @page {{ margin: 10mm 12mm; }}
 </style>
 </head>
 <body>
@@ -2242,6 +2244,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
   <!-- BILL META STRIP -->
   <div class="meta-strip">
     <div class="meta-cell"><div class="meta-label">Customer</div><div class="meta-value">{customer_name}</div></div>
+    <div class="meta-cell"><div class="meta-label">Reference</div><div class="meta-value">{ref_id}</div></div>
     <div class="meta-cell"><div class="meta-label">Date</div><div class="meta-value">{order_date}</div></div>
     <div class="meta-cell"><div class="meta-label">Items</div><div class="meta-value">{len(items)}</div></div>
   </div>
