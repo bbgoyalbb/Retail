@@ -100,7 +100,7 @@ const computeFabricAmount = (price, qty, discount) => {
   return Math.round(discountedPrice * qty);
 };
 
-const computePending = (total, received) => Math.max(0, Math.round(total - (received || 0)));
+const computePending = (total, received) => Math.round(total - (received || 0)); // negative = over-payment (credit)
 
 const FIELD_CLASSES = "w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:border-[var(--brand)] focus:outline-none";
 
