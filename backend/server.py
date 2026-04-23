@@ -2089,7 +2089,8 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
               <td>{ei.get("karigar","N/A")}</td><td class="r">{amt_display}</td>
               <td>{"Settled" if str(pm).startswith("Settled") else pm}</td>
             </tr>"""
-        rows += f'<tr class="foot"><td colspan="4" class="r">TOTAL</td><td class="r">₹{fmt(emb_total)}</td><td></td></tr>'
+        emb_total_display = f'₹{fmt(emb_total)}' if emb_total > 0 else '<em style="color:#9C9690">To be Calculated</em>'
+        rows += f'<tr class="foot"><td colspan="4" class="r">TOTAL</td><td class="r">{emb_total_display}</td><td></td></tr>'
         emb_section = f"""
         <h3 class="sec-title">Embroidery</h3>
         <table><thead><tr><th>#</th><th>Article</th><th>Status</th><th>Karigar</th><th class="r">Amount</th><th>Payment</th></tr></thead>
