@@ -2221,12 +2221,17 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
 
   /* ── Print ── */
   @media print {{
-    body {{ padding: 0; }}
+    body {{ padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
     .no-print {{ display: none !important; }}
-    @page {{ margin: 10mm 12mm; size: A4; margin-top: 8mm; }}
+    thead tr {{ background: #3D3A36 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+    th {{ color: #F5F3EE !important; }}
+    tr.foot td {{ background: #EDEBE6 !important; }}
+    tr.grand td {{ background: #3D3A36 !important; color: #F5F3EE !important; }}
+    tr.net td {{ background: {brand_color} !important; color: #fff !important; }}
+    .meta-strip {{ border: 1px solid #E0DDD7 !important; }}
+    .header {{ border-bottom: 2.5px solid {brand_color} !important; }}
+    @page {{ margin: 10mm 12mm; size: A4; }}
   }}
-  /* Hide browser-injected print headers/footers (title, URL, date) */
-  @page {{ margin: 10mm 12mm; }}
 </style>
 </head>
 <body>
