@@ -7,8 +7,8 @@
 :root {
   --bg: #F5F3EE;
   --surface: #FFFFFF;
-  --text-primary: #2D2A26;
-  --text-secondary: #6C6760;
+  --text-primary: #0A0A0A;
+  --text-secondary: #3D3A36;
   --brand: #C86B4D;
   --brand-hover: #B35A3E;
   --brand-fg: #FFFFFF;
@@ -138,17 +138,17 @@ option {
 @layer base {
   :root {
     --background: 40 14% 95%;
-    --foreground: 30 6% 16%;
+    --foreground: 0 0% 4%;
     --card: 0 0% 100%;
-    --card-foreground: 30 6% 16%;
+    --card-foreground: 0 0% 4%;
     --popover: 0 0% 100%;
-    --popover-foreground: 30 6% 16%;
+    --popover-foreground: 0 0% 4%;
     --primary: 16 52% 54%;
     --primary-foreground: 0 0% 100%;
     --secondary: 35 14% 92%;
-    --secondary-foreground: 30 6% 16%;
+    --secondary-foreground: 0 0% 4%;
     --muted: 35 14% 92%;
-    --muted-foreground: 30 4% 40%;
+    --muted-foreground: 30 4% 22%;
     --accent: 35 14% 92%;
     --accent-foreground: 30 6% 16%;
     --destructive: 6 44% 43%;
