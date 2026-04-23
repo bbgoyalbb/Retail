@@ -319,7 +319,7 @@ export default function Settlements() {
                     )}
                   </div>
                   );
-                })
+                })}
               </div>
             </div>
           )}
