@@ -41,6 +41,9 @@ api_router = APIRouter(prefix="/api")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Suppress WinError 10054 noise (browser forcibly closes SSL connections on Windows)
+logging.getLogger("asyncio").setLevel(logging.CRITICAL)
+
 # --- Auth dependency ---
 async def get_current_user_dep(credentials: HTTPAuthorizationCredentials = Depends(auth_module.security)):
     return await auth_module.get_current_user(credentials, db)
