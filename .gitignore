@@ -52,6 +52,12 @@ __pycache__/
 venv/
 .venv/
 
+# Backend: secrets, SSL certs, compiled frontend build
+backend/.env
+backend/ssl.key
+backend/ssl.crt
+backend/frontend/
+
 # Development tools
 chainlit.md
 .chainlit
