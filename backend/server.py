@@ -148,6 +148,7 @@ class LabourPaymentRequest(BaseModel):
     labour_type: str  # "tailoring" or "embroidery"
     payment_date: str
     payment_modes: List[str]
+    payment_id: Optional[str] = None
 
 class ItemUpdateRequest(BaseModel):
     barcode: Optional[str] = None
@@ -1345,6 +1346,28 @@ async def move_embroidery(req: EmbMoveRequest):
             updated += 1
     return {"message": f"{updated} embroidery items updated"}
 
+class EmbEditRequest(BaseModel):
+    item_id: str
+    karigar: Optional[str] = None
+    emb_labour_amount: Optional[float] = None
+    emb_customer_amount: Optional[float] = None
+
+@api_router.post("/jobwork/edit-emb")
+async def edit_embroidery(req: EmbEditRequest):
+    update_fields = {}
+    if req.karigar is not None:
+        update_fields["karigar"] = req.karigar
+    if req.emb_labour_amount is not None:
+        update_fields["emb_labour_amount"] = req.emb_labour_amount
+    if req.emb_customer_amount is not None:
+        update_fields["embroidery_amount"] = req.emb_customer_amount
+        update_fields["embroidery_pending"] = req.emb_customer_amount
+        update_fields["embroidery_pay_mode"] = "Pending"
+    if not update_fields:
+        return {"message": "Nothing to update"}
+    result = await db.items.update_one({"id": req.item_id}, {"$set": update_fields})
+    return {"message": "Updated" if result.modified_count > 0 else "No change"}
+
 @api_router.get("/jobwork/filters")
 async def get_jobwork_filters():
     order_nos = await db.items.distinct("order_no", {"order_no": {"$ne": "N/A"}})
@@ -1642,32 +1665,47 @@ async def tally_entries(req: TallyRequest):
 # ==========================================
 
 @api_router.get("/labour")
-async def get_labour_items(filter_type: str = "All", filter_karigar: str = "All"):
+async def get_labour_items(filter_type: str = "All", filter_karigar: str = "All", view_mode: str = "unpaid"):
     items = []
+    paid = view_mode == "paid"
 
     if filter_type in ("All", "Tailoring Labour"):
-        query = {
-            "tailoring_status": {"$in": ["Stitched", "Delivered"]},
-            "labour_paid": {"$in": ["N/A", "", None]},
-            "labour_amount": {"$gt": 0},
-        }
+        if paid:
+            query = {
+                "tailoring_status": {"$in": ["Stitched", "Delivered"]},
+                "labour_paid": "Yes",
+                "labour_amount": {"$gt": 0},
+            }
+        else:
+            query = {
+                "tailoring_status": {"$in": ["Stitched", "Delivered"]},
+                "labour_paid": {"$in": ["N/A", "", None]},
+                "labour_amount": {"$gt": 0},
+            }
         tail_items = await db.items.find(query, {"_id": 0}).to_list(500)
         for item in tail_items:
-            if filter_karigar == "All":
+            karigar = item.get("karigar", "N/A")
+            if filter_karigar == "All" or karigar == filter_karigar:
                 items.append({**item, "labour_type": "Tailoring"})
 
     if filter_type in ("All", "Embroidery Labour"):
-        query = {
-            "embroidery_status": "Finished",
-            "emb_labour_amount": {"$gt": 0},
-        }
+        if paid:
+            query = {
+                "embroidery_status": "Finished",
+                "emb_labour_paid": "Yes",
+                "emb_labour_amount": {"$gt": 0},
+            }
+        else:
+            query = {
+                "embroidery_status": "Finished",
+                "emb_labour_paid": {"$in": ["N/A", "", None]},
+                "emb_labour_amount": {"$gt": 0},
+            }
         emb_items = await db.items.find(query, {"_id": 0}).to_list(500)
         for item in emb_items:
-            emb_labour_paid = item.get("emb_labour_paid", "N/A")
-            if emb_labour_paid in ("N/A", "", None):
-                karigar = item.get("karigar", "N/A")
-                if filter_karigar == "All" or karigar == filter_karigar:
-                    items.append({**item, "labour_type": "Embroidery"})
+            karigar = item.get("karigar", "N/A")
+            if filter_karigar == "All" or karigar == filter_karigar:
+                items.append({**item, "labour_type": "Embroidery"})
 
     return items
 
@@ -1679,16 +1717,21 @@ async def get_karigars():
 @api_router.post("/labour/pay")
 async def pay_labour(req: LabourPaymentRequest):
     updated = 0
+    mode_str = ", ".join(req.payment_modes) if req.payment_modes else "Cash"
     for item_id in req.item_ids:
         if req.labour_type == "tailoring":
             update = {
                 "labour_paid": "Yes",
                 "labour_pay_date": req.payment_date,
+                "labour_payment_mode": mode_str,
+                "labour_payment_id": req.payment_id or "",
             }
         else:
             update = {
                 "emb_labour_paid": "Yes",
                 "emb_labour_date": req.payment_date,
+                "emb_labour_payment_mode": mode_str,
+                "emb_labour_payment_id": req.payment_id or "",
             }
         result = await db.items.update_one({"id": item_id}, {"$set": update})
         if result.modified_count > 0:
