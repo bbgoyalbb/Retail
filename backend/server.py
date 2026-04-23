@@ -1946,14 +1946,15 @@ async def search_items(
 
     if payment_status and payment_status != "All":
         if payment_status == "Settled":
-            query["fabric_pending"] = {"$lte": 0}
+            # $lt: 1 covers both pending=0 (exact) and negative (over-paid credit)
+            query["fabric_pending"] = {"$lt": 1}
             query["fabric_received"] = {"$gt": 0}
         elif payment_status == "Partially Settled":
             query["fabric_pending"] = {"$gt": 0}
             query["fabric_received"] = {"$gt": 0}
         elif payment_status == "Pending":
             query["fabric_pending"] = {"$gt": 0}
-            query["fabric_received"] = {"$lte": 0}
+            query["fabric_received"] = {"$eq": 0}
 
     if min_amount is not None:
         query.setdefault("fabric_amount", {})["$gte"] = min_amount
@@ -2115,16 +2116,17 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
 
     # ---- Payment summary ----
     fab_received = sum(float(i.get("fabric_received", 0)) for i in items)
-    fab_pending = sum(float(i.get("fabric_pending", 0)) for i in items if i.get("fabric_pay_mode") == "Pending")
+    # Use pending > 0 as filter — not pay_mode string — to correctly include Partially Settled items
+    fab_pending = sum(float(i.get("fabric_pending", 0)) for i in items if float(i.get("fabric_pending", 0)) > 0)
     tail_total_amt = sum(float(i.get("tailoring_amount", 0)) for i in items)
     tail_received = sum(float(i.get("tailoring_received", 0)) for i in items)
-    tail_pending_amt = sum(float(i.get("tailoring_pending", 0)) for i in items if i.get("tailoring_pay_mode") == "Pending")
+    tail_pending_amt = sum(float(i.get("tailoring_pending", 0)) for i in items if float(i.get("tailoring_pending", 0)) > 0)
     emb_total_amt = sum(float(i.get("embroidery_amount", 0)) for i in items)
     emb_received = sum(float(i.get("embroidery_received", 0)) for i in items)
-    emb_pending_amt = sum(float(i.get("embroidery_pending", 0)) for i in items if i.get("embroidery_pay_mode") == "Pending")
+    emb_pending_amt = sum(float(i.get("embroidery_pending", 0)) for i in items if float(i.get("embroidery_pending", 0)) > 0)
     addon_total_amt = sum(float(i.get("addon_amount", 0)) for i in items)
     addon_received = sum(float(i.get("addon_received", 0)) for i in items)
-    addon_pending_amt = sum(float(i.get("addon_pending", 0)) for i in items if i.get("addon_pay_mode") == "Pending")
+    addon_pending_amt = sum(float(i.get("addon_pending", 0)) for i in items if float(i.get("addon_pending", 0)) > 0)
 
     grand_total = fab_total + tail_total_amt + emb_total_amt + addon_total_amt
     total_received = fab_received + tail_received + emb_received + addon_received
@@ -2381,15 +2383,16 @@ async def get_summary_report(date_from: Optional[str] = None, date_to: Optional[
 
     total_fabric = sum(i.get("fabric_amount", 0) for i in items)
     total_fabric_received = sum(i.get("fabric_received", 0) for i in items)
-    total_fabric_pending = sum(i.get("fabric_pending", 0) for i in items if i.get("fabric_pending", 0) > 0)
+    # max(0, sum) so over-paid credits (negative pending) correctly reduce the outstanding total
+    total_fabric_pending = max(0, sum(i.get("fabric_pending", 0) for i in items))
     total_tailoring = sum(i.get("tailoring_amount", 0) for i in items)
     total_tailoring_received = sum(i.get("tailoring_received", 0) for i in items)
-    total_tailoring_pending = sum(i.get("tailoring_pending", 0) for i in items if i.get("tailoring_pending", 0) > 0)
+    total_tailoring_pending = max(0, sum(i.get("tailoring_pending", 0) for i in items))
     total_embroidery = sum(i.get("embroidery_amount", 0) for i in items)
     total_embroidery_received = sum(i.get("embroidery_received", 0) for i in items)
-    total_embroidery_pending = sum(i.get("embroidery_pending", 0) for i in items if i.get("embroidery_pending", 0) > 0)
+    total_embroidery_pending = max(0, sum(i.get("embroidery_pending", 0) for i in items))
     total_addon = sum(i.get("addon_amount", 0) for i in items)
-    total_addon_pending = sum(i.get("addon_pending", 0) for i in items if i.get("addon_pending", 0) > 0)
+    total_addon_pending = max(0, sum(i.get("addon_pending", 0) for i in items))
     total_advance = sum(a.get("amount", 0) for a in advances)
 
     # Payment mode breakdown
