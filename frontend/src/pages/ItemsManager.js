@@ -102,6 +102,18 @@ const computeFabricAmount = (price, qty, discount) => {
 
 const computePending = (total, received) => Math.max(0, Math.round(total - (received || 0)));
 
+const FIELD_CLASSES = "w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:border-[var(--brand)] focus:outline-none";
+
+const renderFieldInput = (field, itemId, value, onChange) => {
+  switch (field.type) {
+    case 'date': return <input type="date" value={value || ''} onChange={e => onChange(itemId, field.key, e.target.value)} className={FIELD_CLASSES} />;
+    case 'number': return <input type="number" step={field.step || 1} value={value ?? 0} onChange={e => onChange(itemId, field.key, parseFloat(e.target.value) || 0)} disabled={field.computed} className={`${FIELD_CLASSES} ${field.computed ? 'bg-[var(--bg)] text-[var(--text-secondary)]' : ''}`} />;
+    case 'select': return <select value={value || ''} onChange={e => onChange(itemId, field.key, e.target.value)} className={FIELD_CLASSES}>{field.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>;
+    case 'checkbox': return <input type="checkbox" checked={!!value} onChange={e => onChange(itemId, field.key, e.target.checked)} className="w-4 h-4 accent-[var(--brand)]" />;
+    default: return <input type="text" value={value || ''} onChange={e => onChange(itemId, field.key, e.target.value)} className={FIELD_CLASSES} />;
+  }
+};
+
 export default function ItemsManager() {
   const [allItems, setAllItems] = useState([]);
   const [advances, setAdvances] = useState([]);
@@ -584,412 +596,10 @@ export default function ItemsManager() {
   };
   const fmt = (n) => n ? new Intl.NumberFormat('en-IN').format(Math.round(n)) : "-";
 
-  // ==========================================
-  // MODAL COMPONENTS (inline)
-  // ==========================================
-  const SectionSelectorModal = () => (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-[var(--surface)] rounded-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-[var(--border-subtle)]">
-          <h2 className="font-heading text-xl font-medium">Select Section to Edit</h2>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">
-            {editMode === 'order' ? `Editing order with ${editItems.length} items` : 'Editing single item'}
-          </p>
-        </div>
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Object.entries(SECTIONS).map(([key, section]) => (
-            <button
-              key={key}
-              onClick={() => startEdit(key, editItems, editMode)}
-              className="p-4 border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:bg-[#C86B4D08] text-left transition-colors"
-            >
-              <h3 className="font-medium text-[var(--brand)]">{section.label}</h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-1">{section.description}</p>
-              <p className="text-xs text-[var(--text-secondary)] mt-2">{section.fields.length} fields</p>
-            </button>
-          ))}
-        </div>
-        <div className="p-4 border-t border-[var(--border-subtle)] flex justify-end">
-          <button onClick={() => { setShowSectionSelector(false); setEditItems([]); }} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const SectionEditModal = () => {
-    const section = SECTIONS[selectedSection];
-    const isAdvance = section.isAdvanceSection;
-    
-    // For advances section, filter advances for this reference
-    const refAdvances = isAdvance && editItems.length > 0 
-      ? advances.filter(a => a.ref === editItems[0].ref)
-      : [];
-
-    const renderFieldInput = (field, itemId, value) => {
-      const commonClasses = "w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:border-[var(--brand)] focus:outline-none";
-      
-      switch (field.type) {
-        case 'date':
-          return (
-            <input
-              type="date"
-              value={value || ''}
-              onChange={e => handleFieldChange(itemId, field.key, e.target.value)}
-              className={commonClasses}
-            />
-          );
-        case 'number':
-          return (
-            <input
-              type="number"
-              step={field.step || 1}
-              value={value || 0}
-              onChange={e => handleFieldChange(itemId, field.key, parseFloat(e.target.value) || 0)}
-              disabled={field.computed}
-              className={`${commonClasses} ${field.computed ? 'bg-[var(--bg)] text-[var(--text-secondary)]' : ''}`}
-            />
-          );
-        case 'select':
-          return (
-            <select
-              value={value || ''}
-              onChange={e => handleFieldChange(itemId, field.key, e.target.value)}
-              className={commonClasses}
-            >
-              {field.options.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-          );
-        case 'checkbox':
-          return (
-            <input
-              type="checkbox"
-              checked={!!value}
-              onChange={e => handleFieldChange(itemId, field.key, e.target.checked)}
-              className="w-4 h-4 accent-[var(--brand)]"
-            />
-          );
-        default:
-          return (
-            <input
-              type="text"
-              value={value || ''}
-              onChange={e => handleFieldChange(itemId, field.key, e.target.value)}
-              className={commonClasses}
-            />
-          );
-      }
-    };
-
-    // Render field input for existing advances
-    const renderAdvanceField = (field, advanceId, value) => {
-      const commonClasses = "w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:border-[var(--brand)] focus:outline-none";
-      
-      switch (field.type) {
-        case 'date':
-          return (
-            <input
-              type="date"
-              value={value || ''}
-              onChange={e => handleAdvanceChange(advanceId, field.key, e.target.value)}
-              className={commonClasses}
-            />
-          );
-        case 'number':
-          return (
-            <input
-              type="number"
-              step={field.step || 1}
-              value={value || 0}
-              onChange={e => handleAdvanceChange(advanceId, field.key, parseFloat(e.target.value) || 0)}
-              className={commonClasses}
-            />
-          );
-        case 'select':
-          return (
-            <select
-              value={value || ''}
-              onChange={e => handleAdvanceChange(advanceId, field.key, e.target.value)}
-              className={commonClasses}
-            >
-              {field.options.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-          );
-        case 'checkbox':
-          return (
-            <input
-              type="checkbox"
-              checked={!!value}
-              onChange={e => handleAdvanceChange(advanceId, field.key, e.target.checked)}
-              className="w-4 h-4 accent-[var(--brand)]"
-            />
-          );
-        default:
-          return (
-            <input
-              type="text"
-              value={value || ''}
-              onChange={e => handleAdvanceChange(advanceId, field.key, e.target.value)}
-              className={commonClasses}
-            />
-          );
-      }
-    };
-
-    // Render field input for new advances
-    const renderNewAdvanceField = (field, index, value) => {
-      const commonClasses = "w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:border-[var(--brand)] focus:outline-none";
-      
-      switch (field.type) {
-        case 'date':
-          return (
-            <input
-              type="date"
-              value={value || ''}
-              onChange={e => handleNewAdvanceChange(index, field.key, e.target.value)}
-              className={commonClasses}
-            />
-          );
-        case 'number':
-          return (
-            <input
-              type="number"
-              step={field.step || 1}
-              value={value || 0}
-              onChange={e => handleNewAdvanceChange(index, field.key, parseFloat(e.target.value) || 0)}
-              className={commonClasses}
-            />
-          );
-        case 'select':
-          return (
-            <select
-              value={value || ''}
-              onChange={e => handleNewAdvanceChange(index, field.key, e.target.value)}
-              className={commonClasses}
-            >
-              {field.options.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-          );
-        case 'checkbox':
-          return (
-            <input
-              type="checkbox"
-              checked={!!value}
-              onChange={e => handleNewAdvanceChange(index, field.key, e.target.checked)}
-              className="w-4 h-4 accent-[var(--brand)]"
-            />
-          );
-        default:
-          return (
-            <input
-              type="text"
-              value={value || ''}
-              onChange={e => handleNewAdvanceChange(index, field.key, e.target.value)}
-              className={commonClasses}
-            />
-          );
-      }
-    };
-
-    return (
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div className="bg-[var(--surface)] rounded-sm max-w-[95vw] w-full max-h-[90vh] flex flex-col">
-          <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
-            <div>
-              <h2 className="font-heading text-lg font-medium">{section.label}</h2>
-              <p className="text-xs text-[var(--text-secondary)]">
-                {editMode === 'order' ? `Editing ${editItems.length} items` : 'Editing 1 item'} • {section.description}
-              </p>
-            </div>
-            <button onClick={cancelEdit} className="p-1 hover:bg-[var(--bg)] rounded-sm">
-              <X size={20} />
-            </button>
-          </div>
-          
-          <div className="flex-1 overflow-auto p-4">
-            {isAdvance ? (
-              // Advances table - EDITABLE
-              <div className="overflow-x-auto">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-xs text-[var(--text-secondary)]">
-                    Editing advances for: <span className="font-mono font-medium">{editItems[0]?.ref}</span>
-                  </span>
-                  <button
-                    onClick={addNewAdvance}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[var(--success)] text-white rounded-sm hover:bg-[#3d4a3f]"
-                  >
-                    <Plus size={12} /> Add Advance
-                  </button>
-                </div>
-                
-                {/* Existing Advances */}
-                {Object.keys(advanceData).length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-xs font-semibold text-[var(--text-secondary)] mb-2">Existing Advances</h4>
-                    <table className="w-full border border-[var(--border-subtle)]">
-                      <thead className="bg-[var(--bg)] sticky top-0">
-                        <tr>
-                          {section.fields.map(field => (
-                            <th key={field.key} className="px-2 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">
-                              {field.label}
-                            </th>
-                          ))}
-                          <th className="px-2 py-2 text-center text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-16">
-                            Action
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(advanceData).map(([advId, adv]) => (
-                          <tr key={advId} className="border-b border-[var(--border-subtle)] last:border-0">
-                            {section.fields.map(field => (
-                              <td key={field.key} className="px-2 py-2">
-                                {renderAdvanceField(field, advId, adv[field.key])}
-                              </td>
-                            ))}
-                            <td className="px-2 py-2 text-center">
-                              <button
-                                onClick={() => markAdvanceForDelete(advId)}
-                                className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"
-                                title="Delete Advance"
-                              >
-                                <Trash size={14} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                
-                {/* New Advances */}
-                {newAdvances.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-xs font-semibold text-[var(--success)] mb-2">New Advances (to be created)</h4>
-                    <table className="w-full border border-[var(--border-subtle)]">
-                      <thead className="bg-[var(--bg)] sticky top-0">
-                        <tr>
-                          {section.fields.map(field => (
-                            <th key={field.key} className="px-2 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">
-                              {field.label}
-                            </th>
-                          ))}
-                          <th className="px-2 py-2 text-center text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-16">
-                            Action
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {newAdvances.map((adv, idx) => (
-                          <tr key={adv.id} className="border-b border-[var(--border-subtle)] last:border-0 bg-[#455D4A08]">
-                            {section.fields.map(field => (
-                              <td key={field.key} className="px-2 py-2">
-                                {renderNewAdvanceField(field, idx, adv[field.key])}
-                              </td>
-                            ))}
-                            <td className="px-2 py-2 text-center">
-                              <button
-                                onClick={() => removeNewAdvance(idx)}
-                                className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"
-                                title="Remove"
-                              >
-                                <X size={14} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                
-                {/* Deleted Advances Indicator */}
-                {deletedAdvances.length > 0 && (
-                  <div className="mb-3 p-2 bg-[#9E473D10] border border-[var(--error)] rounded-sm text-xs">
-                    <span className="text-[var(--error)]">
-                      {deletedAdvances.length} advance(s) marked for deletion
-                    </span>
-                  </div>
-                )}
-                
-                {/* Empty State */}
-                {Object.keys(advanceData).length === 0 && newAdvances.length === 0 && (
-                  <div className="p-4 text-center text-sm text-[var(--text-secondary)] border border-dashed border-[var(--border-subtle)] rounded-sm">
-                    No advances for this reference. Click "Add Advance" to create one.
-                  </div>
-                )}
-              </div>
-            ) : (
-              // Regular items table
-              <div className="overflow-x-auto">
-                <table className="w-full border border-[var(--border-subtle)]">
-                  <thead className="bg-[var(--bg)] sticky top-0">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-20">
-                        Item
-                      </th>
-                      {section.fields.map(field => (
-                        <th key={field.key} className="px-3 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] min-w-[100px]">
-                          {field.label} {field.computed && <span className="text-[var(--info)]">(auto)</span>}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {editItems.map((item, idx) => (
-                      <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D05]">
-                        <td className="px-3 py-2 align-top">
-                          <div className="text-xs font-mono text-[var(--brand)]">#{idx + 1}</div>
-                          <div className="text-[10px] text-[var(--text-secondary)] truncate max-w-[100px]">{item.barcode}</div>
-                        </td>
-                        {section.fields.map(field => (
-                          <td key={field.key} className="px-2 py-2 align-top">
-                            {renderFieldInput(field, item.id, editData[item.id]?.[field.key])}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-          
-          <div className="p-4 border-t border-[var(--border-subtle)] flex justify-between items-center">
-            <button 
-              onClick={() => setShowSectionSelector(true)} 
-              className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]"
-            >
-              ← Change Section
-            </button>
-            <div className="flex gap-3">
-              <button 
-                onClick={cancelEdit} 
-                className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={saveEdits} 
-                disabled={saving}
-                className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 flex items-center gap-2"
-              >
-                {saving ? 'Saving...' : <><Check size={14} /> Confirm Changes</>}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // Section selector and edit modals are rendered inline in the return to avoid
+  // inner-component remount bug that causes input focus loss on every keystroke.
+  const _sectionForEdit = selectedSection ? SECTIONS[selectedSection] : null;
+  const _isAdvanceEdit = _sectionForEdit?.isAdvanceSection;
 
   const DeleteConfirmModal = () => (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setDelConfirm(null)}>
@@ -1045,9 +655,142 @@ export default function ItemsManager() {
         <span className="ml-auto text-xs text-[var(--text-secondary)]">{refs.length} references, {allItems.length} items</span>
       </div>
 
-      {/* Modals */}
-      {showSectionSelector && <SectionSelectorModal />}
-      {selectedSection && <SectionEditModal />}
+      {/* Section Selector Modal - inline to preserve input focus */}
+      {showSectionSelector && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--surface)] rounded-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-[var(--border-subtle)]">
+              <h2 className="font-heading text-xl font-medium">Select Section to Edit</h2>
+              <p className="text-sm text-[var(--text-secondary)] mt-1">
+                {editMode === 'order' ? `Editing order with ${editItems.length} items` : 'Editing single item'}
+              </p>
+            </div>
+            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(SECTIONS).map(([key, section]) => (
+                <button key={key} onClick={() => startEdit(key, editItems, editMode)} className="p-4 border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:bg-[#C86B4D08] text-left transition-colors">
+                  <h3 className="font-medium text-[var(--brand)]">{section.label}</h3>
+                  <p className="text-xs text-[var(--text-secondary)] mt-1">{section.description}</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-2">{section.fields.length} fields</p>
+                </button>
+              ))}
+            </div>
+            <div className="p-4 border-t border-[var(--border-subtle)] flex justify-end">
+              <button onClick={() => { setShowSectionSelector(false); setEditItems([]); }} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section Edit Modal - inline to preserve input focus */}
+      {selectedSection && _sectionForEdit && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--surface)] rounded-sm max-w-[95vw] w-full max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
+              <div>
+                <h2 className="font-heading text-lg font-medium">{_sectionForEdit.label}</h2>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  {editMode === 'order' ? `Editing ${editItems.length} items` : 'Editing 1 item'} • {_sectionForEdit.description}
+                </p>
+              </div>
+              <button onClick={cancelEdit} className="p-1 hover:bg-[var(--bg)] rounded-sm"><X size={20} /></button>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              {_isAdvanceEdit ? (
+                <div className="overflow-x-auto">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-xs text-[var(--text-secondary)]">Editing advances for: <span className="font-mono font-medium">{editItems[0]?.ref}</span></span>
+                    <button onClick={addNewAdvance} className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[var(--success)] text-white rounded-sm hover:bg-[#3d4a3f]"><Plus size={12} /> Add Advance</button>
+                  </div>
+                  {Object.keys(advanceData).length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-xs font-semibold text-[var(--text-secondary)] mb-2">Existing Advances</h4>
+                      <table className="w-full border border-[var(--border-subtle)]">
+                        <thead className="bg-[var(--bg)] sticky top-0"><tr>
+                          {_sectionForEdit.fields.map(f => <th key={f.key} className="px-2 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">{f.label}</th>)}
+                          <th className="px-2 py-2 text-center text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-16">Action</th>
+                        </tr></thead>
+                        <tbody>
+                          {Object.entries(advanceData).map(([advId, adv]) => (
+                            <tr key={advId} className="border-b border-[var(--border-subtle)] last:border-0">
+                              {_sectionForEdit.fields.map(f => <td key={f.key} className="px-2 py-2">{renderFieldInput(f, advId, adv[f.key], handleAdvanceChange)}</td>)}
+                              <td className="px-2 py-2 text-center"><button onClick={() => markAdvanceForDelete(advId)} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"><Trash size={14} /></button></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {newAdvances.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-xs font-semibold text-[var(--success)] mb-2">New Advances (to be created)</h4>
+                      <table className="w-full border border-[var(--border-subtle)]">
+                        <thead className="bg-[var(--bg)] sticky top-0"><tr>
+                          {_sectionForEdit.fields.map(f => <th key={f.key} className="px-2 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">{f.label}</th>)}
+                          <th className="px-2 py-2 text-center text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-16">Action</th>
+                        </tr></thead>
+                        <tbody>
+                          {newAdvances.map((adv, idx) => (
+                            <tr key={adv.id} className="border-b border-[var(--border-subtle)] last:border-0 bg-[#455D4A08]">
+                              {_sectionForEdit.fields.map(f => <td key={f.key} className="px-2 py-2">{renderFieldInput(f, idx, adv[f.key], (i, k, v) => handleNewAdvanceChange(i, k, v))}</td>)}
+                              <td className="px-2 py-2 text-center"><button onClick={() => removeNewAdvance(idx)} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"><X size={14} /></button></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {deletedAdvances.length > 0 && (
+                    <div className="mb-3 p-2 bg-[#9E473D10] border border-[var(--error)] rounded-sm text-xs">
+                      <span className="text-[var(--error)]">{deletedAdvances.length} advance(s) marked for deletion</span>
+                    </div>
+                  )}
+                  {Object.keys(advanceData).length === 0 && newAdvances.length === 0 && (
+                    <div className="p-4 text-center text-sm text-[var(--text-secondary)] border border-dashed border-[var(--border-subtle)] rounded-sm">No advances for this reference. Click "Add Advance" to create one.</div>
+                  )}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full border border-[var(--border-subtle)]">
+                    <thead className="bg-[var(--bg)] sticky top-0"><tr>
+                      <th className="px-3 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-20">Item</th>
+                      {_sectionForEdit.fields.map(f => (
+                        <th key={f.key} className="px-3 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] min-w-[100px]">
+                          {f.label} {f.computed && <span className="text-[var(--info)]">(auto)</span>}
+                        </th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {editItems.map((item, idx) => (
+                        <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D05]">
+                          <td className="px-3 py-2 align-top">
+                            <div className="text-xs font-mono text-[var(--brand)]">#{idx + 1}</div>
+                            <div className="text-[10px] text-[var(--text-secondary)] truncate max-w-[100px]">{item.barcode}</div>
+                          </td>
+                          {_sectionForEdit.fields.map(f => (
+                            <td key={f.key} className="px-2 py-2 align-top">
+                              {renderFieldInput(f, item.id, editData[item.id]?.[f.key], handleFieldChange)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-[var(--border-subtle)] flex justify-between items-center">
+              <button onClick={() => setShowSectionSelector(true)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">← Change Section</button>
+              <div className="flex gap-3">
+                <button onClick={cancelEdit} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">Cancel</button>
+                <button onClick={saveEdits} disabled={saving} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 flex items-center gap-2">
+                  {saving ? 'Saving...' : <><Check size={14} /> Confirm Changes</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {delConfirm && <DeleteConfirmModal />}
       
       {/* Amount Mismatch Prompt */}
