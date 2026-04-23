@@ -2068,7 +2068,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
             </tr>"""
         rows += f'<tr class="foot"><td colspan="4" class="r">TOTAL</td><td class="r">₹{fmt(tail_total)}</td><td></td><td></td></tr>'
         tail_section = f"""
-        <h3 class="sec-title">B. Tailoring</h3>
+        <h3 class="sec-title">Tailoring</h3>
         <table><thead><tr><th>#</th><th>Article</th><th>Order#</th><th>Delivery</th><th class="r">Tailoring</th><th class="r">Labour</th><th>Payment</th></tr></thead>
         <tbody>{rows}</tbody></table>"""
 
@@ -2089,7 +2089,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
             </tr>"""
         rows += f'<tr class="foot"><td colspan="4" class="r">TOTAL</td><td class="r">₹{fmt(emb_total)}</td><td></td></tr>'
         emb_section = f"""
-        <h3 class="sec-title">C. Embroidery</h3>
+        <h3 class="sec-title">Embroidery</h3>
         <table><thead><tr><th>#</th><th>Article</th><th>Status</th><th>Karigar</th><th class="r">Amount</th><th>Payment</th></tr></thead>
         <tbody>{rows}</tbody></table>"""
 
@@ -2110,7 +2110,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
             </tr>"""
         rows += f'<tr class="foot"><td colspan="3" class="r">TOTAL</td><td class="r">₹{fmt(addon_total)}</td><td></td></tr>'
         addon_section = f"""
-        <h3 class="sec-title">D. Add-ons</h3>
+        <h3 class="sec-title">Add-ons</h3>
         <table><thead><tr><th>#</th><th>Article</th><th>Add-on</th><th class="r">Amount</th><th>Payment</th></tr></thead>
         <tbody>{rows}</tbody></table>"""
 
@@ -2121,27 +2121,27 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
         rows = "".join(f'<tr><td>{a.get("date","")}</td><td class="r">₹{fmt(a.get("amount",0))}</td><td>{a.get("mode","")}</td></tr>' for a in advances)
         rows += f'<tr class="foot"><td>Net Advance</td><td class="r">₹{fmt(total_adv)}</td><td></td></tr>'
         adv_section = f"""
-        <h3 class="sec-title">E. Advances</h3>
+        <h3 class="sec-title">Advances</h3>
         <table><thead><tr><th>Date</th><th class="r">Amount</th><th>Mode</th></tr></thead>
         <tbody>{rows}</tbody></table>"""
 
     # ---- Payment summary ----
     fab_received = sum(float(i.get("fabric_received", 0)) for i in items)
-    fab_pending = sum(float(i.get("fabric_pending", 0)) for i in items if i.get("fabric_pay_mode") == "Pending")
+    fab_pending = sum(max(float(i.get("fabric_pending", 0)), 0) for i in items)
     tail_total_amt = sum(float(i.get("tailoring_amount", 0)) for i in items)
     tail_received = sum(float(i.get("tailoring_received", 0)) for i in items)
-    tail_pending_amt = sum(float(i.get("tailoring_pending", 0)) for i in items if i.get("tailoring_pay_mode") == "Pending")
+    tail_pending_amt = sum(max(float(i.get("tailoring_pending", 0)), 0) for i in items)
     emb_total_amt = sum(float(i.get("embroidery_amount", 0)) for i in items)
     emb_received = sum(float(i.get("embroidery_received", 0)) for i in items)
-    emb_pending_amt = sum(float(i.get("embroidery_pending", 0)) for i in items if i.get("embroidery_pay_mode") == "Pending")
+    emb_pending_amt = sum(max(float(i.get("embroidery_pending", 0)), 0) for i in items)
     addon_total_amt = sum(float(i.get("addon_amount", 0)) for i in items)
     addon_received = sum(float(i.get("addon_received", 0)) for i in items)
-    addon_pending_amt = sum(float(i.get("addon_pending", 0)) for i in items if i.get("addon_pay_mode") == "Pending")
+    addon_pending_amt = sum(max(float(i.get("addon_pending", 0)), 0) for i in items)
 
     grand_total = fab_total + tail_total_amt + emb_total_amt + addon_total_amt
     total_received = fab_received + tail_received + emb_received + addon_received
     total_pending = fab_pending + tail_pending_amt + emb_pending_amt + addon_pending_amt
-    net_payable = total_pending - max(total_adv, 0)
+    net_payable = max(total_pending - max(total_adv, 0), 0)
 
     summary_rows = f"""
       <tr><td>Fabric (incl. GST {GST_RATE:.0f}%)</td><td class="r">₹{fmt(fab_total)}</td><td class="r">₹{fmt(fab_received)}</td><td class="r">₹{fmt(fab_pending)}</td></tr>"""
@@ -2245,7 +2245,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
   </div>
 
   <!-- A. FABRIC ITEMS -->
-  <h3 class="sec-title">A. Fabric Items</h3>
+  <h3 class="sec-title">Fabric Items</h3>
   <table>
     <thead><tr><th>#</th><th>Article</th><th>Barcode</th><th class="r">Price/m</th><th class="r">Qty</th><th class="r">Disc%</th><th class="r">Amount</th><th class="r">Base Amt</th><th class="r">GST ({GST_RATE:.0f}%)</th></tr></thead>
     <tbody>{fab_rows_html}{fab_foot}</tbody>
@@ -2258,7 +2258,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
 
   <!-- F. PAYMENT SUMMARY -->
   <div class="summary-wrap">
-    <h3 class="sec-title">F. Payment Summary</h3>
+    <h3 class="sec-title">Payment Summary</h3>
     <table>
       <thead><tr><th>Category</th><th class="r">Total</th><th class="r">Received</th><th class="r">Pending</th></tr></thead>
       <tbody>{summary_rows}</tbody>
