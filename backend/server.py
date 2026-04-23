@@ -145,6 +145,7 @@ class TallyRequest(BaseModel):
     entry_ids: List[str]
     category: str
     action: str  # "tally" or "untally"
+    date: Optional[str] = None  # scope tally to a specific pay-date row
 
 class LabourPaymentRequest(BaseModel):
     item_ids: List[str]
@@ -1540,7 +1541,21 @@ async def process_settlement(req: SettlementRequest):
 
 @api_router.get("/daybook")
 async def get_daybook(date_filter: Optional[str] = None):
-    entries = {}  # ref -> entry dict
+    # Key: (date, ref) — each unique pay-date × ref combination is a separate row
+    entries = {}
+
+    def get_or_create(date, ref, name):
+        key = (date, ref)
+        if key not in entries:
+            entries[key] = {
+                "date": date,
+                "ref": ref,
+                "name": name,
+                "fabric": 0, "tailoring": 0, "embroidery": 0, "addon": 0, "advance": 0, "total": 0,
+                "modes": {"fabric": "", "tailoring": "", "embroidery": "", "addon": "", "advance": ""},
+                "tally_status": {"fabric": False, "tailoring": False, "embroidery": False, "addon": False, "advance": False},
+            }
+        return entries[key]
 
     item_query = {}
     if date_filter and date_filter != "All":
@@ -1554,43 +1569,30 @@ async def get_daybook(date_filter: Optional[str] = None):
     items = await db.items.find(item_query if date_filter and date_filter != "All" else {}, {"_id": 0}).to_list(2000)
 
     categories = [
-        ("fabric", "fabric_pay_date", "fabric_received", "fabric_pay_mode", "tally_fabric"),
-        ("tailoring", "tailoring_pay_date", "tailoring_received", "tailoring_pay_mode", "tally_tailoring"),
+        ("fabric",     "fabric_pay_date",     "fabric_received",     "fabric_pay_mode",     "tally_fabric"),
+        ("tailoring",  "tailoring_pay_date",  "tailoring_received",  "tailoring_pay_mode",  "tally_tailoring"),
         ("embroidery", "embroidery_pay_date", "embroidery_received", "embroidery_pay_mode", "tally_embroidery"),
-        ("addon", "addon_pay_date", "addon_received", "addon_pay_mode", "tally_addon"),
+        ("addon",      "addon_pay_date",      "addon_received",      "addon_pay_mode",      "tally_addon"),
     ]
 
     for item in items:
+        ref  = item.get("ref", "")
+        name = item.get("name", "")
         for cat_name, date_field, received_field, mode_field, tally_field in categories:
             pay_date = item.get(date_field, "N/A")
             received = item.get(received_field, 0)
-            if pay_date == "N/A" or received == 0:
+            if pay_date == "N/A" or not received:
                 continue
-
             if date_filter and date_filter != "All" and pay_date != date_filter:
                 continue
 
-            ref = item.get("ref", "")
-            is_tallied = item.get(tally_field, False)
-
-            if ref not in entries:
-                entries[ref] = {
-                    "ref": ref,
-                    "name": item.get("name", ""),
-                    "fabric": 0, "tailoring": 0, "embroidery": 0, "addon": 0, "advance": 0, "total": 0,
-                    "modes": {"fabric": "", "tailoring": "", "embroidery": "", "addon": ""},
-                    "tally_status": {"fabric": False, "tailoring": False, "embroidery": False, "addon": False, "advance": False},
-                    "pay_dates": [],
-                }
-
-            entries[ref][cat_name] += received
-            entries[ref]["total"] += received
-            entries[ref]["tally_status"][cat_name] = is_tallied
+            e = get_or_create(pay_date, ref, name)
+            e[cat_name]  += received
+            e["total"]   += received
+            e["tally_status"][cat_name] = item.get(tally_field, False)
             mode = item.get(mode_field, "")
-            if mode and mode not in entries[ref]["modes"][cat_name]:
-                entries[ref]["modes"][cat_name] = mode
-            if pay_date and pay_date not in entries[ref]["pay_dates"]:
-                entries[ref]["pay_dates"].append(pay_date)
+            if mode:
+                e["modes"][cat_name] = mode
 
     adv_query = {}
     if date_filter and date_filter != "All":
@@ -1598,26 +1600,23 @@ async def get_daybook(date_filter: Optional[str] = None):
 
     advances = await db.advances.find(adv_query, {"_id": 0}).to_list(500)
     for adv in advances:
-        if adv.get("amount", 0) == 0:
+        amount = adv.get("amount", 0)
+        if not amount:
             continue
-        ref = adv.get("ref", "")
-        is_tallied = adv.get("tally", False)
-
-        if ref not in entries:
-            entries[ref] = {
-                "ref": ref,
-                "name": adv.get("name", ""),
-                "fabric": 0, "tailoring": 0, "embroidery": 0, "addon": 0, "advance": 0, "total": 0,
-                "modes": {"fabric": "", "tailoring": "", "embroidery": "", "addon": ""},
-                "tally_status": {"fabric": False, "tailoring": False, "embroidery": False, "addon": False, "advance": False},
-                "pay_dates": [],
-            }
-        entries[ref]["advance"] += adv.get("amount", 0)
-        entries[ref]["total"] += adv.get("amount", 0)
-        entries[ref]["tally_status"]["advance"] = is_tallied
+        ref      = adv.get("ref", "")
         adv_date = adv.get("date", "")
-        if adv_date and adv_date not in entries[ref]["pay_dates"]:
-            entries[ref]["pay_dates"].append(adv_date)
+        if not adv_date:
+            continue
+        if date_filter and date_filter != "All" and adv_date != date_filter:
+            continue
+
+        e = get_or_create(adv_date, ref, adv.get("name", ""))
+        e["advance"] += amount
+        e["total"]   += amount
+        e["tally_status"]["advance"] = adv.get("tally", False)
+        mode = adv.get("mode", "")
+        if mode:
+            e["modes"]["advance"] = mode
 
     return {"entries": list(entries.values())}
 
@@ -1641,31 +1640,38 @@ async def get_daybook_dates():
 async def tally_entries(req: TallyRequest):
     tally_value = req.action == "tally"
 
+    date_field_map = {
+        "fabric":     ("tally_fabric",     "fabric_pay_date"),
+        "tailoring":  ("tally_tailoring",  "tailoring_pay_date"),
+        "embroidery": ("tally_embroidery", "embroidery_pay_date"),
+        "addon":      ("tally_addon",      "addon_pay_date"),
+    }
+
     if req.category == "advance":
         for entry_ref in req.entry_ids:
-            await db.advances.update_many({"ref": entry_ref}, {"$set": {"tally": tally_value}})
-    else:
-        field_map = {
-            "fabric": "tally_fabric",
-            "tailoring": "tally_tailoring",
-            "embroidery": "tally_embroidery",
-            "addon": "tally_addon",
-            "all": None,
-        }
-
+            adv_query = {"ref": entry_ref}
+            if req.date:
+                adv_query["date"] = req.date
+            await db.advances.update_many(adv_query, {"$set": {"tally": tally_value}})
+    elif req.category == "all":
         for entry_ref in req.entry_ids:
-            if req.category == "all":
-                update = {
-                    "tally_fabric": tally_value,
-                    "tally_tailoring": tally_value,
-                    "tally_embroidery": tally_value,
-                    "tally_addon": tally_value,
-                }
-                await db.items.update_many({"ref": entry_ref}, {"$set": update})
-                await db.advances.update_many({"ref": entry_ref}, {"$set": {"tally": tally_value}})
-            elif req.category in field_map:
-                field = field_map[req.category]
-                await db.items.update_many({"ref": entry_ref}, {"$set": {field: tally_value}})
+            # Update each category scoped to its own pay_date
+            for cat, (tally_field, pay_date_field) in date_field_map.items():
+                item_query = {"ref": entry_ref}
+                if req.date:
+                    item_query[pay_date_field] = req.date
+                await db.items.update_many(item_query, {"$set": {tally_field: tally_value}})
+            adv_query = {"ref": entry_ref}
+            if req.date:
+                adv_query["date"] = req.date
+            await db.advances.update_many(adv_query, {"$set": {"tally": tally_value}})
+    elif req.category in date_field_map:
+        tally_field, pay_date_field = date_field_map[req.category]
+        for entry_ref in req.entry_ids:
+            item_query = {"ref": entry_ref}
+            if req.date:
+                item_query[pay_date_field] = req.date
+            await db.items.update_many(item_query, {"$set": {tally_field: tally_value}})
 
     return {"message": f"{len(req.entry_ids)} entries {req.action}ed"}
 

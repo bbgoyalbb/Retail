@@ -34,12 +34,10 @@ function DaybookTable({ entries, onCategoryTally, loading }) {
   const { toast } = useToast();
   const [sortKey, setSortKey] = useState("date");
   const [sortDir, setSortDir] = useState("desc");
-  const [viewMode, setViewMode] = useState("pending"); // "pending" | "tallied"
-  // Track optimistic tally updates for instant UI feedback
+  const [viewMode, setViewMode] = useState("pending");
   const [localEntries, setLocalEntries] = useState(entries);
-  const [updatingTally, setUpdatingTally] = useState({}); // { "ref:category": true }
+  const [updatingTally, setUpdatingTally] = useState({});
 
-  // Sync local entries when props change
   useEffect(() => { setLocalEntries(entries); }, [entries]);
 
   const handleSort = (key) => {
@@ -48,122 +46,69 @@ function DaybookTable({ entries, onCategoryTally, loading }) {
   };
 
   const fmt = (n) => n ? new Intl.NumberFormat('en-IN').format(Math.round(n)) : "-";
-  
-  // Helper to check if entry is fully tallied
+
   const isFullyTallied = (entry) => {
-    const tallyStatus = entry.tally_status || {};
-    const hasFabric = (entry.fabric || 0) > 0;
-    const hasTailoring = (entry.tailoring || 0) > 0;
-    const hasEmbroidery = (entry.embroidery || 0) > 0;
-    const hasAddon = (entry.addon || 0) > 0;
-    const hasAdvance = (entry.advance || 0) !== 0;
-    
-    if (hasFabric && !tallyStatus.fabric) return false;
-    if (hasTailoring && !tallyStatus.tailoring) return false;
-    if (hasEmbroidery && !tallyStatus.embroidery) return false;
-    if (hasAddon && !tallyStatus.addon) return false;
-    if (hasAdvance && !tallyStatus.advance) return false;
+    const ts = entry.tally_status || {};
+    if ((entry.fabric || 0) > 0 && !ts.fabric) return false;
+    if ((entry.tailoring || 0) > 0 && !ts.tailoring) return false;
+    if ((entry.embroidery || 0) > 0 && !ts.embroidery) return false;
+    if ((entry.addon || 0) > 0 && !ts.addon) return false;
+    if ((entry.advance || 0) !== 0 && !ts.advance) return false;
     return true;
   };
-  
-  // Filter entries based on view mode
-  const visibleEntries = localEntries.filter(entry => {
-    const fullyTallied = isFullyTallied(entry);
-    if (viewMode === "pending") return !fullyTallied;
-    return fullyTallied;
-  });
-  
+
+  const visibleEntries = localEntries.filter(entry =>
+    viewMode === "pending" ? !isFullyTallied(entry) : isFullyTallied(entry)
+  );
+
   const grandTotal = visibleEntries.reduce((s, e) => s + (e.total || 0), 0);
-  
+
   const sorted = [...visibleEntries].sort((a, b) => {
-    let va = a[sortKey], vb = b[sortKey];
-    
-    // Handle missing values
-    if (va === undefined || va === null) va = "";
-    if (vb === undefined || vb === null) vb = "";
-    
-    // For date field, use pay_dates if available (take first date for sorting)
-    if (sortKey === "date") {
-      const payDatesA = a.pay_dates || [];
-      const payDatesB = b.pay_dates || [];
-      va = payDatesA.length > 0 ? payDatesA[0] : (a.date || "");
-      vb = payDatesB.length > 0 ? payDatesB[0] : (b.date || "");
-    }
-    
-    // Check if values are dates (YYYY-MM-DD format)
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    const isDateA = dateRegex.test(String(va));
-    const isDateB = dateRegex.test(String(vb));
-    
-    if (isDateA && isDateB) {
-      // Compare as dates (reverse for desc)
-      const cmp = String(va).localeCompare(String(vb));
-      return sortDir === "asc" ? cmp : -cmp;
-    }
-    
-    // Check if numeric
+    let va = a[sortKey] ?? "";
+    let vb = b[sortKey] ?? "";
     if (typeof va === "number" && typeof vb === "number") {
-      const cmp = va - vb;
-      return sortDir === "asc" ? cmp : -cmp;
+      return sortDir === "asc" ? va - vb : vb - va;
     }
-    
-    // Default string comparison
     const cmp = String(va).localeCompare(String(vb));
     return sortDir === "asc" ? cmp : -cmp;
   });
 
-  const getModeCodes = (modes) => {
-    if (!modes) return "";
-    const all = Object.values(modes).join(" ").toUpperCase();
-    const codes = [];
-    if (all.includes("CASH")) codes.push("C");
-    if (all.includes("PHONEPE")) codes.push("P");
-    if (all.includes("[E]")) codes.push("E");
-    if (all.includes("[S]")) codes.push("S");
-    if (all.includes("BANK") || all.includes("TRANSFER")) codes.push("B");
-    return codes.length > 0 ? `[${codes.join("+")}]` : "";
+  // Compact mode label: Cash→C, PhonePe→P, Bank/Transfer→B, etc.
+  const modeCode = (mode = "") => {
+    const m = mode.toUpperCase();
+    if (m.includes("CASH")) return "C";
+    if (m.includes("PHONEPE") || m.includes("PHONE PE")) return "P";
+    if (m.includes("BANK") || m.includes("TRANSFER") || m.includes("NEFT") || m.includes("IMPS")) return "B";
+    if (m.includes("[E]")) return "E";
+    if (m.includes("[S]")) return "S";
+    return mode ? mode.slice(0, 2).toUpperCase() : "";
   };
 
-  const handleCategoryTallyClick = async (ref, category, isTallied) => {
+  // Row-level unique key: date + ref
+  const rowKey = (entry) => `${entry.date}__${entry.ref}`;
+
+  const handleCategoryTallyClick = async (entry, category, isTallied) => {
     const action = isTallied ? "untally" : "tally";
-    const tallyKey = `${ref}:${category}`;
-    
-    // Optimistically update UI immediately
-    setLocalEntries(prev => prev.map(entry => {
-      if (entry.ref === ref) {
-        return {
-          ...entry,
-          tally_status: {
-            ...entry.tally_status,
-            [category]: !isTallied
-          }
-        };
-      }
-      return entry;
-    }));
-    
-    // Track loading state
-    setUpdatingTally(prev => ({ ...prev, [tallyKey]: true }));
-    
+    const key = `${rowKey(entry)}:${category}`;
+
+    setLocalEntries(prev => prev.map(e =>
+      e.date === entry.date && e.ref === entry.ref
+        ? { ...e, tally_status: { ...e.tally_status, [category]: !isTallied } }
+        : e
+    ));
+    setUpdatingTally(prev => ({ ...prev, [key]: true }));
+
     try {
-      await onCategoryTally(ref, category, action);
+      await onCategoryTally(entry.ref, entry.date, category, action);
     } catch (err) {
-      // Revert optimistic update on error
-      setLocalEntries(prev => prev.map(entry => {
-        if (entry.ref === ref) {
-          return {
-            ...entry,
-            tally_status: {
-              ...entry.tally_status,
-              [category]: isTallied
-            }
-          };
-        }
-        return entry;
-      }));
-      toast({ title: "Tally failed", description: err.message || "Could not update tally. Please try again.", variant: "destructive" });
+      setLocalEntries(prev => prev.map(e =>
+        e.date === entry.date && e.ref === entry.ref
+          ? { ...e, tally_status: { ...e.tally_status, [category]: isTallied } }
+          : e
+      ));
+      toast({ title: "Tally failed", description: err.message || "Could not update tally.", variant: "destructive" });
     } finally {
-      setUpdatingTally(prev => ({ ...prev, [tallyKey]: false }));
+      setUpdatingTally(prev => ({ ...prev, [key]: false }));
     }
   };
 
@@ -177,26 +122,16 @@ function DaybookTable({ entries, onCategoryTally, loading }) {
           <span className="font-mono text-xs text-[var(--text-secondary)]">Total: ₹{fmt(grandTotal)}</span>
         </div>
         <div className="flex items-center gap-1 bg-[var(--bg)] rounded-sm p-0.5">
-          <button
-            onClick={() => setViewMode("pending")}
-            className={`px-3 py-1 text-xs font-medium rounded-sm transition-colors ${
-              viewMode === "pending" 
-                ? 'bg-[var(--surface)] text-[var(--brand)] shadow-sm' 
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            Pending
-          </button>
-          <button
-            onClick={() => setViewMode("tallied")}
-            className={`px-3 py-1 text-xs font-medium rounded-sm transition-colors ${
-              viewMode === "tallied" 
-                ? 'bg-[var(--surface)] text-[var(--brand)] shadow-sm' 
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            Tallied
-          </button>
+          {["pending", "tallied"].map(mode => (
+            <button key={mode} onClick={() => setViewMode(mode)}
+              className={`px-3 py-1 text-xs font-medium rounded-sm transition-colors capitalize ${
+                viewMode === mode
+                  ? 'bg-[var(--surface)] text-[var(--brand)] shadow-sm'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}>
+              {mode}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -204,110 +139,67 @@ function DaybookTable({ entries, onCategoryTally, loading }) {
         <p className="p-6 text-sm text-[var(--text-secondary)] text-center">No entries</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[860px]">
             <thead>
               <tr className="bg-[var(--bg)]">
-                <SortableHeader label="Ref" sortKey="ref" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortableHeader label="Date" sortKey="date" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-                <SortableHeader label="Name" sortKey="name" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Fabric</th>
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Tailoring</th>
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Emb.</th>
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Add-on</th>
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Adv.</th>
+                <SortableHeader label="Date"      sortKey="date"      currentKey={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortableHeader label="Ref"       sortKey="ref"       currentKey={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortableHeader label="Name"      sortKey="name"      currentKey={sortKey} dir={sortDir} onSort={handleSort} />
+                <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-center">Mode</th>
+                <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Fabric</th>
+                <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Tailoring</th>
+                <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Emb.</th>
+                <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Add-on</th>
+                <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Adv.</th>
                 <SortableHeader label="Total" sortKey="total" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Mode</th>
               </tr>
             </thead>
             <tbody>
-              {sorted.map((entry, i) => {
-                const tallyStatus = entry.tally_status || {};
-                const fabricKey = `${entry.ref}:fabric`;
-                const tailoringKey = `${entry.ref}:tailoring`;
-                const embroideryKey = `${entry.ref}:embroidery`;
-                const addonKey = `${entry.ref}:addon`;
-                const advanceKey = `${entry.ref}:advance`;
+              {sorted.map((entry) => {
+                const ts = entry.tally_status || {};
+                const modes = entry.modes || {};
+                // Build compact mode string from all non-empty modes
+                const allModeCodes = [...new Set(
+                  ["fabric","tailoring","embroidery","addon","advance"]
+                    .map(c => modeCode(modes[c] || ""))
+                    .filter(Boolean)
+                )].join("+");
+
+                const tallyCell = (cat, amount) => {
+                  const key = `${rowKey(entry)}:${cat}`;
+                  if (!amount) return <td key={cat} className="px-2 py-2.5 text-right"><span className="font-mono text-xs text-[var(--text-secondary)]">-</span></td>;
+                  return (
+                    <td key={cat} className="px-2 py-2.5">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span className="font-mono text-xs">{fmt(amount)}</span>
+                        <TallyButton
+                          isTallied={ts[cat]}
+                          onClick={(e) => { e.stopPropagation(); handleCategoryTallyClick(entry, cat, ts[cat]); }}
+                          hasAmount={true}
+                          label={cat}
+                          loading={updatingTally[key]}
+                        />
+                      </div>
+                    </td>
+                  );
+                };
+
                 return (
-                  <tr key={i} className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D05]">
-                    <td className="px-3 py-2.5 font-mono text-xs">{entry.ref}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs">
-                      {entry.pay_dates && entry.pay_dates.length > 0 
-                        ? entry.pay_dates.sort().join(", ") 
-                        : (entry.date || "-")}
-                    </td>
+                  <tr key={rowKey(entry)} className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D05]">
+                    <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap">{entry.date || "-"}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-[var(--brand)] font-medium">{entry.ref}</td>
                     <td className="px-3 py-2.5 text-sm">{entry.name}</td>
-                    <td className="px-2 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs">{entry.fabric ? fmt(entry.fabric) : "-"}</span>
-                        {entry.fabric > 0 && (
-                          <TallyButton 
-                            isTallied={tallyStatus.fabric} 
-                            onClick={(e) => { e.stopPropagation(); handleCategoryTallyClick(entry.ref, "fabric", tallyStatus.fabric); }}
-                            hasAmount={entry.fabric > 0}
-                            label="Fabric"
-                            loading={updatingTally[fabricKey]}
-                          />
-                        )}
-                      </div>
+                    <td className="px-2 py-2.5 text-center">
+                      {allModeCodes
+                        ? <span className="font-mono text-[10px] text-[var(--text-secondary)] bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-1.5 py-0.5">{allModeCodes}</span>
+                        : <span className="text-[var(--text-secondary)]">-</span>}
                     </td>
-                    <td className="px-2 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs">{entry.tailoring ? fmt(entry.tailoring) : "-"}</span>
-                        {entry.tailoring > 0 && (
-                          <TallyButton 
-                            isTallied={tallyStatus.tailoring} 
-                            onClick={(e) => { e.stopPropagation(); handleCategoryTallyClick(entry.ref, "tailoring", tallyStatus.tailoring); }}
-                            hasAmount={entry.tailoring > 0}
-                            label="Tailoring"
-                            loading={updatingTally[tailoringKey]}
-                          />
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs">{entry.embroidery ? fmt(entry.embroidery) : "-"}</span>
-                        {entry.embroidery > 0 && (
-                          <TallyButton 
-                            isTallied={tallyStatus.embroidery} 
-                            onClick={(e) => { e.stopPropagation(); handleCategoryTallyClick(entry.ref, "embroidery", tallyStatus.embroidery); }}
-                            hasAmount={entry.embroidery > 0}
-                            label="Embroidery"
-                            loading={updatingTally[embroideryKey]}
-                          />
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs">{entry.addon ? fmt(entry.addon) : "-"}</span>
-                        {entry.addon > 0 && (
-                          <TallyButton 
-                            isTallied={tallyStatus.addon} 
-                            onClick={(e) => { e.stopPropagation(); handleCategoryTallyClick(entry.ref, "addon", tallyStatus.addon); }}
-                            hasAmount={entry.addon > 0}
-                            label="Add-on"
-                            loading={updatingTally[addonKey]}
-                          />
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs">{entry.advance ? fmt(entry.advance) : "-"}</span>
-                        {entry.advance !== 0 && (
-                          <TallyButton 
-                            isTallied={tallyStatus.advance} 
-                            onClick={(e) => { e.stopPropagation(); handleCategoryTallyClick(entry.ref, "advance", tallyStatus.advance); }}
-                            hasAmount={entry.advance !== 0}
-                            label="Advance"
-                            loading={updatingTally[advanceKey]}
-                          />
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 font-mono text-sm text-right font-medium">{fmt(entry.total)}</td>
-                    <td className="px-2 py-2.5 text-xs text-[var(--text-secondary)]">{getModeCodes(entry.modes)}</td>
+                    {tallyCell("fabric",     entry.fabric)}
+                    {tallyCell("tailoring",  entry.tailoring)}
+                    {tallyCell("embroidery", entry.embroidery)}
+                    {tallyCell("addon",      entry.addon)}
+                    {tallyCell("advance",    entry.advance)}
+                    <td className="px-3 py-2.5 font-mono text-sm text-right font-semibold">{fmt(entry.total)}</td>
                   </tr>
                 );
               })}
@@ -336,10 +228,8 @@ export default function Daybook() {
   useEffect(() => { getDaybookDates().then(res => setDates(res.data)).catch(() => {}); }, []);
   useEffect(() => { loadData(); }, [loadData]);
 
-  const handleCategoryTally = async (ref, category, action) => {
-    // API call happens inside DaybookTable with optimistic updates
-    // No page refresh - UI updates instantly via local state
-    await tallyEntries({ entry_ids: [ref], category, action });
+  const handleCategoryTally = async (ref, date, category, action) => {
+    await tallyEntries({ entry_ids: [ref], date, category, action });
   };
 
   return (
