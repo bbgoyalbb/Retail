@@ -98,23 +98,33 @@ export default function Settlements() {
 
   const toggleMode = (m) => setSelectedModes(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
 
-  // Auto-distribute: allocate freshPay across sections proportionally
+  // Auto-distribute: allocate the full pool pro-rata across sections (may exceed balance — that's OK)
   const autoDistribute = () => {
-    if (totalPending <= 0) return;
     const pool = totalPool;
     if (pool <= 0) return;
 
-    let remaining = pool;
-    const fabShare = Math.min(balances.fabric, Math.round(pool * (balances.fabric / totalPending)));
-    const tailShare = Math.min(balances.tailoring, Math.round(pool * (balances.tailoring / totalPending)));
-    const embShare = Math.min(balances.embroidery, Math.round(pool * (balances.embroidery / totalPending)));
-    remaining = pool - fabShare - tailShare - embShare;
-    const addonShare = Math.min(balances.addon, Math.max(0, remaining));
+    // Sections with a pending balance participate in pro-rata distribution
+    const sections = [
+      { bal: balances.fabric,     setter: setAllotFab },
+      { bal: balances.tailoring,  setter: setAllotTail },
+      { bal: balances.embroidery, setter: setAllotEmb },
+      { bal: balances.addon,      setter: setAllotAddon },
+    ].filter(s => s.bal > 0);
 
-    setAllotFab(fabShare > 0 ? String(fabShare) : "");
-    setAllotTail(tailShare > 0 ? String(tailShare) : "");
-    setAllotEmb(embShare > 0 ? String(embShare) : "");
-    setAllotAddon(addonShare > 0 ? String(addonShare) : "");
+    const pendingTotal = sections.reduce((s, x) => s + x.bal, 0);
+    if (pendingTotal <= 0) return;
+
+    let running = 0;
+    sections.forEach((s, idx) => {
+      let share;
+      if (idx === sections.length - 1) {
+        share = Math.round(pool - running);
+      } else {
+        share = Math.round(pool * (s.bal / pendingTotal));
+        running += share;
+      }
+      s.setter(share > 0 ? String(share) : "");
+    });
     setAllotAdv("");
   };
 
@@ -129,10 +139,6 @@ export default function Settlements() {
   const handleSubmit = async () => {
     if (!selectedRef) { setMessage({ type: "error", text: "Please select a reference" }); return; }
     if (totalAllocated <= 0) { setMessage({ type: "error", text: "Please allocate at least some amount" }); return; }
-    if (Math.abs(totalAllocated - totalPool) > 1) {
-      setMessage({ type: "error", text: `Allocated (₹${fmt(totalAllocated)}) doesn't match Pool (₹${fmt(totalPool)})` });
-      return;
-    }
     setSaving(true);
     try {
       await processSettlement({
@@ -158,7 +164,11 @@ export default function Settlements() {
     }
   };
 
-  const fmt = (n) => new Intl.NumberFormat('en-IN').format(Math.round(n || 0));
+  const fmt = (n) => {
+    const v = n || 0;
+    const abs = new Intl.NumberFormat('en-IN').format(Math.round(Math.abs(v)));
+    return v < 0 ? `-${abs}` : abs;
+  };
   const hasRef = selectedRef && selectedRef.length > 0;
 
   // Reset when switching modes
@@ -252,9 +262,10 @@ export default function Settlements() {
                     { key: "addon", label: "Add-on", value: balances.addon, color: "var(--text-secondary)" },
                     { key: "advance", label: "Advance", value: balances.advance, color: "var(--success)" },
                   ].map(b => (
-                    <div key={b.key} className="p-3 bg-[var(--bg)] rounded-sm">
+                    <div key={b.key} className={`p-3 rounded-sm ${b.value < 0 ? 'bg-[#9E473D08] border border-[var(--error)]' : 'bg-[var(--bg)]'}`}>
                       <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">{b.label}</p>
-                      <p className="font-mono text-lg font-medium mt-0.5" style={{ color: b.color }}>₹{fmt(b.value)}</p>
+                      <p className="font-mono text-lg font-medium mt-0.5" style={{ color: b.value < 0 ? 'var(--error)' : b.color }}>₹{fmt(b.value)}</p>
+                      {b.value < 0 && <p className="text-[9px] text-[var(--error)] mt-0.5">Credit</p>}
                     </div>
                   ))}
                 </div>
@@ -273,22 +284,42 @@ export default function Settlements() {
               </div>
               <div className="space-y-3">
                 {[
-                  { key: "fabric", label: "Fabric", value: allotFab, setter: setAllotFab, balance: balances.fabric },
-                  { key: "tailoring", label: "Tailoring", value: allotTail, setter: setAllotTail, balance: balances.tailoring },
-                  { key: "embroidery", label: "Embroidery", value: allotEmb, setter: setAllotEmb, balance: balances.embroidery },
-                  { key: "addon", label: "Add-on", value: allotAddon, setter: setAllotAddon, balance: balances.addon },
-                  { key: "advance", label: "New Advance", value: allotAdv, setter: setAllotAdv, balance: null },
-                ].filter(s => s.balance === null || s.balance > 0).map(s => (
-                  <div key={s.key} className="flex items-center gap-2">
-                    <label className="w-20 sm:w-24 text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] flex-shrink-0">{s.label}</label>
-                    <input data-testid={`allot-${s.key}`} type="number" value={s.value} onChange={e => s.setter(e.target.value)} placeholder="0" className="flex-1 min-w-0 px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" />
-                    {s.balance !== null && s.balance > 0 && (
-                      <button onClick={() => settleSection(s.key)} className="flex-shrink-0 text-[10px] px-2 py-1 text-[var(--brand)] border border-[var(--brand)] rounded-sm hover:bg-[#C86B4D10] whitespace-nowrap">
-                        Full
-                      </button>
+                  { key: "fabric",    label: "Fabric",      value: allotFab,   setter: setAllotFab,   balance: balances.fabric },
+                  { key: "tailoring", label: "Tailoring",   value: allotTail,  setter: setAllotTail,  balance: balances.tailoring },
+                  { key: "embroidery",label: "Embroidery",  value: allotEmb,   setter: setAllotEmb,   balance: balances.embroidery },
+                  { key: "addon",     label: "Add-on",      value: allotAddon, setter: setAllotAddon, balance: balances.addon },
+                  { key: "advance",   label: "New Advance", value: allotAdv,   setter: setAllotAdv,   balance: null },
+                ].filter(s => s.balance === null || s.balance > 0).map(s => {
+                  const allotted = parseFloat(s.value) || 0;
+                  const isOver = s.balance !== null && allotted > s.balance + 0.5;
+                  return (
+                  <div key={s.key} className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <label className="w-20 sm:w-24 text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] flex-shrink-0">{s.label}</label>
+                      <input
+                        data-testid={`allot-${s.key}`}
+                        type="number"
+                        value={s.value}
+                        onChange={e => s.setter(e.target.value)}
+                        placeholder="0"
+                        className={`flex-1 min-w-0 px-3 py-2 text-sm border rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] ${
+                          isOver ? 'border-[var(--warning)] bg-[#D4870010]' : 'border-[var(--border-subtle)]'
+                        }`}
+                      />
+                      {s.balance !== null && s.balance > 0 && (
+                        <button onClick={() => settleSection(s.key)} className="flex-shrink-0 text-[10px] px-2 py-1 text-[var(--brand)] border border-[var(--brand)] rounded-sm hover:bg-[#C86B4D10] whitespace-nowrap">
+                          Full
+                        </button>
+                      )}
+                    </div>
+                    {isOver && (
+                      <p className="text-[10px] text-[var(--warning)] pl-[calc(5rem+0.5rem)] sm:pl-[calc(6rem+0.5rem)]">
+                        ⚠ Exceeds balance by ₹{fmt(allotted - s.balance)}. Pending will go negative.
+                      </p>
                     )}
                   </div>
-                ))}
+                  );
+                })
               </div>
             </div>
           )}
@@ -326,10 +357,13 @@ export default function Settlements() {
             </div>
             <div className="flex justify-between text-sm border-t border-[var(--border-subtle)] pt-1.5">
               <span className="text-[var(--text-secondary)]">Allocated</span>
-              <span className={`font-mono font-medium ${Math.abs(totalAllocated - totalPool) > 1 ? 'text-[var(--error)]' : 'text-[var(--success)]'}`}>₹{fmt(totalAllocated)}</span>
+              <span className={`font-mono font-medium ${Math.abs(totalAllocated - totalPool) > 1 ? 'text-[var(--warning)]' : 'text-[var(--success)]'}`}>₹{fmt(totalAllocated)}</span>
             </div>
             {totalPool > 0 && Math.abs(totalAllocated - totalPool) > 1 && (
-              <p className="text-[10px] text-[var(--error)]">Allocated must match pool. Difference: ₹{fmt(Math.abs(totalAllocated - totalPool))}</p>
+              <p className="text-[10px] text-[var(--warning)]">⚠ Allocated ≠ Pool (diff ₹{fmt(Math.abs(totalAllocated - totalPool))}). You can still proceed.</p>
+            )}
+            {totalPool > 0 && totalPool > totalPending && (
+              <p className="text-[10px] text-[var(--warning)]">⚠ Payment exceeds pending balance. Excess will be applied as negative pending (credit).</p>
             )}
           </div>
 

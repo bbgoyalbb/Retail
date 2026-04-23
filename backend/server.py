@@ -1393,19 +1393,19 @@ async def get_settlement_balances(name: Optional[str] = None, ref: Optional[str]
         return {"fabric": 0, "tailoring": 0, "embroidery": 0, "addon": 0, "advance": 0}
 
     pipeline_fab = [
-        {"$match": {"ref": ref, "fabric_pending": {"$gt": 0}}},
+        {"$match": {"ref": ref, "fabric_pending": {"$ne": 0}}},
         {"$group": {"_id": None, "total": {"$sum": "$fabric_pending"}}}
     ]
     pipeline_tail = [
-        {"$match": {"ref": ref, "tailoring_pending": {"$gt": 0}}},
+        {"$match": {"ref": ref, "tailoring_pending": {"$ne": 0}}},
         {"$group": {"_id": None, "total": {"$sum": "$tailoring_pending"}}}
     ]
     pipeline_emb = [
-        {"$match": {"ref": ref, "embroidery_pending": {"$gt": 0}}},
+        {"$match": {"ref": ref, "embroidery_pending": {"$ne": 0}}},
         {"$group": {"_id": None, "total": {"$sum": "$embroidery_pending"}}}
     ]
     pipeline_addon = [
-        {"$match": {"ref": ref, "addon_pending": {"$gt": 0}}},
+        {"$match": {"ref": ref, "addon_pending": {"$ne": 0}}},
         {"$group": {"_id": None, "total": {"$sum": "$addon_pending"}}}
     ]
     pipeline_adv = [
@@ -1439,31 +1439,14 @@ async def process_settlement(req: SettlementRequest):
         raise HTTPException(status_code=400, detail="Please allocate at least some amount")
 
     current_balances = await get_settlement_balances(ref=req.ref)
-    category_limits = {
-        "fabric": (dq_round_money(req.allot_fabric), dq_round_money(current_balances["fabric"])),
-        "tailoring": (dq_round_money(req.allot_tailoring), dq_round_money(current_balances["tailoring"])),
-        "embroidery": (dq_round_money(req.allot_embroidery), dq_round_money(current_balances["embroidery"])),
-        "addon": (dq_round_money(req.allot_addon), dq_round_money(current_balances["addon"])),
-    }
-
-    for category, (allocated, limit) in category_limits.items():
-        if allocated > limit + 0.01:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Allocated {category} amount exceeds the current pending balance."
-            )
 
     available_advance = dq_round_money(current_balances["advance"])
     advance_to_use = 0.0
     if req.use_advance:
         advance_to_use = min(available_advance, max(0.0, dq_round_money(total_allocated - fresh_payment)))
 
-    available_pool = dq_round_money(fresh_payment + advance_to_use)
-    if abs(total_allocated - available_pool) > 1:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Allocated amount ({total_allocated:.0f}) does not match the available payment pool ({available_pool:.0f})."
-        )
+    # Over-payment is allowed: excess is distributed pro-rata and pending goes negative.
+    # Pool-match is validated on the frontend as a warning, not a hard block here.
 
     async def apply_pro_rata(ref, pay_mode_field, pay_date_field, received_field, pending_field, total_to_pay):
         items = await db.items.find({
@@ -1486,10 +1469,9 @@ async def process_settlement(req: SettlementRequest):
                 share = dq_round_money((bal / total_pending) * total_to_pay) if total_pending > 0 else 0
                 running_paid += share
 
-            share = min(share, bal)
             existing_received = dq_round_money(item.get(received_field, 0))
             new_received = dq_round_money(existing_received + share)
-            new_balance = dq_round_money(max(0, bal - share))
+            new_balance = dq_round_money(bal - share)  # allowed to be negative (over-payment)
             update = {
                 pay_date_field: req.payment_date,
                 received_field: new_received,
