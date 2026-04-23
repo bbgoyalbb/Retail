@@ -173,8 +173,22 @@ export default function LabourPayments() {
       .filter(i => editSelectedItems.includes(i.id));
     
     if (itemsToKeep.length === 0) {
-      // If no items left, delete the entire payment
-      await handleDeletePayment(editingPayment);
+      // If no items left, delete the entire payment directly (no need for separate confirm — user already confirmed by deselecting all)
+      setSaving(true);
+      try {
+        await deleteLabourPayment({
+          payment_id: editingPayment.payment_id,
+          item_ids: editingPayment.items.map(i => i.id),
+          labour_type: editingPayment.labour_type
+        });
+        setMessage({ type: "success", text: `Payment deleted - ${editingPayment.items.length} items marked as unpaid` });
+        loadData();
+      } catch (err) {
+        setMessage({ type: "error", text: "Failed to delete payment" });
+      } finally {
+        setSaving(false);
+        setTimeout(() => setMessage(null), 3000);
+      }
       setEditingPayment(null);
       setEditSelectedItems([]);
       return;
@@ -264,20 +278,16 @@ export default function LabourPayments() {
               </button>
             </div>
             
-            {viewMode === "unpaid" && (
-              <>
-                <select data-testid="labour-type-filter" value={filterType} onChange={e => setFilterType(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-                  <option value="All">All Types</option>
-                  <option value="Tailoring Labour">Tailoring</option>
-                  <option value="Embroidery Labour">Embroidery</option>
-                </select>
-                {filterType !== "Tailoring Labour" && (
-                  <select data-testid="labour-karigar-filter" value={filterKarigar} onChange={e => setFilterKarigar(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-                    <option value="All">All Karigars</option>
-                    {karigars.map(k => <option key={k} value={k}>{k}</option>)}
-                  </select>
-                )}
-              </>
+            <select data-testid="labour-type-filter" value={filterType} onChange={e => setFilterType(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
+              <option value="All">All Types</option>
+              <option value="Tailoring Labour">Tailoring</option>
+              <option value="Embroidery Labour">Embroidery</option>
+            </select>
+            {filterType !== "Tailoring Labour" && (
+              <select data-testid="labour-karigar-filter" value={filterKarigar} onChange={e => setFilterKarigar(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
+                <option value="All">All Karigars</option>
+                {karigars.map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
             )}
             
             <div className="w-full sm:w-auto sm:ml-auto flex flex-wrap gap-3 sm:gap-4 text-sm">
@@ -533,20 +543,27 @@ No paid entries`}
                           </tbody>
                         </table>
                       </div>
-                      <div className="p-4 border-t border-[var(--border-subtle)] flex justify-end gap-3">
-                        <button
-                          onClick={cancelEditPayment}
-                          className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={saveEditPayment}
-                          disabled={saving || editSelectedItems.length === 0}
-                          className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50"
-                        >
-                          {saving ? 'Saving...' : `Save Changes (${editSelectedItems.length} items)`}
-                        </button>
+                      <div className="p-4 border-t border-[var(--border-subtle)] space-y-3">
+                        {editSelectedItems.length === 0 && (
+                          <div className="px-3 py-2 text-xs text-[var(--error)] bg-[#9E473D10] border border-[var(--error)] rounded-sm">
+                            ⚠ All items deselected — saving will <strong>delete this entire payment</strong> and mark all items as unpaid.
+                          </div>
+                        )}
+                        <div className="flex justify-end gap-3">
+                          <button
+                            onClick={cancelEditPayment}
+                            className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={saveEditPayment}
+                            disabled={saving}
+                            className={`px-4 py-2 text-sm text-white rounded-sm disabled:opacity-50 ${editSelectedItems.length === 0 ? 'bg-[var(--error)] hover:bg-[var(--error)]/90' : 'bg-[var(--brand)] hover:bg-[var(--brand-hover)]'}`}
+                          >
+                            {saving ? 'Saving...' : editSelectedItems.length === 0 ? 'Delete Payment' : `Save Changes (${editSelectedItems.length} items)`}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

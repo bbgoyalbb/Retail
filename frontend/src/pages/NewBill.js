@@ -326,7 +326,7 @@ export default function NewBill() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Customer Name</label>
-              <input ref={nameRef} data-testid="customer-name-input" list="customers-list" value={customerName} onChange={e => setCustomerName(e.target.value)} onKeyDown={e => enterNav(e, dateRef)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" placeholder="Customer name" />
+              <input ref={nameRef} data-testid="customer-name-input" list="customers-list" value={customerName} onChange={e => setCustomerName(e.target.value)} onKeyDown={e => enterNav(e, dateRef)} maxLength={100} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" placeholder="Customer name" />
               <datalist id="customers-list">{customers.map(c => <option key={c} value={c} />)}</datalist>
             </div>
             <div>
@@ -338,7 +338,7 @@ export default function NewBill() {
           <h3 className="font-heading text-base font-medium pt-2">Add Items</h3>
           <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
             <div className="relative col-span-2 sm:col-span-2">
-              <input ref={barcodeRef} data-testid="barcode-input" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="Barcode / Item No." className="w-full px-3 py-2 pr-10 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" onKeyDown={e => enterNav(e, qtyRef)} />
+              <input ref={barcodeRef} data-testid="barcode-input" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="Barcode / Item No." maxLength={60} className="w-full px-3 py-2 pr-10 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" onKeyDown={e => enterNav(e, qtyRef)} />
               <button data-testid="scan-barcode-btn" onClick={() => setShowScanner(true)} className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm" title="Scan with camera">
                 <Barcode size={18} weight="duotone" />
               </button>
@@ -373,21 +373,29 @@ export default function NewBill() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item, i) => (
-                    <tr key={i} className="border-b border-[var(--border-subtle)]">
-                      <td className="px-3 py-2 text-sm">{item.barcode}</td>
-                      <td className="px-3 py-2 font-mono text-sm text-right">{item.qty}</td>
-                      <td className="px-3 py-2 font-mono text-sm text-right">₹{item.price}</td>
-                      <td className="px-3 py-2 font-mono text-sm text-right">{item.discount}%</td>
-                      <td className="px-3 py-2 font-mono text-sm text-right font-medium">₹{item.total}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => editItem(i)} className="text-[var(--info)] hover:bg-[#5C8A9E10] p-1 rounded-sm" title="Edit row"><PencilSimple size={16} /></button>
-                          <button onClick={() => removeItem(i)} className="text-[var(--error)] hover:bg-[#9E473D10] p-1 rounded-sm" title="Delete row"><Trash size={16} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {items.map((item, i) => {
+                    const isEditing = editingIndex === i;
+                    return (
+                      <tr key={i} className={`border-b border-[var(--border-subtle)] transition-colors ${isEditing ? 'bg-[#C86B4D08] outline outline-1 outline-[var(--brand)]' : 'hover:bg-[var(--bg)]'}`}>
+                        <td className="px-3 py-2 text-sm">
+                          <div className="flex items-center gap-1.5">
+                            {isEditing && <PencilSimple size={12} className="text-[var(--brand)] flex-shrink-0" weight="fill" />}
+                            <span className={isEditing ? 'text-[var(--brand)] font-medium' : ''}>{item.barcode}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 font-mono text-sm text-right">{item.qty}</td>
+                        <td className="px-3 py-2 font-mono text-sm text-right">₹{item.price}</td>
+                        <td className="px-3 py-2 font-mono text-sm text-right">{item.discount}%</td>
+                        <td className="px-3 py-2 font-mono text-sm text-right font-medium">₹{item.total}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center justify-end gap-1">
+                            <button onClick={() => editItem(i)} className={`p-1 rounded-sm transition-colors ${isEditing ? 'text-[var(--brand)] bg-[#C86B4D15]' : 'text-[var(--info)] hover:bg-[#5C8A9E10]'}`} title="Edit row"><PencilSimple size={16} /></button>
+                            <button onClick={() => removeItem(i)} className="text-[var(--error)] hover:bg-[#9E473D10] p-1 rounded-sm" title="Delete row"><Trash size={16} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -398,9 +406,10 @@ export default function NewBill() {
         <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
           <h3 className="font-heading text-base font-medium">Payment</h3>
 
-          <div className="p-4 bg-[var(--bg)] rounded-sm">
-            <p className="text-xs uppercase tracking-[0.15em] text-[var(--text-secondary)]">Grand Total</p>
-            <p data-testid="grand-total" className="font-heading text-3xl font-light tracking-tight text-[var(--brand)] mt-1">₹{grandTotal.toLocaleString('en-IN')}</p>
+          <div className="p-4 bg-[var(--bg)] rounded-sm border-l-2" style={{ borderLeftColor: "var(--brand)" }}>
+            <p className="text-[10px] uppercase tracking-[0.2em] font-semibold text-[var(--text-secondary)]">Grand Total</p>
+            <p data-testid="grand-total" className="font-heading text-3xl font-semibold tracking-tight mt-1" style={{ color: "var(--brand)" }}>₹{grandTotal.toLocaleString('en-IN')}</p>
+            {items.length > 0 && <p className="text-xs text-[var(--text-secondary)] mt-1">{items.length} item{items.length !== 1 ? 's' : ''}</p>}
           </div>
 
           <div>
@@ -766,7 +775,7 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
                   <td className="px-2 py-2"><input type="checkbox" checked={!!item.tailoring?.enabled} onChange={e => updateItemTailoring(idx, { enabled: e.target.checked })} /></td>
                   <td className="px-2 py-2 text-sm">{item.barcode}</td>
                   <td className="px-2 py-2 text-sm">{item.qty}</td>
-                  <td className="px-2 py-2"><input value={item.tailoring?.order_no || ""} onChange={e => updateItemTailoring(idx, { order_no: e.target.value })} disabled={!item.tailoring?.enabled} className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm disabled:opacity-50" /></td>
+                  <td className="px-2 py-2"><input value={item.tailoring?.order_no || ""} onChange={e => updateItemTailoring(idx, { order_no: e.target.value })} disabled={!item.tailoring?.enabled} maxLength={30} className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm disabled:opacity-50" /></td>
                   <td className="px-2 py-2"><input type="date" value={item.tailoring?.delivery_date || ""} onChange={e => updateItemTailoring(idx, { delivery_date: e.target.value })} disabled={!item.tailoring?.enabled} className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm disabled:opacity-50" /></td>
                   <td className="px-2 py-2">
                     <select value={item.tailoring?.article_type || (articleTypes[0] || "Shirt")} onChange={e => updateItemTailoring(idx, { article_type: e.target.value })} disabled={!item.tailoring?.enabled} className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm disabled:opacity-50">
@@ -782,7 +791,7 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
                   <td className="px-2 py-2">
                     <button
                       onClick={() => handleSplit(idx)}
-                      disabled={item.qty <= 1 || !item.tailoring?.enabled}
+                      disabled={item.qty <= 0 || !item.tailoring?.enabled}
                       className="px-2 py-1 text-xs border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] disabled:opacity-30 flex items-center gap-1"
                       title="Split this article into multiple tailoring orders"
                     >

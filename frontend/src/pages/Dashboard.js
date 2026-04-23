@@ -1,18 +1,23 @@
 import { useState, useEffect, useCallback } from "react";
 import { getDashboard } from "@/api";
-import { CurrencyDollar, Scissors, UsersThree, TrendUp, ArrowsClockwise } from "@phosphor-icons/react";
+import { CurrencyDollar, Scissors, UsersThree, TrendUp, ArrowsClockwise, Receipt } from "@phosphor-icons/react";
 
 function StatCard({ icon: Icon, label, value, sub, color = "var(--brand)" }) {
   return (
-    <div data-testid={`stat-${label.toLowerCase().replace(/\s/g, '-')}`} className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 sm:p-6 rounded-sm">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[9px] sm:text-xs uppercase tracking-[0.15em] sm:tracking-[0.2em] font-semibold text-[var(--text-secondary)] mb-1 sm:mb-2 leading-tight">{label}</p>
-          <p className="font-heading text-xl sm:text-3xl font-light tracking-tight truncate" style={{ color }}>{value}</p>
-          {sub && <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5 sm:mt-1 truncate">{sub}</p>}
-        </div>
-        <div className="p-1.5 sm:p-2 rounded-sm flex-shrink-0" style={{ backgroundColor: `${color}10` }}>
-          <Icon size={20} weight="duotone" style={{ color }} />
+    <div data-testid={`stat-${label.toLowerCase().replace(/\s/g, '-')}`}
+      className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden relative"
+      style={{ borderLeftColor: color, borderLeftWidth: 3 }}
+    >
+      <div className="p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] font-semibold text-[var(--text-secondary)] mb-2 leading-tight">{label}</p>
+            <p className="font-heading text-2xl sm:text-3xl font-semibold tracking-tight truncate" style={{ color }}>{value}</p>
+            {sub && <p className="text-xs text-[var(--text-secondary)] mt-1.5 truncate">{sub}</p>}
+          </div>
+          <div className="p-2.5 rounded-sm flex-shrink-0 mt-0.5" style={{ backgroundColor: `${color}15` }}>
+            <Icon size={22} weight="duotone" style={{ color }} />
+          </div>
         </div>
       </div>
     </div>
@@ -23,13 +28,14 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
 
   const fetchData = useCallback((silent = false) => {
-    if (!silent) setLoading(true);
+    if (!silent) { setLoading(true); setFetchError(false); }
     else setRefreshing(true);
     getDashboard()
-      .then(res => setData(res.data))
-      .catch(() => {})
+      .then(res => { setData(res.data); setFetchError(false); })
+      .catch(() => { if (!silent) setFetchError(true); })
       .finally(() => { setLoading(false); setRefreshing(false); });
   }, []);
 
@@ -53,7 +59,17 @@ export default function Dashboard() {
     );
   }
 
-  if (!data) return <p className="text-sm text-[var(--text-secondary)] p-8 text-center">Failed to load dashboard data</p>;
+  if (fetchError || !data) return (
+    <div className="flex flex-col items-center justify-center py-24 gap-4">
+      <p className="text-sm text-[var(--text-secondary)]">Failed to load dashboard data.</p>
+      <button
+        onClick={() => fetchData()}
+        className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] transition-colors"
+      >
+        Retry
+      </button>
+    </div>
+  );
 
   const fmt = (n) => new Intl.NumberFormat('en-IN').format(Math.round(n || 0));
 
@@ -141,7 +157,12 @@ export default function Dashboard() {
           <h3 className="font-heading text-base sm:text-lg font-medium tracking-tight">Recent Transactions</h3>
         </div>
         {(!data.recent_items || data.recent_items.length === 0) && (
-          <p className="p-8 text-center text-sm text-[var(--text-secondary)]">No recent transactions found.</p>
+          <div className="flex flex-col items-center justify-center py-14 gap-3">
+            <div className="p-4 rounded-sm" style={{ background: "var(--bg)" }}>
+              <Receipt size={28} className="text-[var(--border-strong)]" weight="duotone" />
+            </div>
+            <p className="text-sm text-[var(--text-secondary)]">No recent transactions found.</p>
+          </div>
         )}
         <div className="overflow-x-auto">
           <table className="w-full" data-testid="recent-transactions-table">

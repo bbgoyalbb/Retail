@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getDaybook, getDaybookDates, tallyEntries } from "@/api";
 import { Check, Circle, Spinner } from "@phosphor-icons/react";
+import { useToast } from "@/hooks/use-toast";
 
 function SortableHeader({ label, sortKey, currentKey, dir, onSort }) {
   return (
@@ -30,6 +31,7 @@ function TallyButton({ isTallied, onClick, hasAmount, label, loading }) {
 }
 
 function DaybookTable({ entries, onCategoryTally, loading }) {
+  const { toast } = useToast();
   const [sortKey, setSortKey] = useState("date");
   const [sortDir, setSortDir] = useState("desc");
   const [viewMode, setViewMode] = useState("pending"); // "pending" | "tallied"
@@ -159,7 +161,7 @@ function DaybookTable({ entries, onCategoryTally, loading }) {
         }
         return entry;
       }));
-      // tally reverted via optimistic update above
+      toast({ title: "Tally failed", description: err.message || "Could not update tally. Please try again.", variant: "destructive" });
     } finally {
       setUpdatingTally(prev => ({ ...prev, [tallyKey]: false }));
     }

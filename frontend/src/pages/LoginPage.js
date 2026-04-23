@@ -2,10 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { getPublicSettings } from "@/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { Scissors } from "@phosphor-icons/react";
 
 export default function LoginPage() {
   const { login, sessionExpired } = useAuth();
@@ -42,47 +40,83 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 p-4">
-      <div className="w-full max-w-sm bg-white dark:bg-slate-950 rounded-2xl shadow-xl p-8">
-        {sessionExpired && (
-          <div className="mb-5 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm text-center">
-            ⏱ Your session has expired. Please sign in again.
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg)] p-4">
+      {/* Subtle background texture */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full opacity-[0.04]" style={{ background: "var(--brand)" }} />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full opacity-[0.04]" style={{ background: "var(--brand)" }} />
+      </div>
+
+      <div className="relative w-full max-w-sm">
+        {/* Brand mark */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-14 h-14 rounded-sm flex items-center justify-center mb-4 shadow-sm" style={{ background: "var(--brand)" }}>
+            <span className="text-white font-serif font-bold text-3xl leading-none">R</span>
           </div>
-        )}
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="font-heading text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
             {firmName}
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Sign in to your account
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-secondary)] mt-1 flex items-center gap-1.5">
+            <Scissors size={10} /> Fabric &amp; Tailoring
           </p>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        {/* Card */}
+        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm shadow-sm p-8 space-y-6">
+          {sessionExpired && (
+            <div className="px-4 py-3 rounded-sm bg-[#D4984210] border border-[var(--warning)] text-[var(--warning)] text-sm text-center">
+              ⏱ Your session has expired. Please sign in again.
+            </div>
+          )}
+
           <div>
-            <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              type="text"
-              placeholder="Enter username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoFocus
-            />
+            <h2 className="font-heading text-base font-medium text-[var(--text-primary)]">Sign in</h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">Enter your credentials to continue</p>
           </div>
-          <div>
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Enter password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? "Signing in..." : "Sign In"}
-          </Button>
-        </form>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="username" className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">
+                Username
+              </label>
+              <input
+                id="username"
+                type="text"
+                placeholder="Enter username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoFocus
+                autoComplete="username"
+                className="w-full px-3 py-2.5 text-sm border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)] focus:border-[var(--brand)] transition-colors"
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                placeholder="Enter password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                className="w-full px-3 py-2.5 text-sm border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)] focus:border-[var(--brand)] transition-colors"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full py-2.5 text-sm font-semibold bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-60 transition-all duration-150 active:scale-[0.99] tracking-wide mt-2"
+            >
+              {busy ? "Signing in…" : "Sign In"}
+            </button>
+          </form>
+        </div>
+
+        <p className="text-center text-[10px] text-[var(--text-secondary)] mt-6 tracking-[0.1em] uppercase">
+          Retail Management System
+        </p>
       </div>
     </div>
   );

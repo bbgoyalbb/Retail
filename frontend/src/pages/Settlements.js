@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { getCustomers, getRefs, getBalances, processSettlement, getOrders, getItems, getSettings } from "@/api";
 import { CurrencyDollar, CheckCircle } from "@phosphor-icons/react";
 
@@ -37,7 +37,19 @@ export default function Settlements() {
     }).catch(() => {});
   }, []);
 
-  // When customer changes via manual selection (not order lookup), load refs
+  const loadBalances = useCallback((ref) => {
+    getBalances({ ref }).then(res => {
+      setBalances(res.data);
+      setAllotFab(res.data.fabric > 0 ? String(res.data.fabric) : "");
+      setAllotTail(res.data.tailoring > 0 ? String(res.data.tailoring) : "");
+      setAllotEmb(res.data.embroidery > 0 ? String(res.data.embroidery) : "");
+      setAllotAddon(res.data.addon > 0 ? String(res.data.addon) : "");
+      setAllotAdv("");
+    }).catch(() => {});
+  }, []);
+
+  // When customer changes via manual selection (not order lookup), load refs.
+  // `mode` is intentionally included so switching modes doesn't leave stale refs loaded.
   useEffect(() => {
     if (setByOrderRef.current) {
       setByOrderRef.current = false;
@@ -48,18 +60,17 @@ export default function Settlements() {
       setSelectedRef("");
       setBalances({ fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0 });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCustomer]);
+  }, [selectedCustomer, mode]);
 
   // When ref changes, load balances
   useEffect(() => {
     if (selectedRef) {
       loadBalances(selectedRef);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedRef]);
+  }, [selectedRef, loadBalances]);
 
-  // When order number changes, look up the customer + ref
+  // When order number changes, look up the customer + ref.
+  // `mode` is intentionally included so stale order lookups don't fire in customer mode.
   useEffect(() => {
     if (selectedOrder && mode === "order") {
       getItems({ order_no: selectedOrder, limit: 10 }).then(res => {
@@ -79,19 +90,7 @@ export default function Settlements() {
     } else {
       setOrderInfo(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedOrder]);
-
-  const loadBalances = (ref) => {
-    getBalances({ ref }).then(res => {
-      setBalances(res.data);
-      setAllotFab(res.data.fabric > 0 ? String(res.data.fabric) : "");
-      setAllotTail(res.data.tailoring > 0 ? String(res.data.tailoring) : "");
-      setAllotEmb(res.data.embroidery > 0 ? String(res.data.embroidery) : "");
-      setAllotAddon(res.data.addon > 0 ? String(res.data.addon) : "");
-      setAllotAdv("");
-    }).catch(() => {});
-  };
+  }, [selectedOrder, mode]);
 
   const totalPending = balances.fabric + balances.tailoring + balances.embroidery + balances.addon;
   const totalPool = (parseFloat(freshPay) || 0) + (useAdvance ? balances.advance : 0);
@@ -170,6 +169,7 @@ export default function Settlements() {
     setBalances({ fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0 });
     setAllotFab(""); setAllotTail(""); setAllotEmb(""); setAllotAddon(""); setAllotAdv("");
     setFreshPay("");
+    setUseAdvance(false);
     setSelectedModes(["Cash"]);
   };
 

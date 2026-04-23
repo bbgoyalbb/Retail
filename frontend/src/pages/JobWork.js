@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getJobwork, moveJobwork, getJobworkFilters } from "@/api";
-import { ArrowRight, ArrowLeft, Funnel, SortAscending, SortDescending, X, PencilSimple } from "@phosphor-icons/react";
+import { ArrowRight, ArrowLeft, Funnel, X, PencilSimple, CheckSquare } from "@phosphor-icons/react";
 import api from "@/api";
 
 function MoveDialog({ title, onConfirm, onCancel, fields }) {
@@ -72,9 +72,9 @@ function StatusColumn({ title, items, color, onMove, moveLabel, onMoveBack, move
     <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm flex flex-col">
       <div className="p-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-          <h4 className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">{title}</h4>
-          <span className="font-mono text-xs text-[var(--text-secondary)]">({items.length})</span>
+          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+          <h4 className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-primary)]">{title}</h4>
+          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-semibold font-mono text-white" style={{ backgroundColor: color }}>{items.length}</span>
         </div>
         <div className="flex gap-1">
           {["order_no", "date", "delivery_date"].map(k => (
@@ -86,7 +86,10 @@ function StatusColumn({ title, items, color, onMove, moveLabel, onMoveBack, move
       </div>
       <div className="flex-1 overflow-y-auto max-h-[400px] divide-y divide-[var(--border-subtle)]">
         {items.length === 0 ? (
-          <p className="p-4 text-xs text-[var(--text-secondary)] text-center">No items</p>
+          <div className="flex flex-col items-center justify-center py-10 gap-2">
+            <CheckSquare size={24} className="text-[var(--border-strong)]" weight="duotone" />
+            <p className="text-xs text-[var(--text-secondary)]">No items here</p>
+          </div>
         ) : items.map(item => (
           <div 
             key={item.id} 
@@ -198,18 +201,30 @@ export default function JobWork() {
   };
 
   const handleTailoringMove = async (itemIds, newStatus) => {
-    await moveJobwork({ item_ids: itemIds, new_status: newStatus });
-    loadData();
+    try {
+      await moveJobwork({ item_ids: itemIds, new_status: newStatus });
+      loadData();
+    } catch (err) {
+      toast({ title: "Error", description: err.message || "Failed to move items", variant: "destructive" });
+    }
   };
 
   const handleTailoringMoveBack = async (itemIds, currentStatus) => {
-    await api.post("/jobwork/move-back", { item_ids: itemIds, current_status: currentStatus });
-    loadData();
+    try {
+      await api.post("/jobwork/move-back", { item_ids: itemIds, current_status: currentStatus });
+      loadData();
+    } catch (err) {
+      toast({ title: "Error", description: err.message || "Failed to move items back", variant: "destructive" });
+    }
   };
 
   const handleEmbMoveBack = async (itemIds, currentStatus) => {
-    await api.post("/jobwork/move-back", { item_ids: itemIds, current_status: currentStatus });
-    loadData();
+    try {
+      await api.post("/jobwork/move-back", { item_ids: itemIds, current_status: currentStatus });
+      loadData();
+    } catch (err) {
+      toast({ title: "Error", description: err.message || "Failed to move items back", variant: "destructive" });
+    }
   };
 
   // Embroidery: Required → In Progress needs Karigar name
@@ -218,9 +233,13 @@ export default function JobWork() {
       title: "Assign Karigar",
       fields: [{ key: "karigar", label: "Karigar Name", placeholder: "Enter karigar name", skippable: true }],
       onConfirm: async (values, skips) => {
-        await moveJobwork({ item_ids: itemIds, new_status: "In Progress", karigar: skips.karigar ? undefined : (values.karigar || undefined) });
-        setDialog(null);
-        loadData();
+        try {
+          await moveJobwork({ item_ids: itemIds, new_status: "In Progress", karigar: skips.karigar ? undefined : (values.karigar || undefined) });
+          setDialog(null);
+          loadData();
+        } catch (err) {
+          toast({ title: "Error", description: err.message || "Failed to assign karigar", variant: "destructive" });
+        }
       },
     });
   };
@@ -231,11 +250,15 @@ export default function JobWork() {
       title: "Edit Karigar",
       fields: [{ key: "karigar", label: "Karigar Name", placeholder: "Enter karigar name", skippable: true }],
       onConfirm: async (values, skips) => {
-        if (!skips.karigar && values.karigar !== undefined) {
-          await api.post("/jobwork/edit-emb", { item_id: item.id, karigar: values.karigar || "" });
+        try {
+          if (!skips.karigar && values.karigar !== undefined) {
+            await api.post("/jobwork/edit-emb", { item_id: item.id, karigar: values.karigar || "" });
+          }
+          setDialog(null);
+          loadData();
+        } catch (err) {
+          toast({ title: "Error", description: err.message || "Failed to update karigar", variant: "destructive" });
         }
-        setDialog(null);
-        loadData();
       },
     });
   };
@@ -250,21 +273,25 @@ export default function JobWork() {
         { key: "emb_customer", label: "Customer Embroidery Charges", type: "number", placeholder: item.embroidery_amount || "0", skippable: true },
       ],
       onConfirm: async (values, skips) => {
-        const updates = { item_id: item.id };
-        if (!skips.karigar && values.karigar !== undefined) {
-          updates.karigar = values.karigar;
+        try {
+          const updates = { item_id: item.id };
+          if (!skips.karigar && values.karigar !== undefined) {
+            updates.karigar = values.karigar;
+          }
+          if (!skips.emb_labour && values.emb_labour) {
+            updates.emb_labour_amount = parseFloat(values.emb_labour);
+          }
+          if (!skips.emb_customer && values.emb_customer) {
+            updates.emb_customer_amount = parseFloat(values.emb_customer);
+          }
+          if (Object.keys(updates).length > 1) {
+            await api.post("/jobwork/edit-emb", updates);
+          }
+          setDialog(null);
+          loadData();
+        } catch (err) {
+          toast({ title: "Error", description: err.message || "Failed to update embroidery details", variant: "destructive" });
         }
-        if (!skips.emb_labour && values.emb_labour) {
-          updates.emb_labour_amount = parseFloat(values.emb_labour);
-        }
-        if (!skips.emb_customer && values.emb_customer) {
-          updates.emb_customer_amount = parseFloat(values.emb_customer);
-        }
-        if (Object.keys(updates).length > 1) {
-          await api.post("/jobwork/edit-emb", updates);
-        }
-        setDialog(null);
-        loadData();
       },
     });
   };
@@ -278,12 +305,16 @@ export default function JobWork() {
         { key: "emb_customer", label: "Customer Embroidery Charges", type: "number", placeholder: "Amount payable by customer", skippable: true },
       ],
       onConfirm: async (values, skips) => {
-        const updates = { item_ids: itemIds, new_status: "Finished" };
-        if (!skips.emb_labour && values.emb_labour) updates.emb_labour_amount = parseFloat(values.emb_labour);
-        if (!skips.emb_customer && values.emb_customer) updates.emb_customer_amount = parseFloat(values.emb_customer);
-        await api.post("/jobwork/move-emb", updates);
-        setDialog(null);
-        loadData();
+        try {
+          const updates = { item_ids: itemIds, new_status: "Finished" };
+          if (!skips.emb_labour && values.emb_labour) updates.emb_labour_amount = parseFloat(values.emb_labour);
+          if (!skips.emb_customer && values.emb_customer) updates.emb_customer_amount = parseFloat(values.emb_customer);
+          await api.post("/jobwork/move-emb", updates);
+          setDialog(null);
+          loadData();
+        } catch (err) {
+          toast({ title: "Error", description: err.message || "Failed to finish embroidery", variant: "destructive" });
+        }
       },
     });
   };

@@ -156,27 +156,32 @@ export default function Sidebar({ open, setOpen }) {
           {!collapsed && (
             <button
               onClick={() => { navigate("/new-bill"); setOpen(false); }}
-              className="w-full flex items-center justify-center gap-2 mt-2 py-2 px-3 bg-[var(--brand)] text-white text-xs font-medium rounded-sm hover:opacity-90 active:scale-[0.98] transition-all"
+              className="w-full flex items-center justify-center gap-2 mt-2 py-2.5 px-3 bg-[var(--brand)] text-white text-xs font-semibold rounded-sm hover:bg-[var(--brand-hover)] active:scale-[0.98] transition-all tracking-wide shadow-sm"
             >
-              <Receipt size={14} weight="bold" />
-              New Bill
+              <Receipt size={14} weight="fill" />
+              + New Bill
             </button>
           )}
           {/* User info + logout */}
-          <div className={`mt-2 flex items-center ${collapsed ? 'justify-center' : 'gap-2 px-2'} py-1.5 rounded-sm bg-[var(--bg)]`}>
-            <UserCircle size={collapsed ? 20 : 18} className="text-[var(--text-secondary)] flex-shrink-0" />
+          <div className={`mt-2 flex items-center ${collapsed ? 'justify-center' : 'gap-2 px-2.5'} py-2 rounded-sm bg-[var(--bg)] border border-[var(--border-subtle)]`}>
+            <div className="relative flex-shrink-0">
+              <UserCircle size={collapsed ? 20 : 20} className="text-[var(--text-secondary)]" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[var(--bg)]"
+                style={{ background: user?.role === 'admin' ? 'var(--error)' : user?.role === 'manager' ? 'var(--info)' : 'var(--success)' }}
+              />
+            </div>
             {!collapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-[var(--text-primary)] truncate">{user?.full_name || user?.username}</p>
-                <p className="text-[10px] text-[var(--text-secondary)] uppercase">{user?.role}</p>
+                <p className="text-xs font-semibold text-[var(--text-primary)] truncate leading-tight">{user?.full_name || user?.username}</p>
+                <p className="text-[10px] text-[var(--text-secondary)] capitalize leading-tight mt-0.5">{user?.role}</p>
               </div>
             )}
             <button
               onClick={handleLogout}
-              className="p-1 rounded-sm hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-red-500 transition-colors"
+              className="p-1 rounded-sm hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-red-500 transition-colors flex-shrink-0"
               title="Logout"
             >
-              <SignOut size={16} />
+              <SignOut size={15} />
             </button>
           </div>
         </div>

@@ -124,6 +124,7 @@ export default function ItemsManager() {
   const [message, setMessage] = useState(null);
   const [sortKey, setSortKey] = useState("date");
   const [sortDir, setSortDir] = useState("desc");
+  const [loading, setLoading] = useState(false);
   
   // Edit modal states
   const [showSectionSelector, setShowSectionSelector] = useState(false);
@@ -148,7 +149,6 @@ export default function ItemsManager() {
   
   // Amount mismatch detection
   const [mismatchPrompt, setMismatchPrompt] = useState(null); // { refs: [], mismatches: [] }
-  const [pendingRedirect, setPendingRedirect] = useState(null);
 
   useEffect(() => { 
     getCustomers().then(res => setCustomers(res.data)).catch(() => {}); 
@@ -159,6 +159,7 @@ export default function ItemsManager() {
     if (nameFilter) params.name = nameFilter;
     if (orderFilter) params.order_no = orderFilter;
     
+    setLoading(true);
     try {
       const [itemsRes, advancesRes] = await Promise.all([
         getItems(params),
@@ -167,7 +168,10 @@ export default function ItemsManager() {
       setAllItems(itemsRes.data.items || []);
       setAdvances(advancesRes.data || []);
     } catch (err) {
-      // silenced
+      setMessage({ type: "error", text: "Failed to load data. Please try again." });
+      setTimeout(() => setMessage(null), 4000);
+    } finally {
+      setLoading(false);
     }
   }, [nameFilter, orderFilter]);
 
@@ -487,21 +491,16 @@ export default function ItemsManager() {
     loadData();
   };
 
-  const handleMismatchConfirm = () => {
-    // Close the prompt
+  const handleMismatchConfirm = (refsToRedirect) => {
     setMismatchPrompt(null);
-    
-    // Redirect to settlement page with refs as query params
-    if (pendingRedirect && pendingRedirect.length > 0) {
-      const refsParam = pendingRedirect.join(',');
+    if (refsToRedirect && refsToRedirect.length > 0) {
+      const refsParam = refsToRedirect.join(',');
       window.location.href = `/settlements?refs=${encodeURIComponent(refsParam)}`;
     }
-    setPendingRedirect(null);
   };
 
   const handleMismatchCancel = () => {
     setMismatchPrompt(null);
-    setPendingRedirect(null);
   };
 
   const cancelEdit = () => {
@@ -600,36 +599,6 @@ export default function ItemsManager() {
   // inner-component remount bug that causes input focus loss on every keystroke.
   const _sectionForEdit = selectedSection ? SECTIONS[selectedSection] : null;
   const _isAdvanceEdit = _sectionForEdit?.isAdvanceSection;
-
-  const DeleteConfirmModal = () => (
-    <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setDelConfirm(null)}>
-      <div data-testid="delete-confirm-modal" className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm mx-4" onClick={e => e.stopPropagation()}>
-        <h3 className="font-heading text-lg font-medium mb-2">
-          Delete {delMode === 'order' ? 'Order' : 'Item'}?
-        </h3>
-        <p className="text-sm text-[var(--text-secondary)] mb-4">
-          {delMode === 'order' ? (
-            <>
-              Order: <span className="font-mono font-medium">{delConfirm.ref}</span><br/>
-              <span className="text-xs">{delConfirm.items?.length || 0} items will be deleted</span>
-            </>
-          ) : (
-            <>Item: <span className="font-mono">{delConfirm.barcode}</span></>
-          )}
-        </p>
-        <div className="flex gap-3 justify-end">
-          <button onClick={() => setDelConfirm(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm">Cancel</button>
-          <button 
-            data-testid="confirm-delete-btn" 
-            onClick={handleDelete} 
-            className="px-4 py-2 text-sm bg-[var(--error)] text-white rounded-sm hover:bg-[var(--error)]/90"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <div data-testid="items-manager-page" className="space-y-6">
@@ -791,7 +760,35 @@ export default function ItemsManager() {
         </div>
       )}
 
-      {delConfirm && <DeleteConfirmModal />}
+      {delConfirm && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setDelConfirm(null)}>
+          <div data-testid="delete-confirm-modal" className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+            <h3 className="font-heading text-lg font-medium mb-2">
+              Delete {delMode === 'order' ? 'Order' : 'Item'}?
+            </h3>
+            <p className="text-sm text-[var(--text-secondary)] mb-4">
+              {delMode === 'order' ? (
+                <>
+                  Order: <span className="font-mono font-medium">{delConfirm.ref}</span><br/>
+                  <span className="text-xs">{delConfirm.items?.length || 0} items will be deleted</span>
+                </>
+              ) : (
+                <>Item: <span className="font-mono">{delConfirm.barcode}</span></>
+              )}
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setDelConfirm(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm">Cancel</button>
+              <button
+                data-testid="confirm-delete-btn"
+                onClick={handleDelete}
+                className="px-4 py-2 text-sm bg-[var(--error)] text-white rounded-sm hover:bg-[var(--error)]/90"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Amount Mismatch Prompt */}
       {mismatchPrompt && (
@@ -841,7 +838,7 @@ export default function ItemsManager() {
                   I'll fix it later
                 </button>
                 <button 
-                  onClick={() => { setPendingRedirect(mismatchPrompt.refs); handleMismatchConfirm(); }}
+                  onClick={() => handleMismatchConfirm(mismatchPrompt.refs)}
                   className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] flex items-center gap-2"
                 >
                   Go to Settlement →
@@ -868,7 +865,15 @@ export default function ItemsManager() {
           <span className="w-10"></span>
         </div>
 
-        {refs.map(group => (
+        {loading ? (
+          <>
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="h-12 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm animate-pulse" />
+            ))}
+          </>
+        ) : (
+          <>
+            {refs.map(group => (
           <div key={group.ref} className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
             {/* Collapsed Reference Row */}
             <div className="px-3 py-3 cursor-pointer hover:bg-[#C86B4D05] transition-colors" onClick={() => toggleExpand(group.ref)}>
@@ -980,7 +985,9 @@ export default function ItemsManager() {
               </div>
             )}
           </div>
-        ))}
+            ))}
+          </>
+        )}
       </div>
 
       {invoiceRef && (
