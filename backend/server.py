@@ -2242,7 +2242,6 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
   <!-- BILL META STRIP -->
   <div class="meta-strip">
     <div class="meta-cell"><div class="meta-label">Customer</div><div class="meta-value">{customer_name}</div></div>
-    <div class="meta-cell"><div class="meta-label">Reference</div><div class="meta-value">{ref_id}</div></div>
     <div class="meta-cell"><div class="meta-label">Date</div><div class="meta-value">{order_date}</div></div>
     <div class="meta-cell"><div class="meta-label">Items</div><div class="meta-value">{len(items)}</div></div>
   </div>
@@ -2277,7 +2276,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
     <p>5. Any dispute is subject to local jurisdiction.</p>
   </div>
 
-  <div class="inv-footer">Generated on {gen_time} &nbsp;·&nbsp; Thank you for your business!</div>
+  <div class="inv-footer">Invoice Ref: <strong>{ref_id}</strong> &nbsp;·&nbsp; Generated: {gen_time} &nbsp;·&nbsp; Thank you for your business!</div>
 </div>
 </body>
 </html>"""
