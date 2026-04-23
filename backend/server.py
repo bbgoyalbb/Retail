@@ -2064,12 +2064,12 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
             rows += f"""<tr>
               <td>{i}</td><td>{ti.get("article_type","")}</td><td>{ti.get("order_no","")}</td>
               <td>{ti.get("delivery_date","")}</td><td class="r">₹{fmt(t_amt)}</td>
-              <td class="r">₹{fmt(ti.get("labour_amount",0))}</td><td>{status_lbl}</td>
+              <td>{status_lbl}</td>
             </tr>"""
-        rows += f'<tr class="foot"><td colspan="4" class="r">TOTAL</td><td class="r">₹{fmt(tail_total)}</td><td></td><td></td></tr>'
+        rows += f'<tr class="foot"><td colspan="4" class="r">TOTAL</td><td class="r">₹{fmt(tail_total)}</td><td></td></tr>'
         tail_section = f"""
         <h3 class="sec-title">Tailoring</h3>
-        <table><thead><tr><th>#</th><th>Article</th><th>Order#</th><th>Delivery</th><th class="r">Tailoring</th><th class="r">Labour</th><th>Payment</th></tr></thead>
+        <table><thead><tr><th>#</th><th>Article</th><th>Order#</th><th>Delivery</th><th class="r">Tailoring</th><th>Payment</th></tr></thead>
         <tbody>{rows}</tbody></table>"""
 
     # ---- Embroidery section ----
@@ -2082,9 +2082,11 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
             e_amt = float(ei.get("embroidery_amount", 0))
             emb_total += e_amt
             pm = ei.get("embroidery_pay_mode", "N/A")
+            emb_status = ei.get("embroidery_status", "")
+            amt_display = f'₹{fmt(e_amt)}' if e_amt > 0 else '<em style="color:#9C9690">To be Calculated</em>'
             rows += f"""<tr>
-              <td>{i}</td><td>{ei.get("article_type","")}</td><td>{ei.get("embroidery_status","")}</td>
-              <td>{ei.get("karigar","N/A")}</td><td class="r">₹{fmt(e_amt)}</td>
+              <td>{i}</td><td>{ei.get("article_type","")}</td><td>{emb_status}</td>
+              <td>{ei.get("karigar","N/A")}</td><td class="r">{amt_display}</td>
               <td>{"Settled" if str(pm).startswith("Settled") else pm}</td>
             </tr>"""
         rows += f'<tr class="foot"><td colspan="4" class="r">TOTAL</td><td class="r">₹{fmt(emb_total)}</td><td></td></tr>'
