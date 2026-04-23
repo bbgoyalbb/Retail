@@ -1540,7 +1540,7 @@ async def process_settlement(req: SettlementRequest):
 
 @api_router.get("/daybook")
 async def get_daybook(date_filter: Optional[str] = None):
-    result = {"pending": {}, "reconciled": {}}
+    entries = {}  # ref -> entry dict
 
     item_query = {}
     if date_filter and date_filter != "All":
@@ -1572,21 +1572,25 @@ async def get_daybook(date_filter: Optional[str] = None):
 
             ref = item.get("ref", "")
             is_tallied = item.get(tally_field, False)
-            bucket = "reconciled" if is_tallied else "pending"
 
-            if ref not in result[bucket]:
-                result[bucket][ref] = {
+            if ref not in entries:
+                entries[ref] = {
                     "ref": ref,
                     "name": item.get("name", ""),
                     "fabric": 0, "tailoring": 0, "embroidery": 0, "addon": 0, "advance": 0, "total": 0,
                     "modes": {"fabric": "", "tailoring": "", "embroidery": "", "addon": ""},
+                    "tally_status": {"fabric": False, "tailoring": False, "embroidery": False, "addon": False, "advance": False},
+                    "pay_dates": [],
                 }
 
-            result[bucket][ref][cat_name] += received
-            result[bucket][ref]["total"] += received
+            entries[ref][cat_name] += received
+            entries[ref]["total"] += received
+            entries[ref]["tally_status"][cat_name] = is_tallied
             mode = item.get(mode_field, "")
-            if mode and mode not in result[bucket][ref]["modes"][cat_name]:
-                result[bucket][ref]["modes"][cat_name] = mode
+            if mode and mode not in entries[ref]["modes"][cat_name]:
+                entries[ref]["modes"][cat_name] = mode
+            if pay_date and pay_date not in entries[ref]["pay_dates"]:
+                entries[ref]["pay_dates"].append(pay_date)
 
     adv_query = {}
     if date_filter and date_filter != "All":
@@ -1598,22 +1602,24 @@ async def get_daybook(date_filter: Optional[str] = None):
             continue
         ref = adv.get("ref", "")
         is_tallied = adv.get("tally", False)
-        bucket = "reconciled" if is_tallied else "pending"
 
-        if ref not in result[bucket]:
-            result[bucket][ref] = {
+        if ref not in entries:
+            entries[ref] = {
                 "ref": ref,
                 "name": adv.get("name", ""),
                 "fabric": 0, "tailoring": 0, "embroidery": 0, "addon": 0, "advance": 0, "total": 0,
                 "modes": {"fabric": "", "tailoring": "", "embroidery": "", "addon": ""},
+                "tally_status": {"fabric": False, "tailoring": False, "embroidery": False, "addon": False, "advance": False},
+                "pay_dates": [],
             }
-        result[bucket][ref]["advance"] += adv.get("amount", 0)
-        result[bucket][ref]["total"] += adv.get("amount", 0)
+        entries[ref]["advance"] += adv.get("amount", 0)
+        entries[ref]["total"] += adv.get("amount", 0)
+        entries[ref]["tally_status"]["advance"] = is_tallied
+        adv_date = adv.get("date", "")
+        if adv_date and adv_date not in entries[ref]["pay_dates"]:
+            entries[ref]["pay_dates"].append(adv_date)
 
-    return {
-        "pending": list(result["pending"].values()),
-        "reconciled": list(result["reconciled"].values()),
-    }
+    return {"entries": list(entries.values())}
 
 @api_router.get("/daybook/dates")
 async def get_daybook_dates():
