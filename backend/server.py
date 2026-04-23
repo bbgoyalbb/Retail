@@ -244,11 +244,13 @@ def analyze_payment_field(
     mode = item.get(mode_field, "N/A") or "N/A"
     expected_status = determine_payment_status(pending, received)
 
-    if pending < 0:
+    # negative_pending and received>total are intentional when an over-payment was made.
+    # Flag as informational 'overpaid' rather than an error so audit still surfaces them.
+    if pending < 0 or (total >= 0 and received - total > 0.01):
         issues.append({
-            "type": "negative_pending",
+            "type": "overpaid",
             "category": label,
-            "message": f"{label} pending is negative",
+            "message": f"{label} over-payment: received ₹{received} against total ₹{total} (credit ₹{round_money(received - total)})",
             "total": total,
             "received": received,
             "pending": pending,
@@ -266,17 +268,6 @@ def analyze_payment_field(
             "mode": mode,
         })
 
-    if total >= 0 and received - total > 0.01:
-        issues.append({
-            "type": "received_exceeds_total",
-            "category": label,
-            "message": f"{label} received exceeds total amount",
-            "total": total,
-            "received": received,
-            "pending": pending,
-            "mode": mode,
-        })
-
     if total >= 0 and pending - total > 0.01:
         issues.append({
             "type": "pending_exceeds_total",
@@ -288,7 +279,8 @@ def analyze_payment_field(
             "mode": mode,
         })
 
-    if total > 0 and abs(round_money(received + pending) - total) > 1:
+    # Only flag amount_mismatch when pending >= 0 (negative pending is an intentional over-payment state)
+    if total > 0 and pending >= 0 and abs(round_money(received + pending) - total) > 1:
         issues.append({
             "type": "amount_mismatch",
             "category": label,
@@ -480,15 +472,10 @@ async def repair_high_risk_data(limit: int = 100) -> dict:
             corrected_received = received
             corrected_pending = pending
 
-            if received > total + 0.01:
-                excess = max(excess, round_money(received - total))
-                corrected_received = total
-                corrected_pending = 0.0
-
-            if corrected_pending < -0.01:
-                excess = max(excess, round_money(-corrected_pending))
-                corrected_received = total
-                corrected_pending = 0.0
+            # Skip over-paid items — negative pending / received>total is intentional.
+            # The repair tool must not undo deliberate over-payments.
+            if received > total + 0.01 or corrected_pending < -0.01:
+                continue
 
             if corrected_pending >= 0 and corrected_received <= total + 0.01:
                 corrected_pending = round_money(max(0, total - corrected_received))
