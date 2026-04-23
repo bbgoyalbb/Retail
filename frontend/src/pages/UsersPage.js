@@ -42,6 +42,7 @@ export default function UsersPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [newPassword, setNewPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -140,10 +141,10 @@ export default function UsersPage() {
   };
 
   const handleDelete = async (u) => {
-    if (!window.confirm(`Delete user "${u.username}"? This cannot be undone.`)) return;
     try {
       await deleteUser(u.username);
       toast({ title: "User deleted" });
+      setDeleteConfirm(null);
       fetchUsers();
     } catch (err) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -234,9 +235,16 @@ export default function UsersPage() {
                         {u.is_active ? <CheckCircle size={15} /> : <XCircle size={15} />}
                       </button>
                       {u.username !== "admin" && u.username !== me.username && (
-                        <button onClick={() => handleDelete(u)} title="Delete" className="p-1.5 rounded-sm hover:bg-red-50 text-[var(--text-secondary)] hover:text-red-600 transition-colors">
-                          <Trash size={15} />
-                        </button>
+                        deleteConfirm === u.username ? (
+                          <span className="flex items-center gap-1 text-xs">
+                            <button onClick={() => handleDelete(u)} className="px-2 py-0.5 bg-red-500 text-white rounded-sm text-[10px] hover:bg-red-600">Delete</button>
+                            <button onClick={() => setDeleteConfirm(null)} className="px-2 py-0.5 border border-[var(--border-subtle)] rounded-sm text-[10px] hover:bg-[var(--bg)]">Cancel</button>
+                          </span>
+                        ) : (
+                          <button onClick={() => setDeleteConfirm(u.username)} title="Delete" className="p-1.5 rounded-sm hover:bg-red-50 text-[var(--text-secondary)] hover:text-red-600 transition-colors">
+                            <Trash size={15} />
+                          </button>
+                        )
                       )}
                     </div>
                   </td>

@@ -157,7 +157,7 @@ export default function SettingsPage() {
 
           {/* Firm Info */}
           <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-3">
-            <h3 className="font-heading text-base font-medium">Firm Details (PDF Invoice)</h3>
+            <h3 className="font-heading text-base font-medium">Firm Details (Invoice)</h3>
             <div className="space-y-3">
               {/* Logo Upload */}
               <div className="space-y-2">

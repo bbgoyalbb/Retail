@@ -51,10 +51,7 @@ function StatusColumn({ title, items, color, onMove, moveLabel, onMoveBack, move
   const toggleSelect = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const handleMove = () => {
-    if (selected.length === 0) {
-      window.alert("Please select at least one item to move.");
-      return;
-    }
+    if (selected.length === 0) return;
     onMove(selected);
     setSelected([]);
   };

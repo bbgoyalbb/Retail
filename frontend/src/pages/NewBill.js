@@ -32,6 +32,7 @@ export default function NewBill() {
   const [showInvoice, setShowInvoice] = useState(false);
   const [showTailoringModal, setShowTailoringModal] = useState(false);
   const [showAddonModal, setShowAddonModal] = useState(false);
+  const [dupWarning, setDupWarning] = useState(null);
 
   const nameRef = useRef(null);
   const dateRef = useRef(null);
@@ -95,9 +96,13 @@ export default function NewBill() {
       )));
     } else {
       const isDuplicate = items.some(row => row.barcode === barcode);
-      if (isDuplicate) {
-        if (!window.confirm(`Barcode "${barcode}" is already in the bill. Add it again?`)) return;
+      if (isDuplicate && dupWarning !== barcode) {
+        setDupWarning(barcode);
+        setMessage({ type: "error", text: `Barcode "${barcode}" already in bill. Scan/click Add again to force-add.` });
+        setTimeout(() => { setDupWarning(null); setMessage(null); }, 4000);
+        return;
       }
+      setDupWarning(null);
       setItems(prev => [...prev, {
         barcode,
         qty: parseFloat(qty),

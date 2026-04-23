@@ -13,6 +13,8 @@ export default function DataManager() {
   const [repairing, setRepairing] = useState(false);
   const [importMode, setImportMode] = useState("replace");
   const [dragActive, setDragActive] = useState(false);
+  const [restoreConfirm, setRestoreConfirm] = useState(false);
+  const [pendingRestoreFile, setPendingRestoreFile] = useState(null);
   const [audit, setAudit] = useState(null);
   const [normalizationResult, setNormalizationResult] = useState(null);
   const [repairResult, setRepairResult] = useState(null);
@@ -99,11 +101,13 @@ export default function DataManager() {
       setMessage({ type: "error", text: "Please upload a .json backup file" });
       return;
     }
-
-    const confirmed = window.confirm(
-      "⚠️ RESTORE BACKUP\n\nThis will permanently overwrite ALL current data with the contents of this backup file.\n\nThis action cannot be undone.\n\nAre you absolutely sure?"
-    );
-    if (!confirmed) return;
+    if (!restoreConfirm) {
+      setPendingRestoreFile(file);
+      setRestoreConfirm(true);
+      return;
+    }
+    setRestoreConfirm(false);
+    setPendingRestoreFile(null);
 
     setRestoring(true);
     setMessage(null);
@@ -316,6 +320,29 @@ export default function DataManager() {
                 onChange={(e) => handleRestore(e.target.files?.[0])}
               />
             </div>
+            {restoreConfirm && (
+              <div className="p-4 bg-[#9E473D10] border border-[var(--error)] rounded-sm space-y-3">
+                <p className="text-sm font-semibold text-[var(--error)] flex items-center gap-2"><Warning size={16} weight="fill" /> Confirm Restore</p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  This will permanently overwrite <strong>ALL current data</strong> with <strong>{pendingRestoreFile?.name}</strong>. This cannot be undone.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleRestore(pendingRestoreFile)}
+                    disabled={restoring}
+                    className="px-4 py-2 text-sm bg-red-500 text-white rounded-sm hover:bg-red-600 disabled:opacity-50"
+                  >
+                    {restoring ? "Restoring..." : "Yes, Restore Now"}
+                  </button>
+                  <button
+                    onClick={() => { setRestoreConfirm(false); setPendingRestoreFile(null); }}
+                    className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
