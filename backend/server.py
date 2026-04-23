@@ -2173,84 +2173,78 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
   *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: 'Inter', Arial, sans-serif; font-size: 12px; color: #2D2A26; background: #fff; padding: 24px; }}
+  body {{ font-family: 'Inter', Arial, sans-serif; font-size: 12px; color: #2D2A26; background: #fff; padding: 28px 32px; }}
   .invoice-wrap {{ max-width: 860px; margin: 0 auto; }}
 
-  /* Header */
-  .header {{ display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 14px; border-bottom: 2px solid {brand_color}; margin-bottom: 14px; }}
-  .header-left {{ display: flex; align-items: center; gap: 14px; }}
-  .logo {{ width: 64px; height: 64px; object-fit: contain; border-radius: 4px; }}
-  .firm-name {{ font-size: {firm_name_size}pt; font-weight: 700; color: {brand_color}; text-transform: {firm_name_case}; letter-spacing: 0.04em; }}
-  .firm-sub {{ font-size: 10px; color: #6C6760; margin-top: 2px; }}
-  .header-right {{ text-align: right; }}
-  .invoice-label {{ font-size: 20px; font-weight: 700; color: {brand_color}; letter-spacing: 0.1em; text-transform: uppercase; }}
-  .invoice-ref {{ font-size: 11px; color: #6C6760; margin-top: 2px; }}
+  /* ── Centered firm header ── */
+  .header {{ text-align: center; padding-bottom: 16px; border-bottom: 2.5px solid {brand_color}; margin-bottom: 16px; }}
+  .logo {{ width: 72px; height: 72px; object-fit: contain; border-radius: 6px; display: block; margin: 0 auto 8px; }}
+  .firm-name {{ font-size: {firm_name_size}pt; font-weight: 700; color: {brand_color}; text-transform: {firm_name_case}; letter-spacing: 0.05em; }}
+  .firm-sub {{ font-size: 10.5px; color: #6C6760; margin-top: 3px; line-height: 1.5; }}
+  .invoice-badge {{ display: inline-block; margin-top: 10px; padding: 3px 16px; background: {brand_color}; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; border-radius: 2px; }}
 
-  /* Meta info */
-  .meta-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; margin-bottom: 18px; padding: 10px 14px; background: #F5F3EE; border-radius: 4px; }}
-  .meta-grid span {{ font-size: 11px; color: #6C6760; }}
-  .meta-grid strong {{ font-size: 12px; color: #2D2A26; }}
+  /* ── Bill meta strip ── */
+  .meta-strip {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-bottom: 18px; border: 1px solid #E0DDD7; border-radius: 4px; overflow: hidden; }}
+  .meta-cell {{ padding: 8px 12px; border-right: 1px solid #E0DDD7; }}
+  .meta-cell:last-child {{ border-right: none; }}
+  .meta-label {{ font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.1em; color: #9C9690; margin-bottom: 2px; }}
+  .meta-value {{ font-size: 12px; font-weight: 600; color: #2D2A26; }}
 
-  /* Section titles */
-  .sec-title {{ font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: {brand_color}; margin: 18px 0 6px; padding-bottom: 3px; border-bottom: 1px solid #EBE8E1; }}
+  /* ── Section titles ── */
+  .sec-title {{ font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: {brand_color}; margin: 20px 0 5px; padding-bottom: 4px; border-bottom: 1.5px solid #E0DDD7; }}
 
-  /* Tables */
+  /* ── Tables ── */
   table {{ width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 4px; }}
-  thead tr {{ background: #F5F3EE; }}
-  th {{ padding: 5px 7px; font-weight: 600; text-align: left; color: #2D2A26; border-bottom: 1px solid #EBE8E1; white-space: nowrap; }}
-  td {{ padding: 5px 7px; border-bottom: 1px solid #EBE8E1; vertical-align: top; }}
+  thead tr {{ background: #3D3A36; }}
+  th {{ padding: 6px 8px; font-weight: 600; text-align: left; color: #F5F3EE; white-space: nowrap; font-size: 10.5px; letter-spacing: 0.03em; }}
+  td {{ padding: 5px 8px; border-bottom: 1px solid #EDEBE6; vertical-align: top; }}
+  tbody tr:nth-child(even) {{ background: #FAFAF8; }}
   tr:last-child td {{ border-bottom: none; }}
-  tr.foot td {{ font-weight: 700; background: #F5F3EE; border-top: 1.5px solid #2D2A26; }}
+  tr.foot td {{ font-weight: 700; background: #EDEBE6; border-top: 1.5px solid #3D3A36; border-bottom: none; }}
   .r {{ text-align: right; }}
 
-  /* Summary */
-  .summary-wrap {{ margin-top: 20px; }}
-  tr.grand td {{ font-size: 13px; font-weight: 700; background: #F5F3EE; border-top: 2px solid #2D2A26; }}
-  tr.net td {{ font-size: 14px; font-weight: 700; color: {brand_color}; background: #fff8f5; border-top: 1.5px solid {brand_color}; }}
+  /* ── Payment summary ── */
+  .summary-wrap {{ margin-top: 22px; }}
+  tr.grand td {{ font-size: 12.5px; font-weight: 700; background: #3D3A36; color: #F5F3EE; border-top: none; border-bottom: none; }}
+  tr.grand td.r {{ text-align: right; }}
+  tr.net td {{ font-size: 13.5px; font-weight: 700; color: #fff; background: {brand_color}; border-top: none; border-bottom: none; }}
 
-  /* Terms */
-  .terms {{ margin-top: 20px; padding-top: 12px; border-top: 1px solid #EBE8E1; }}
-  .terms p {{ font-size: 10px; color: #6C6760; margin-bottom: 3px; }}
+  /* ── Terms ── */
+  .terms {{ margin-top: 22px; padding-top: 12px; border-top: 1px dashed #CBCAC4; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 24px; }}
+  .terms p {{ font-size: 10px; color: #8C8A84; margin-bottom: 2px; }}
 
-  /* Footer */
-  .inv-footer {{ margin-top: 14px; font-size: 10px; color: #9C9690; text-align: center; }}
+  /* ── Footer ── */
+  .inv-footer {{ margin-top: 16px; font-size: 10px; color: #AEACA6; text-align: center; padding-top: 10px; border-top: 1px solid #EDEBE6; }}
 
-  /* Print */
+  /* ── Print ── */
   @media print {{
     body {{ padding: 0; }}
     .no-print {{ display: none !important; }}
-    @page {{ margin: 12mm; size: A4; }}
+    @page {{ margin: 10mm 12mm; size: A4; }}
   }}
 </style>
 </head>
 <body>
 <div class="invoice-wrap">
 
-  <!-- HEADER -->
+  <!-- CENTERED FIRM HEADER -->
   <div class="header">
-    <div class="header-left">
-      {logo_html}
-      <div>
-        <div class="firm-name">{firm_name}</div>
-        <div class="firm-sub">{firm_address}</div>
-        <div class="firm-sub">Ph: {firm_phones} &nbsp;|&nbsp; GSTIN: {firm_gstin}</div>
-      </div>
-    </div>
-    <div class="header-right">
-      <div class="invoice-label">Invoice</div>
-      <div class="invoice-ref">{ref_id}</div>
-    </div>
+    {logo_html}
+    <div class="firm-name">{firm_name}</div>
+    <div class="firm-sub">{firm_address}</div>
+    <div class="firm-sub">Ph: {firm_phones} &nbsp;&nbsp;|&nbsp;&nbsp; GSTIN: {firm_gstin}</div>
+    <div><span class="invoice-badge">Invoice</span></div>
   </div>
 
-  <!-- META -->
-  <div class="meta-grid">
-    <div><span>Customer&nbsp;&nbsp;</span><strong>{customer_name}</strong></div>
-    <div><span>Date&nbsp;&nbsp;</span><strong>{order_date}</strong></div>
-    <div><span>Reference&nbsp;&nbsp;</span><strong>{ref_id}</strong></div>
-    <div><span>Items&nbsp;&nbsp;</span><strong>{len(items)}</strong></div>
+  <!-- BILL META STRIP -->
+  <div class="meta-strip">
+    <div class="meta-cell"><div class="meta-label">Customer</div><div class="meta-value">{customer_name}</div></div>
+    <div class="meta-cell"><div class="meta-label">Reference</div><div class="meta-value">{ref_id}</div></div>
+    <div class="meta-cell"><div class="meta-label">Date</div><div class="meta-value">{order_date}</div></div>
+    <div class="meta-cell"><div class="meta-label">Items</div><div class="meta-value">{len(items)}</div></div>
   </div>
 
-  <!-- FABRIC -->
+  <!-- A. FABRIC ITEMS -->
   <h3 class="sec-title">A. Fabric Items</h3>
   <table>
     <thead><tr><th>#</th><th>Article</th><th>Barcode</th><th class="r">Price/m</th><th class="r">Qty</th><th class="r">Disc%</th><th class="r">Amount</th><th class="r">Base Amt</th><th class="r">GST ({GST_RATE:.0f}%)</th></tr></thead>
@@ -2262,9 +2256,9 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
   {addon_section}
   {adv_section}
 
-  <!-- PAYMENT SUMMARY -->
+  <!-- F. PAYMENT SUMMARY -->
   <div class="summary-wrap">
-    <h3 class="sec-title">Payment Summary</h3>
+    <h3 class="sec-title">F. Payment Summary</h3>
     <table>
       <thead><tr><th>Category</th><th class="r">Total</th><th class="r">Received</th><th class="r">Pending</th></tr></thead>
       <tbody>{summary_rows}</tbody>
@@ -2273,14 +2267,14 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
 
   <!-- TERMS -->
   <div class="terms">
-    <p>1. All fabric prices are inclusive of GST @ {GST_RATE:.0f}%.</p>
+    <p>1. Fabric prices are inclusive of GST @ {GST_RATE:.0f}%.</p>
     <p>2. Goods once sold will not be taken back or exchanged.</p>
-    <p>3. Tailoring orders are subject to delivery timelines agreed at time of order.</p>
-    <p>4. Advance payments are non-refundable and adjusted against the final bill.</p>
+    <p>3. Tailoring subject to delivery timelines agreed at order.</p>
+    <p>4. Advances are non-refundable and adjusted against final bill.</p>
     <p>5. Any dispute is subject to local jurisdiction.</p>
   </div>
 
-  <div class="inv-footer">Generated on {gen_time} &nbsp;|&nbsp; Thank you for your business!</div>
+  <div class="inv-footer">Generated on {gen_time} &nbsp;·&nbsp; Thank you for your business!</div>
 </div>
 </body>
 </html>"""
