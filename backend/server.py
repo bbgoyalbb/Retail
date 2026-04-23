@@ -1302,6 +1302,27 @@ async def move_jobwork(req: StatusUpdateRequest):
 
     return {"message": f"{updated} items moved to {req.new_status}"}
 
+class MoveBackRequest(BaseModel):
+    item_ids: List[str]
+    current_status: str
+
+@api_router.post("/jobwork/move-back")
+async def move_jobwork_back(req: MoveBackRequest):
+    TAILORING_PREV = {"Stitched": "Pending", "Delivered": "Stitched"}
+    EMB_PREV = {"In Progress": "Required", "Finished": "In Progress"}
+    updated = 0
+    for item_id in req.item_ids:
+        if req.current_status in TAILORING_PREV:
+            update_fields = {"tailoring_status": TAILORING_PREV[req.current_status]}
+        elif req.current_status in EMB_PREV:
+            update_fields = {"embroidery_status": EMB_PREV[req.current_status]}
+        else:
+            continue
+        result = await db.items.update_one({"id": item_id}, {"$set": update_fields})
+        if result.modified_count > 0:
+            updated += 1
+    return {"message": f"{updated} items moved back"}
+
 class EmbMoveRequest(BaseModel):
     item_ids: List[str]
     new_status: str
@@ -1675,6 +1696,24 @@ async def pay_labour(req: LabourPaymentRequest):
 
     return {"message": f"{updated} labour payments processed"}
 
+class LabourDeleteRequest(BaseModel):
+    payment_id: Optional[str] = None
+    item_ids: List[str]
+    labour_type: str
+
+@api_router.post("/labour/delete-payment")
+async def delete_labour_payment(req: LabourDeleteRequest):
+    updated = 0
+    for item_id in req.item_ids:
+        if req.labour_type == "tailoring":
+            update = {"labour_paid": "N/A", "labour_pay_date": "N/A"}
+        else:
+            update = {"emb_labour_paid": "N/A", "emb_labour_date": "N/A"}
+        result = await db.items.update_one({"id": item_id}, {"$set": update})
+        if result.modified_count > 0:
+            updated += 1
+    return {"message": f"{updated} items marked as unpaid"}
+
 # ==========================================
 # ADVANCES
 # ==========================================
@@ -1689,6 +1728,36 @@ async def get_advances(name: Optional[str] = None, ref: Optional[str] = None):
     advances = await db.advances.find(query, {"_id": 0}).sort("date", -1).to_list(500)
     return advances
 
+class AdvanceCreateRequest(BaseModel):
+    ref: str
+    name: str
+    amount: float
+    date: str
+    mode: Optional[str] = "Cash"
+
+@api_router.post("/advances")
+async def create_advance(req: AdvanceCreateRequest):
+    import uuid
+    adv = {"id": str(uuid.uuid4()), "ref": req.ref, "name": req.name, "amount": req.amount, "date": req.date, "mode": req.mode or "Cash"}
+    await db.advances.insert_one(adv)
+    adv.pop("_id", None)
+    return adv
+
+@api_router.put("/advances/{advance_id}")
+async def update_advance(advance_id: str, req: AdvanceCreateRequest):
+    update = {"ref": req.ref, "name": req.name, "amount": req.amount, "date": req.date, "mode": req.mode or "Cash"}
+    result = await db.advances.update_one({"id": advance_id}, {"$set": update})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Advance not found")
+    return {"message": "Advance updated"}
+
+@api_router.delete("/advances/{advance_id}")
+async def delete_advance(advance_id: str):
+    result = await db.advances.delete_one({"id": advance_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Advance not found")
+    return {"message": "Advance deleted"}
+
 # ==========================================
 # ORDER NUMBERS
 # ==========================================
@@ -1697,6 +1766,68 @@ async def get_advances(name: Optional[str] = None, ref: Optional[str] = None):
 async def get_order_numbers():
     orders = await db.items.distinct("order_no", {"order_no": {"$nin": ["N/A", "", None]}})
     return sorted([o for o in orders if o])
+
+@api_router.get("/orders/status")
+async def get_order_status(
+    customer: Optional[str] = None,
+    order_no: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = Query(400, le=2000)
+):
+    query = {"order_no": {"$nin": ["N/A", "", None]}}
+    if customer:
+        query["name"] = customer
+    if order_no:
+        query["order_no"] = {"$regex": order_no, "$options": "i"}
+    if date_from:
+        query.setdefault("date", {})["$gte"] = date_from
+    if date_to:
+        query.setdefault("date", {})["$lte"] = date_to
+    items = await db.items.find(query, {"_id": 0}).to_list(limit)
+    grouped: dict = {}
+    for item in items:
+        ono = item.get("order_no", "")
+        if ono not in grouped:
+            grouped[ono] = {
+                "order_no": ono,
+                "customers": set(),
+                "refs": set(),
+                "item_count": 0,
+                "tailoring_pending": 0,
+                "tailoring_stitched": 0,
+                "tailoring_delivered": 0,
+                "emb_required": 0,
+                "emb_in_progress": 0,
+                "emb_finished": 0,
+                "order_total": 0,
+                "latest_bill_date": "",
+                "latest_delivery_date": "",
+            }
+        g = grouped[ono]
+        g["customers"].add(item.get("name", ""))
+        g["refs"].add(item.get("ref", ""))
+        g["item_count"] += 1
+        ts = item.get("tailoring_status", "N/A")
+        if ts == "Pending": g["tailoring_pending"] += 1
+        elif ts == "Stitched": g["tailoring_stitched"] += 1
+        elif ts == "Delivered": g["tailoring_delivered"] += 1
+        es = item.get("embroidery_status", "N/A")
+        if es == "Required": g["emb_required"] += 1
+        elif es == "In Progress": g["emb_in_progress"] += 1
+        elif es == "Finished": g["emb_finished"] += 1
+        g["order_total"] += float(item.get("fabric_amount", 0))
+        d = item.get("date", "")
+        if d and d > g["latest_bill_date"]: g["latest_bill_date"] = d
+        dd = item.get("delivery_date", "")
+        if dd and dd not in ("N/A", "", None) and dd > g["latest_delivery_date"]: g["latest_delivery_date"] = dd
+    result = []
+    for g in grouped.values():
+        g["customers"] = sorted(g["customers"])
+        g["refs"] = sorted(g["refs"])
+        result.append(g)
+    result.sort(key=lambda x: x.get("latest_bill_date", ""), reverse=True)
+    return result
 
 # ==========================================
 # ITEM EDIT & DELETE
