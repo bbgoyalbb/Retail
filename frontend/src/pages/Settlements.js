@@ -40,11 +40,9 @@ export default function Settlements() {
   const loadBalances = useCallback((ref) => {
     getBalances({ ref }).then(res => {
       setBalances(res.data);
-      setAllotFab(res.data.fabric > 0 ? String(res.data.fabric) : "");
-      setAllotTail(res.data.tailoring > 0 ? String(res.data.tailoring) : "");
-      setAllotEmb(res.data.embroidery > 0 ? String(res.data.embroidery) : "");
-      setAllotAddon(res.data.addon > 0 ? String(res.data.addon) : "");
-      setAllotAdv("");
+      // Don't pre-fill allotments — leave blank so fresh payment drives allocation.
+      // User clicks Auto-distribute or enters amounts manually.
+      setAllotFab(""); setAllotTail(""); setAllotEmb(""); setAllotAddon(""); setAllotAdv("");
     }).catch(() => {});
   }, []);
 
@@ -98,22 +96,23 @@ export default function Settlements() {
 
   const toggleMode = (m) => setSelectedModes(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
 
-  // Auto-distribute: allocate the full pool pro-rata across sections (may exceed balance — that's OK)
-  const autoDistribute = () => {
-    const pool = totalPool;
+  // Auto-distribute: allocate the full pool pro-rata by pending balance across active sections.
+  // Works for both normal payments and over-payments (pool > total pending).
+  const autoDistribute = (pool = totalPool) => {
     if (pool <= 0) return;
 
-    // Sections with a pending balance participate in pro-rata distribution
-    const sections = [
+    const all = [
       { bal: balances.fabric,     setter: setAllotFab },
       { bal: balances.tailoring,  setter: setAllotTail },
       { bal: balances.embroidery, setter: setAllotEmb },
       { bal: balances.addon,      setter: setAllotAddon },
-    ].filter(s => s.bal > 0);
+    ];
+    // Use sections that have a positive pending balance as weights.
+    // If nothing is pending (all already settled), don't distribute — user should use New Advance.
+    const sections = all.filter(s => s.bal > 0);
+    if (sections.length === 0) return;
 
     const pendingTotal = sections.reduce((s, x) => s + x.bal, 0);
-    if (pendingTotal <= 0) return;
-
     let running = 0;
     sections.forEach((s, idx) => {
       let share;
@@ -123,10 +122,21 @@ export default function Settlements() {
         share = Math.round(pool * (s.bal / pendingTotal));
         running += share;
       }
-      s.setter(share > 0 ? String(share) : "");
+      s.setter(String(share));
     });
+    // Zero out sections with no balance
+    all.filter(s => s.bal <= 0).forEach(s => s.setter(""));
     setAllotAdv("");
   };
+
+  // Auto-distribute whenever fresh payment changes (and a ref is loaded)
+  useEffect(() => {
+    if (!selectedRef) return;
+    const pool = (parseFloat(freshPay) || 0) + (useAdvance ? balances.advance : 0);
+    if (pool > 0) autoDistribute(pool);
+    else { setAllotFab(""); setAllotTail(""); setAllotEmb(""); setAllotAddon(""); setAllotAdv(""); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [freshPay, useAdvance, selectedRef]);
 
   // Settle full section
   const settleSection = (section) => {
