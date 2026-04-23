@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
-import { searchItems, getCustomers, getInvoiceUrl } from "@/api";
-import { MagnifyingGlass, Funnel, FilePdf, X } from "@phosphor-icons/react";
+import { searchItems, getCustomers } from "@/api";
+import { MagnifyingGlass, Funnel, FilePdf, X, CaretLeft, CaretRight } from "@phosphor-icons/react";
+import InvoiceModal from "@/components/InvoiceModal";
+
+const ITEMS_PER_PAGE = 100;
 
 export default function SearchPage() {
   const [query, setQuery] = useState("");
@@ -16,11 +19,35 @@ export default function SearchPage() {
   const [total, setTotal] = useState(0);
   const [searched, setSearched] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [error, setError] = useState(null);
+  const [invoiceRef, setInvoiceRef] = useState(null);
 
   useEffect(() => { getCustomers().then(res => setCustomers(res.data)).catch(() => {}); }, []);
 
-  const handleSearch = async () => {
-    const params = { q: query, limit: 100 };
+  // Debounced search for query changes
+  useEffect(() => {
+    if (!searched && !query) return;
+    const timer = setTimeout(() => {
+      if (query || searched) {
+        handleSearch(0);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  const handleSearch = async (page = 0) => {
+    setLoading(true);
+    setError(null);
+    setCurrentPage(page);
+    
+    const params = { 
+      q: query, 
+      limit: ITEMS_PER_PAGE,
+      skip: page * ITEMS_PER_PAGE
+    };
     if (customer !== "All") params.customer = customer;
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
@@ -35,29 +62,43 @@ export default function SearchPage() {
       setTotal(res.data.total);
       setSearched(true);
     } catch (err) {
-      console.error(err);
+      setError("Search failed. Please try again.");
+      setResults([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   const clearFilters = () => {
     setQuery(""); setCustomer("All"); setDateFrom(""); setDateTo("");
     setStatus("All"); setPaymentStatus("All"); setMinAmount(""); setMaxAmount("");
-    setResults([]); setTotal(0); setSearched(false);
+    setResults([]); setTotal(0); setSearched(false); setCurrentPage(0); setError(null);
   };
+
+  const clearSearch = () => {
+    setQuery("");
+    if (searched) {
+      handleSearch(0);
+    }
+  };
+
+  const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+  const hasMore = (currentPage + 1) * ITEMS_PER_PAGE < total;
+  const hasPrev = currentPage > 0;
 
   const fmt = (n) => new Intl.NumberFormat('en-IN').format(Math.round(n || 0));
 
   return (
     <div data-testid="search-page" className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-light tracking-tight">Search</h1>
+        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Search</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">Find any record across all items</p>
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white border border-[var(--border-subtle)] p-4 rounded-sm space-y-4">
-        <div className="flex gap-3">
-          <div className="flex-1 relative">
+      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm space-y-4">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
+          <div className="flex-1 min-w-0 relative">
             <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
             <input
               data-testid="search-input"
@@ -65,8 +106,17 @@ export default function SearchPage() {
               onChange={e => setQuery(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSearch()}
               placeholder="Search by name, barcode, reference, article type, karigar..."
-              className="w-full pl-10 pr-4 py-2.5 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] focus:border-[var(--brand)]"
+              className="w-full pl-10 pr-10 py-2.5 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] focus:border-[var(--brand)]"
             />
+            {query && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--error)] p-1 rounded-sm hover:bg-[var(--bg)]"
+                title="Clear search"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
           <button data-testid="search-btn" onClick={handleSearch} className="px-6 py-2.5 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] transition-all duration-200 hover:translate-y-[-1px]">
             Search
@@ -125,7 +175,7 @@ export default function SearchPage() {
 
       {/* Results */}
       {searched && (
-        <div className="bg-white border border-[var(--border-subtle)] rounded-sm">
+        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm">
           <div className="p-4 border-b border-[var(--border-subtle)]">
             <p className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">{total} Results Found</p>
           </div>
@@ -140,73 +190,128 @@ export default function SearchPage() {
               <p className="text-sm text-[var(--text-secondary)]">Try a different search term or adjust filters</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full" data-testid="search-results-table">
-                <thead>
-                  <tr className="bg-[var(--bg)]">
-                    {["Date", "Customer", "Ref", "Item", "Price", "Qty", "Amount", "Article", "Tailoring", "Embroidery", "Payment", "PDF"].map(h => (
-                      <th key={h} className="text-left px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map((item, i) => (
-                    <tr key={i} className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D05]">
-                      <td className="px-3 py-2 font-mono text-xs">{item.date}</td>
-                      <td className="px-3 py-2 text-sm font-medium max-w-[140px] truncate">{item.name}</td>
-                      <td className="px-3 py-2 font-mono text-xs text-[var(--text-secondary)]">{item.ref}</td>
-                      <td className="px-3 py-2 text-xs max-w-[100px] truncate">{item.barcode}</td>
-                      <td className="px-3 py-2 font-mono text-xs text-right">₹{fmt(item.price)}</td>
-                      <td className="px-3 py-2 font-mono text-xs text-right">{item.qty}</td>
-                      <td className="px-3 py-2 font-mono text-xs text-right font-medium">₹{fmt(item.fabric_amount)}</td>
-                      <td className="px-3 py-2 text-xs">{item.article_type !== 'N/A' ? item.article_type : '-'}</td>
-                      <td className="px-3 py-2">
-                        <span className={`text-xs ${item.tailoring_status === 'Delivered' ? 'text-[var(--success)]' : item.tailoring_status === 'N/A' ? 'text-[var(--text-secondary)]' : 'text-[var(--warning)]'}`}>
+            <>
+              {/* Mobile card view */}
+              <div className="md:hidden divide-y divide-[var(--border-subtle)]">
+                {results.map((item, i) => (
+                  <div key={i} className="p-3 space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium leading-tight">{item.name}</p>
+                        <p className="font-mono text-[10px] text-[var(--text-secondary)]">{item.ref} · {item.date}</p>
+                      </div>
+                      <button onClick={() => setInvoiceRef(item.ref)} className="p-1.5 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm flex-shrink-0">
+                        <FilePdf size={16} />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-secondary)]">
+                      <span><span className="font-medium text-[var(--text-primary)]">₹{fmt(item.fabric_amount)}</span> fabric</span>
+                      {item.barcode && item.barcode !== 'N/A' && <span>{item.barcode}</span>}
+                      {item.article_type && item.article_type !== 'N/A' && <span>{item.article_type}</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-sm border ${item.payment_status === 'Settled' ? 'text-[var(--success)] border-[var(--success)]/30 bg-[var(--success)]/5' : item.payment_status === 'Partially Settled' ? 'text-[var(--info)] border-[var(--info)]/30 bg-[var(--info)]/5' : 'text-[var(--warning)] border-[var(--warning)]/30 bg-[var(--warning)]/5'}`}>
+                        {item.payment_status || 'Pending'}
+                      </span>
+                      {item.tailoring_status && item.tailoring_status !== 'N/A' && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-sm border ${item.tailoring_status === 'Delivered' ? 'text-[var(--success)] border-[var(--success)]/30 bg-[var(--success)]/5' : 'text-[var(--warning)] border-[var(--warning)]/30 bg-[var(--warning)]/5'}`}>
                           {item.tailoring_status}
                         </span>
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className={`text-xs ${item.embroidery_status === 'Finished' ? 'text-[var(--success)]' : item.embroidery_status === 'N/A' || item.embroidery_status === 'Not Required' ? 'text-[var(--text-secondary)]' : 'text-[var(--info)]'}`}>
-                          {item.embroidery_status}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className={`inline-flex items-center gap-1 text-xs ${
-                          item.payment_status === 'Settled'
-                            ? 'text-[var(--success)]'
-                            : item.payment_status === 'Partially Settled'
-                              ? 'text-[var(--info)]'
-                              : 'text-[var(--warning)]'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            item.payment_status === 'Settled'
-                              ? 'bg-[var(--success)]'
-                              : item.payment_status === 'Partially Settled'
-                                ? 'bg-[var(--info)]'
-                                : 'bg-[var(--warning)]'
-                          }`} />
-                          {item.payment_status || 'Pending'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2">
-                        <a href={getInvoiceUrl(item.ref)} target="_blank" rel="noopener noreferrer" className="p-1 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm inline-block">
-                          <FilePdf size={16} />
-                        </a>
-                      </td>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Desktop table view */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full" data-testid="search-results-table">
+                  <thead>
+                    <tr className="bg-[var(--bg)]">
+                      {["Date", "Customer", "Ref", "Item", "Price", "Qty", "Amount", "Article", "Tailoring", "Embroidery", "Payment", "PDF"].map(h => (
+                        <th key={h} className="text-left px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {results.map((item, i) => (
+                      <tr key={i} className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D05]">
+                        <td className="px-3 py-2 font-mono text-xs">{item.date}</td>
+                        <td className="px-3 py-2 text-sm font-medium max-w-[140px] truncate">{item.name}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-[var(--text-secondary)]">{item.ref}</td>
+                        <td className="px-3 py-2 text-xs max-w-[100px] truncate">{item.barcode}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-right">₹{fmt(item.price)}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-right">{item.qty}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-right font-medium">₹{fmt(item.fabric_amount)}</td>
+                        <td className="px-3 py-2 text-xs">{item.article_type !== 'N/A' ? item.article_type : '-'}</td>
+                        <td className="px-3 py-2">
+                          <span className={`text-xs ${item.tailoring_status === 'Delivered' ? 'text-[var(--success)]' : item.tailoring_status === 'N/A' ? 'text-[var(--text-secondary)]' : 'text-[var(--warning)]'}`}>{item.tailoring_status}</span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`text-xs ${item.embroidery_status === 'Finished' ? 'text-[var(--success)]' : item.embroidery_status === 'N/A' || item.embroidery_status === 'Not Required' ? 'text-[var(--text-secondary)]' : 'text-[var(--info)]'}`}>{item.embroidery_status}</span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-flex items-center gap-1 text-xs ${item.payment_status === 'Settled' ? 'text-[var(--success)]' : item.payment_status === 'Partially Settled' ? 'text-[var(--info)]' : 'text-[var(--warning)]'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${item.payment_status === 'Settled' ? 'bg-[var(--success)]' : item.payment_status === 'Partially Settled' ? 'bg-[var(--info)]' : 'bg-[var(--warning)]'}`} />
+                            {item.payment_status || 'Pending'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <button onClick={() => setInvoiceRef(item.ref)} className="p-1 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm inline-block"><FilePdf size={16} /></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-[var(--border-subtle)] flex items-center justify-between">
+              <div className="text-xs text-[var(--text-secondary)]">
+                Showing {currentPage * ITEMS_PER_PAGE + 1} - {Math.min((currentPage + 1) * ITEMS_PER_PAGE, total)} of {total} results
+                {loading && <span className="ml-2 text-[var(--brand)]">Loading...</span>}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleSearch(currentPage - 1)}
+                  disabled={!hasPrev || loading}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <CaretLeft size={14} /> Previous
+                </button>
+                <span className="text-xs px-2">
+                  Page {currentPage + 1} of {totalPages}
+                </span>
+                <button
+                  onClick={() => handleSearch(currentPage + 1)}
+                  disabled={!hasMore || loading}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next <CaretRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {error && (
+            <div className="p-4 border-t border-[var(--error)] bg-[#9E473D10] text-[var(--error)] text-sm text-center">
+              {error}
             </div>
           )}
         </div>
       )}
 
       {!searched && (
-        <div className="bg-white border border-[var(--border-subtle)] p-16 rounded-sm text-center">
+        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-16 rounded-sm text-center">
           <MagnifyingGlass size={48} weight="thin" className="mx-auto text-[var(--border-strong)] mb-4" />
           <p className="text-[var(--text-secondary)] text-sm">Enter a search term or apply filters to find records</p>
         </div>
+      )}
+
+      {invoiceRef && (
+        <InvoiceModal billRef={invoiceRef} onClose={() => setInvoiceRef(null)} />
       )}
     </div>
   );

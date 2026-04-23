@@ -101,3 +101,74 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+## user_problem_statement: Fix JobWork embroidery move button disabled state and continue fixing remaining frontend/backend issues
+## frontend:
+##   - task: "JobWork Embroidery Move Button Enable"
+##     implemented: true
+##     working: "NA"
+##     file: "frontend/src/pages/JobWork.js"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: true
+##     status_history:
+##         - working: "NA"
+##         - agent: "main"
+##         - comment: "Removed disabled={selected.length === 0} from forward move button in StatusColumn. Added window.alert in handleMove when no items selected. This fixes the iteration 5 test report issue where embroidery Required column move button was permanently disabled."
+##
+## backend:
+##   - task: "Bulk Delete Items Body Parsing"
+##     implemented: true
+##     working: "NA"
+##     file: "backend/server.py"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: true
+##     status_history:
+##         - working: "NA"
+##         - agent: "main"
+##         - comment: "Added Body import to FastAPI and changed bulk_delete_items parameter from item_ids: List[str] to item_ids: List[str] = Body(...). Previously FastAPI treated this as a query parameter on the DELETE endpoint, but frontend sends the array in the request body via Axios. This caused bulk delete to silently delete 0 items."
+##
+##   - task: "JobWork Move Back embroidery_pay_mode Unset Fix"
+##     implemented: true
+##     working: "NA"
+##     file: "backend/server.py"
+##     stuck_count: 0
+##     priority: "medium"
+##     needs_retesting: true
+##     status_history:
+##         - working: "NA"
+##         - agent: "main"
+##         - comment: "Fixed move_jobwork_back endpoint: embroidery_pay_mode was incorrectly placed in $unset (removing the field entirely) instead of $set when reverting Finished -> In Progress. Now it sets embroidery_pay_mode to 'Pending' via $set."
+##
+##   - task: "Update Item Discount Calculation Mismatch"
+##     implemented: true
+##     working: "NA"
+##     file: "backend/server.py"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: true
+##     status_history:
+##         - working: "NA"
+##         - agent: "main"
+##         - comment: "Fixed update_item endpoint: fabric_amount recalculation used round((p - (p * d / 100)) * q, 0) which differs from create_bill that rounds the discounted unit price first. Changed to discounted_price = round(p - (p * d / 100), 0); update_fields['fabric_amount'] = round(discounted_price * q, 0) to match create_bill and frontend."
+##
+## metadata:
+##   created_by: "main_agent"
+##   version: "1.0"
+##   test_sequence: 6
+##   run_ui: false
+##
+## test_plan:
+##   current_focus:
+##     - "JobWork Embroidery Move Button Enable"
+##     - "Bulk Delete Items Body Parsing"
+##     - "JobWork Move Back embroidery_pay_mode Unset Fix"
+##     - "Update Item Discount Calculation Mismatch"
+##   stuck_tasks: []
+##   test_all: false
+##   test_priority: "high_first"
+##
+## agent_communication:
+##     -agent: "main"
+##     -message: "Fixed JobWork move button disabled state, bulk delete Body parsing, move-back embroidery_pay_mode unset bug, and update_item discount calculation mismatch. Retest required for all four fixes."

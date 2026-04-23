@@ -7,16 +7,26 @@ Tests all API endpoints for the fabric/tailoring business management system
 import requests
 import sys
 import json
+import os
 from datetime import datetime, date
 from typing import Dict, Any, List
 
+
+def normalize_base_url(base_url: str) -> str:
+    """Accept either host root or /api URL and normalize to host root."""
+    clean = (base_url or "").strip().rstrip("/")
+    if clean.endswith("/api"):
+        clean = clean[:-4]
+    return clean
+
 class RetailAPITester:
-    def __init__(self, base_url: str = "https://vba-converter.preview.emergentagent.com"):
-        self.base_url = base_url
-        self.api_base = f"{base_url}/api"
+    def __init__(self, base_url: str = "http://127.0.0.1:8001"):
+        self.base_url = normalize_base_url(base_url)
+        self.api_base = f"{self.base_url}/api"
         self.tests_run = 0
         self.tests_passed = 0
         self.failed_tests = []
+        self.latest_ref = None
         self.session = requests.Session()
         self.session.headers.update({'Content-Type': 'application/json'})
 
@@ -242,6 +252,7 @@ class RetailAPITester:
         self.log_test("Create Bill", success, str(result) if not success else "")
         
         if success and isinstance(result, dict):
+            self.latest_ref = result.get('ref')
             print(f"   🧾 Bill created - Ref: {result.get('ref')}, Total: ₹{result.get('grand_total')}")
         
         return success
@@ -656,6 +667,11 @@ class RetailAPITester:
         """Test specific new features mentioned in the review request"""
         print("\n🎯 Testing Specific New Features from Review Request:")
         print("-" * 50)
+
+        ref_to_test = self.latest_ref
+        if not ref_to_test:
+            self.log_test("Specific feature setup", False, "No reference available from create bill flow")
+            return False
         
         # Test POST /api/jobwork/move-emb endpoint
         success1, result1 = self.test_api_endpoint('POST', '/jobwork/move-emb', data={
@@ -666,29 +682,25 @@ class RetailAPITester:
         })
         self.log_test("POST /api/jobwork/move-emb endpoint exists", success1, str(result1) if not success1 else "")
         
-        # Test PDF invoice with specific reference
-        success2, result2 = self.test_api_endpoint('GET', '/invoice', params={'ref': '03/010426'})
+        # Test PDF invoice with created reference
+        success2, result2 = self.test_api_endpoint('GET', '/invoice', params={'ref': ref_to_test})
         if success2:
-            self.log_test("PDF Invoice for ref 03/010426", True)
-            print("   📄 PDF generated successfully with NARWANA AGENCIES header")
+            self.log_test(f"PDF Invoice for ref {ref_to_test}", True)
+            print("   📄 PDF generated successfully")
         else:
-            self.log_test("PDF Invoice for ref 03/010426", False, str(result2))
+            self.log_test(f"PDF Invoice for ref {ref_to_test}", False, str(result2))
         
-        # Test settlement balances for specific reference
-        success3, result3 = self.test_api_endpoint('GET', '/settlements/balances', params={'ref': '04/010426'})
-        self.log_test("Settlement balances for ref 04/010426", success3, str(result3) if not success3 else "")
+        # Test settlement balances for the same reference
+        success3, result3 = self.test_api_endpoint('GET', '/settlements/balances', params={'ref': ref_to_test})
+        self.log_test(f"Settlement balances for ref {ref_to_test}", success3, str(result3) if not success3 else "")
         
         if success3 and isinstance(result3, dict):
             fabric_balance = result3.get('fabric', 0)
             tailoring_balance = result3.get('tailoring', 0)
             print(f"   💰 Settlement balances - Fabric: ₹{fabric_balance}, Tailoring: ₹{tailoring_balance}")
             
-            # Check if fabric balance is around 3370 as mentioned in review
-            if abs(fabric_balance - 3370) < 100:  # Allow some variance
-                self.log_test("Fabric balance ~3370 for ref 04/010426", True)
-                print("   ✅ Fabric balance matches expected value (~3370)")
-            else:
-                self.log_test("Fabric balance ~3370 for ref 04/010426", False, f"Expected ~3370, got {fabric_balance}")
+            has_fields = all(k in result3 for k in ["fabric", "tailoring", "embroidery", "addon", "advance"])
+            self.log_test("Settlement balances include required fields", has_fields, "Missing one or more required balance keys")
         
         return success1 and success2 and success3
 
@@ -752,7 +764,8 @@ class RetailAPITester:
 
 def main():
     """Main test runner"""
-    tester = RetailAPITester()
+    base_url = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("RETAIL_API_BASE_URL", "http://127.0.0.1:8001")
+    tester = RetailAPITester(base_url)
     
     try:
         success = tester.run_all_tests()

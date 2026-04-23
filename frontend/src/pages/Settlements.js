@@ -1,8 +1,6 @@
-import { useState, useEffect, useRef } from "react";
-import { getCustomers, getRefs, getBalances, processSettlement, getOrders, getItems } from "@/api";
+﻿import { useState, useEffect, useRef } from "react";
+import { getCustomers, getRefs, getBalances, processSettlement, getOrders, getItems, getSettings } from "@/api";
 import { CurrencyDollar, CheckCircle } from "@phosphor-icons/react";
-
-const PAYMENT_MODES = ["Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer"];
 
 export default function Settlements() {
   const [mode, setMode] = useState("customer");
@@ -25,6 +23,7 @@ export default function Settlements() {
   const [message, setMessage] = useState(null);
   const [saving, setSaving] = useState(false);
   const [orderInfo, setOrderInfo] = useState(null);
+  const [paymentModes, setPaymentModes] = useState(["Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer"]);
 
   // Flag to prevent customer useEffect from clearing ref when set by order lookup
   const setByOrderRef = useRef(false);
@@ -32,6 +31,10 @@ export default function Settlements() {
   useEffect(() => {
     getCustomers().then(res => setCustomers(res.data)).catch(() => {});
     getOrders().then(res => setOrders(res.data)).catch(() => {});
+    getSettings().then(res => {
+      const s = res.data || {};
+      if (Array.isArray(s.payment_modes) && s.payment_modes.length > 0) setPaymentModes(s.payment_modes);
+    }).catch(() => {});
   }, []);
 
   // When customer changes via manual selection (not order lookup), load refs
@@ -172,7 +175,7 @@ export default function Settlements() {
   return (
     <div data-testid="settlements-page" className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-light tracking-tight">Payment Settlement</h1>
+        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Settlements</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">Process payments and allocate across categories</p>
       </div>
 
@@ -185,7 +188,7 @@ export default function Settlements() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           {/* Selection Card */}
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
             <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="mode" checked={mode === "customer"} onChange={() => switchMode("customer")} className="accent-[var(--brand)]" />
@@ -260,7 +263,7 @@ export default function Settlements() {
 
           {/* Allocation Card */}
           {hasRef && (
-            <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
+            <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-heading text-base font-medium">Allocate Payment</h3>
                 <button data-testid="auto-distribute-btn" onClick={autoDistribute} disabled={totalPool <= 0} className="text-xs text-[var(--brand)] hover:underline disabled:opacity-40">
@@ -275,12 +278,12 @@ export default function Settlements() {
                   { key: "addon", label: "Add-on", value: allotAddon, setter: setAllotAddon, balance: balances.addon },
                   { key: "advance", label: "New Advance", value: allotAdv, setter: setAllotAdv, balance: null },
                 ].filter(s => s.balance === null || s.balance > 0).map(s => (
-                  <div key={s.key} className="flex items-center gap-3">
-                    <label className="w-24 text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">{s.label}</label>
-                    <input data-testid={`allot-${s.key}`} type="number" value={s.value} onChange={e => s.setter(e.target.value)} placeholder="0" className="flex-1 px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" />
+                  <div key={s.key} className="flex items-center gap-2">
+                    <label className="w-20 sm:w-24 text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] flex-shrink-0">{s.label}</label>
+                    <input data-testid={`allot-${s.key}`} type="number" value={s.value} onChange={e => s.setter(e.target.value)} placeholder="0" className="flex-1 min-w-0 px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" />
                     {s.balance !== null && s.balance > 0 && (
-                      <button onClick={() => settleSection(s.key)} className="text-[10px] px-2 py-1 text-[var(--brand)] border border-[var(--brand)] rounded-sm hover:bg-[#C86B4D10] whitespace-nowrap">
-                        Settle ₹{fmt(s.balance)}
+                      <button onClick={() => settleSection(s.key)} className="flex-shrink-0 text-[10px] px-2 py-1 text-[var(--brand)] border border-[var(--brand)] rounded-sm hover:bg-[#C86B4D10] whitespace-nowrap">
+                        Full
                       </button>
                     )}
                   </div>
@@ -291,7 +294,7 @@ export default function Settlements() {
         </div>
 
         {/* Payment Panel */}
-        <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-4 h-fit">
+        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4 h-fit">
           <h3 className="font-heading text-base font-medium">Payment Details</h3>
 
           <div>
@@ -332,8 +335,8 @@ export default function Settlements() {
           <div>
             <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-2">Payment Mode</label>
             <div className="flex flex-wrap gap-2">
-              {PAYMENT_MODES.map(m => (
-                <button key={m} onClick={() => toggleMode(m)} className={`px-2.5 py-1 text-xs font-medium rounded-sm border transition-all ${selectedModes.includes(m) ? 'bg-[var(--brand)] text-white border-[var(--brand)]' : 'bg-white text-[var(--text-secondary)] border-[var(--border-subtle)]'}`}>
+              {paymentModes.map(m => (
+                <button key={m} onClick={() => toggleMode(m)} className={`px-2.5 py-1 text-xs font-medium rounded-sm border transition-all ${selectedModes.includes(m) ? 'bg-[var(--brand)] text-white border-[var(--brand)]' : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border-subtle)]'}`}>
                   {m}
                 </button>
               ))}

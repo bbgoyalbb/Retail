@@ -1,15 +1,51 @@
 import requests
 import sys
 import json
-from datetime import datetime
+import os
+from datetime import datetime, date
+
+
+def normalize_base_url(base_url: str) -> str:
+    """Accept either host root or /api URL and normalize to host root."""
+    clean = (base_url or "").strip().rstrip("/")
+    if clean.endswith("/api"):
+        clean = clean[:-4]
+    return clean
 
 class SpecificFixesTester:
-    def __init__(self, base_url="https://vba-converter.preview.emergentagent.com"):
-        self.base_url = base_url
-        self.api_base = f"{base_url}/api"
+    def __init__(self, base_url="http://127.0.0.1:8001"):
+        self.base_url = normalize_base_url(base_url)
+        self.api_base = f"{self.base_url}/api"
         self.tests_run = 0
         self.tests_passed = 0
         self.failed_tests = []
+        self.created_refs = []
+
+    def create_test_bill(self, customer_name: str, needs_tailoring: bool = False, qty: float = 1.0):
+        payload = {
+            "customer_name": customer_name,
+            "date": date.today().isoformat(),
+            "payment_date": date.today().isoformat(),
+            "items": [
+                {
+                    "barcode": f"TEST-{customer_name[:8].upper()}",
+                    "qty": qty,
+                    "price": 1000,
+                    "discount": 0,
+                }
+            ],
+            "payment_modes": ["Cash"],
+            "amount_paid": 0,
+            "is_settled": False,
+            "needs_tailoring": needs_tailoring,
+        }
+        response = requests.post(f"{self.api_base}/bills", json=payload)
+        if response.status_code != 200:
+            return None
+        ref = response.json().get("ref")
+        if ref:
+            self.created_refs.append(ref)
+        return response.json()
 
     def log_test(self, name: str, success: bool, details: str = ""):
         """Log test result"""
@@ -68,57 +104,52 @@ class SpecificFixesTester:
         print("\n=== Testing Tailoring Split Feature (Fix #2) ===")
         
         try:
-            # Get items that can be split
-            items_response = requests.get(f"{self.api_base}/items", params={"tailoring_status": "Awaiting Order", "limit": 5})
-            
-            if items_response.status_code == 200:
-                items_data = items_response.json()
-                items = items_data.get("items", [])
-                
-                # Find an item with qty > 1 for splitting
-                split_item = None
-                for item in items:
-                    if item.get("qty", 0) > 1:
-                        split_item = item
-                        break
-                
-                if split_item:
-                    split_data = {
-                        "item_id": split_item["id"],
-                        "order_no": "TEST_SPLIT_001",
-                        "delivery_date": "2024-02-15",
-                        "splits": [
-                            {
-                                "article_type": "Shirt",
-                                "qty": 1.0,
-                                "embroidery_status": "Not Required"
-                            },
-                            {
-                                "article_type": "Pant",
-                                "qty": float(split_item["qty"]) - 1.0,
-                                "embroidery_status": "Required"
-                            }
-                        ]
-                    }
-                    
-                    split_response = requests.post(f"{self.api_base}/tailoring/split", json=split_data)
-                    success = split_response.status_code == 200
-                    
-                    if success:
-                        result = split_response.json()
-                        self.log_test("POST /api/tailoring/split works", True)
-                        print(f"   ✂️ Split successful: {result.get('message', '')}")
-                    else:
-                        self.log_test("POST /api/tailoring/split works", False, 
-                                    f"Status: {split_response.status_code}, Response: {split_response.text}")
-                    
-                    return success
-                else:
-                    self.log_test("Tailoring split test", False, "No suitable items found for splitting (need qty > 1)")
-                    return True  # Not a failure of the API
-            else:
+            fixture = self.create_test_bill("SPLIT_TEST_CUSTOMER", needs_tailoring=True, qty=2.0)
+            if not fixture or not fixture.get("ref"):
+                self.log_test("Tailoring split setup", False, "Failed to create fixture bill")
+                return False
+
+            items_response = requests.get(f"{self.api_base}/items", params={"ref": fixture["ref"], "limit": 10})
+            if items_response.status_code != 200:
                 self.log_test("Get items for split test", False, f"Status: {items_response.status_code}")
                 return False
+
+            items = items_response.json().get("items", [])
+            split_item = items[0] if items else None
+            if not split_item:
+                self.log_test("Tailoring split setup", False, "Fixture item not found")
+                return False
+
+            split_data = {
+                "item_id": split_item["id"],
+                "order_no": "TEST_SPLIT_001",
+                "delivery_date": date.today().isoformat(),
+                "splits": [
+                    {
+                        "article_type": "Shirt",
+                        "qty": 1.0,
+                        "embroidery_status": "Not Required"
+                    },
+                    {
+                        "article_type": "Pant",
+                        "qty": max(float(split_item.get("qty", 2.0)) - 1.0, 1.0),
+                        "embroidery_status": "Required"
+                    }
+                ]
+            }
+
+            split_response = requests.post(f"{self.api_base}/tailoring/split", json=split_data)
+            success = split_response.status_code == 200
+
+            if success:
+                result = split_response.json()
+                self.log_test("POST /api/tailoring/split works", True)
+                print(f"   ✂️ Split successful: {result.get('message', '')}")
+            else:
+                self.log_test("POST /api/tailoring/split works", False,
+                            f"Status: {split_response.status_code}, Response: {split_response.text}")
+
+            return success
                 
         except Exception as e:
             self.log_test("Tailoring split test", False, str(e))
@@ -161,28 +192,33 @@ class SpecificFixesTester:
         print("\n=== Testing PDF Conditional Sections (Fix #1) ===")
         
         try:
-            # Test PDF for ref 04/010426 (should NOT have tailoring section - Pending fabric only)
-            response1 = requests.get(f"{self.api_base}/invoice", params={"ref": "04/010426"})
+            fabric_only = self.create_test_bill("PDF_FABRIC_ONLY", needs_tailoring=False, qty=1.0)
+            tailoring_bill = self.create_test_bill("PDF_WITH_TAILORING", needs_tailoring=True, qty=1.0)
+
+            if not fabric_only or not tailoring_bill:
+                self.log_test("PDF fixture setup", False, "Unable to create fixture bills")
+                return False
+
+            response1 = requests.get(f"{self.api_base}/invoice", params={"ref": fabric_only["ref"]})
             success1 = response1.status_code == 200 and response1.headers.get('content-type') == 'application/pdf'
             
             if success1:
                 pdf_size1 = len(response1.content)
-                self.log_test("PDF for ref 04/010426 generates without tailoring section", True)
-                print(f"   📄 PDF size: {pdf_size1} bytes (items are Pending fabric only)")
+                self.log_test("PDF for fabric-only bill generates", True)
+                print(f"   📄 PDF size: {pdf_size1} bytes")
             else:
-                self.log_test("PDF for ref 04/010426 generates without tailoring section", False, 
+                self.log_test("PDF for fabric-only bill generates", False, 
                             f"Status: {response1.status_code}")
             
-            # Test PDF for ref 03/010426 (should HAVE tailoring section)
-            response2 = requests.get(f"{self.api_base}/invoice", params={"ref": "03/010426"})
+            response2 = requests.get(f"{self.api_base}/invoice", params={"ref": tailoring_bill["ref"]})
             success2 = response2.status_code == 200 and response2.headers.get('content-type') == 'application/pdf'
             
             if success2:
                 pdf_size2 = len(response2.content)
-                self.log_test("PDF for ref 03/010426 generates WITH tailoring section", True)
-                print(f"   📄 PDF size: {pdf_size2} bytes (includes tailoring section)")
+                self.log_test("PDF for tailoring bill generates", True)
+                print(f"   📄 PDF size: {pdf_size2} bytes")
             else:
-                self.log_test("PDF for ref 03/010426 generates WITH tailoring section", False, 
+                self.log_test("PDF for tailoring bill generates", False, 
                             f"Status: {response2.status_code}")
             
             return success1 and success2
@@ -196,8 +232,12 @@ class SpecificFixesTester:
         print("\n=== Testing Settlement by Order No (Fix #5) ===")
         
         try:
-            # Test settlement balances for specific reference
-            response = requests.get(f"{self.api_base}/settlements/balances", params={"ref": "04/010426"})
+            fixture = self.create_test_bill("SETTLEMENT_TEST_CUSTOMER", needs_tailoring=False, qty=1.0)
+            if not fixture or not fixture.get("ref"):
+                self.log_test("Settlement balances fixture setup", False, "Unable to create fixture bill")
+                return False
+
+            response = requests.get(f"{self.api_base}/settlements/balances", params={"ref": fixture["ref"]})
             success = response.status_code == 200
             
             if success:
@@ -260,7 +300,8 @@ class SpecificFixesTester:
 
 def main():
     """Main test runner for specific fixes"""
-    tester = SpecificFixesTester()
+    base_url = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("RETAIL_API_BASE_URL", "http://127.0.0.1:8001")
+    tester = SpecificFixesTester(base_url)
     
     try:
         success = tester.run_specific_fixes_tests()

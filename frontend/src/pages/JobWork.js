@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { getJobwork, moveJobwork, getJobworkFilters } from "@/api";
-import { ArrowRight, Funnel, SortAscending, SortDescending, X } from "@phosphor-icons/react";
+import { ArrowRight, ArrowLeft, Funnel, SortAscending, SortDescending, X, PencilSimple } from "@phosphor-icons/react";
 import api from "@/api";
 
 function MoveDialog({ title, onConfirm, onCancel, fields }) {
@@ -9,7 +10,7 @@ function MoveDialog({ title, onConfirm, onCancel, fields }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" data-testid="move-dialog">
-      <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm w-full space-y-4" onClick={e => e.stopPropagation()}>
+      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm w-full space-y-4" onClick={e => e.stopPropagation()}>
         <h3 className="font-heading text-lg font-medium">{title}</h3>
         {fields.map(f => (
           <div key={f.key}>
@@ -44,21 +45,34 @@ function MoveDialog({ title, onConfirm, onCancel, fields }) {
   );
 }
 
-function StatusColumn({ title, items, color, onMove, moveLabel, sortKey, onSort, sortDir }) {
+function StatusColumn({ title, items, color, onMove, moveLabel, onMoveBack, moveBackLabel, sortKey, onSort, sortDir, onItemDoubleClick, editableFields }) {
   const [selected, setSelected] = useState([]);
 
   const toggleSelect = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const handleMove = () => {
-    if (selected.length === 0) return;
+    if (selected.length === 0) {
+      window.alert("Please select at least one item to move.");
+      return;
+    }
     onMove(selected);
     setSelected([]);
   };
 
-  const SortIcon = sortDir === "asc" ? SortAscending : SortDescending;
+  const handleMoveBack = () => {
+    if (selected.length === 0) return;
+    onMoveBack(selected);
+    setSelected([]);
+  };
+
+  const handleDoubleClick = (item) => {
+    if (onItemDoubleClick) {
+      onItemDoubleClick(item);
+    }
+  };
 
   return (
-    <div className="bg-white border border-[var(--border-subtle)] rounded-sm flex flex-col">
+    <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm flex flex-col">
       <div className="p-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
@@ -77,13 +91,22 @@ function StatusColumn({ title, items, color, onMove, moveLabel, sortKey, onSort,
         {items.length === 0 ? (
           <p className="p-4 text-xs text-[var(--text-secondary)] text-center">No items</p>
         ) : items.map(item => (
-          <div key={item.id} className={`px-3 py-2.5 text-sm cursor-pointer transition-colors ${selected.includes(item.id) ? 'bg-[#C86B4D10]' : 'hover:bg-[var(--bg)]'}`} onClick={() => toggleSelect(item.id)}>
+          <div 
+            key={item.id} 
+            className={`px-3 py-2.5 text-sm cursor-pointer transition-colors ${selected.includes(item.id) ? 'bg-[#C86B4D10]' : 'hover:bg-[var(--bg)]'}`} 
+            onClick={() => toggleSelect(item.id)}
+            onDoubleClick={() => handleDoubleClick(item)}
+            title={onItemDoubleClick ? "Double-click to edit" : undefined}
+          >
             <div className="flex items-center gap-2">
               <input type="checkbox" checked={selected.includes(item.id)} readOnly className="w-3.5 h-3.5 accent-[var(--brand)]" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium truncate">{item.article_type}</p>
-                  <p className="font-mono text-[10px] text-[var(--text-secondary)]">#{item.order_no}</p>
+                  <div className="flex items-center gap-1">
+                    <p className="font-mono text-[10px] text-[var(--text-secondary)]">#{item.order_no}</p>
+                    {onItemDoubleClick && <PencilSimple size={10} className="text-[var(--text-secondary)]" />}
+                  </div>
                 </div>
                 <p className="text-xs text-[var(--text-secondary)]">{item.name}</p>
                 <div className="flex gap-3 text-[10px] text-[var(--text-secondary)] mt-0.5">
@@ -93,18 +116,26 @@ function StatusColumn({ title, items, color, onMove, moveLabel, sortKey, onSort,
                 {item.karigar && item.karigar !== "N/A" && (
                   <p className="text-[10px] text-[var(--info)] mt-0.5">Karigar: {item.karigar}</p>
                 )}
+                {item.emb_labour_amount > 0 && (
+                  <p className="text-[10px] text-[var(--success)] mt-0.5">Labour: ₹{item.emb_labour_amount}</p>
+                )}
               </div>
             </div>
           </div>
         ))}
       </div>
-      {moveLabel && (
-        <div className="p-3 border-t border-[var(--border-subtle)]">
-          <button data-testid={`move-${title.toLowerCase().replace(/\s/g, '-')}-btn`} onClick={handleMove} disabled={selected.length === 0} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 transition-all">
+      <div className="space-y-2 p-3 border-t border-[var(--border-subtle)]">
+        {moveLabel && (
+          <button data-testid={`move-${title.toLowerCase().replace(/\s/g, '-')}-btn`} onClick={handleMove} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] transition-all">
             Move {selected.length} to {moveLabel} <ArrowRight size={14} />
           </button>
-        </div>
-      )}
+        )}
+        {onMoveBack && moveBackLabel && (
+          <button data-testid={`moveback-${title.toLowerCase().replace(/\s/g, '-')}-btn`} onClick={handleMoveBack} disabled={selected.length === 0} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-[var(--text-secondary)] text-white rounded-sm hover:bg-[var(--text-primary)] disabled:opacity-50 transition-all">
+            <ArrowLeft size={14} /> Move {selected.length} {moveBackLabel}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -125,7 +156,7 @@ export default function JobWork() {
     if (orderFilter !== "All") params.order_no = orderFilter;
     if (dateFilter !== "All") params.date_filter = dateFilter;
     if (deliveryFilter !== "All") params.delivery_filter = deliveryFilter;
-    getJobwork(params).then(res => setData(res.data)).catch(console.error);
+    getJobwork(params).then(res => setData(res.data)).catch(() => {});
   }, [tab, orderFilter, dateFilter, deliveryFilter]);
 
   useEffect(() => { getJobworkFilters().then(res => setFilters(res.data)).catch(() => {}); }, []);
@@ -134,9 +165,32 @@ export default function JobWork() {
   const sortItems = (items) => {
     if (!items) return [];
     return [...items].sort((a, b) => {
-      const va = a[sortKey] || "";
-      const vb = b[sortKey] || "";
-      const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+      let va = a[sortKey];
+      let vb = b[sortKey];
+      
+      // Handle missing values
+      if (va === undefined || va === null) va = "";
+      if (vb === undefined || vb === null) vb = "";
+      
+      // Check if values are dates (YYYY-MM-DD format)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      const isDateA = dateRegex.test(String(va));
+      const isDateB = dateRegex.test(String(vb));
+      
+      if (isDateA && isDateB) {
+        // Compare dates using localeCompare for proper sorting
+        const cmp = String(va).localeCompare(String(vb));
+        return sortDir === "asc" ? cmp : -cmp;
+      }
+      
+      // Check if numeric
+      if (typeof va === "number" && typeof vb === "number") {
+        const cmp = va - vb;
+        return sortDir === "asc" ? cmp : -cmp;
+      }
+      
+      // Default string comparison
+      const cmp = String(va).localeCompare(String(vb));
       return sortDir === "asc" ? cmp : -cmp;
     });
   };
@@ -151,6 +205,16 @@ export default function JobWork() {
     loadData();
   };
 
+  const handleTailoringMoveBack = async (itemIds, currentStatus) => {
+    await api.post("/jobwork/move-back", { item_ids: itemIds, current_status: currentStatus });
+    loadData();
+  };
+
+  const handleEmbMoveBack = async (itemIds, currentStatus) => {
+    await api.post("/jobwork/move-back", { item_ids: itemIds, current_status: currentStatus });
+    loadData();
+  };
+
   // Embroidery: Required → In Progress needs Karigar name
   const handleEmbRequiredMove = (itemIds) => {
     setDialog({
@@ -158,6 +222,50 @@ export default function JobWork() {
       fields: [{ key: "karigar", label: "Karigar Name", placeholder: "Enter karigar name", skippable: true }],
       onConfirm: async (values, skips) => {
         await moveJobwork({ item_ids: itemIds, new_status: "In Progress", karigar: skips.karigar ? undefined : (values.karigar || undefined) });
+        setDialog(null);
+        loadData();
+      },
+    });
+  };
+
+  // Double-click to edit karigar name for In Progress items
+  const handleEditInProgress = (item) => {
+    setDialog({
+      title: "Edit Karigar",
+      fields: [{ key: "karigar", label: "Karigar Name", placeholder: "Enter karigar name", skippable: true }],
+      onConfirm: async (values, skips) => {
+        if (!skips.karigar && values.karigar !== undefined) {
+          await api.post("/jobwork/edit-emb", { item_id: item.id, karigar: values.karigar || "" });
+        }
+        setDialog(null);
+        loadData();
+      },
+    });
+  };
+
+  // Double-click to edit karigar and amounts for Finished items
+  const handleEditFinished = (item) => {
+    setDialog({
+      title: "Edit Embroidery Details",
+      fields: [
+        { key: "karigar", label: "Karigar Name", placeholder: item.karigar || "Enter karigar name", skippable: true },
+        { key: "emb_labour", label: "Labour Charges (Karigar)", type: "number", placeholder: item.emb_labour_amount || "0", skippable: true },
+        { key: "emb_customer", label: "Customer Embroidery Charges", type: "number", placeholder: item.embroidery_amount || "0", skippable: true },
+      ],
+      onConfirm: async (values, skips) => {
+        const updates = { item_id: item.id };
+        if (!skips.karigar && values.karigar !== undefined) {
+          updates.karigar = values.karigar;
+        }
+        if (!skips.emb_labour && values.emb_labour) {
+          updates.emb_labour_amount = parseFloat(values.emb_labour);
+        }
+        if (!skips.emb_customer && values.emb_customer) {
+          updates.emb_customer_amount = parseFloat(values.emb_customer);
+        }
+        if (Object.keys(updates).length > 1) {
+          await api.post("/jobwork/edit-emb", updates);
+        }
         setDialog(null);
         loadData();
       },
@@ -186,7 +294,7 @@ export default function JobWork() {
   return (
     <div data-testid="jobwork-page" className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-light tracking-tight">Job Work Tracker</h1>
+        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Job Work Tracker</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">Track tailoring and embroidery progress</p>
       </div>
 
@@ -218,15 +326,75 @@ export default function JobWork() {
 
       {tab === "tailoring" ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatusColumn title="Pending" items={sortItems(data.pending)} color="var(--warning)" moveLabel="Stitched" onMove={(ids) => handleTailoringMove(ids, "Stitched")} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
-          <StatusColumn title="Stitched" items={sortItems(data.stitched)} color="var(--info)" moveLabel="Delivered" onMove={(ids) => handleTailoringMove(ids, "Delivered")} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
-          <StatusColumn title="Delivered" items={sortItems(data.delivered)} color="var(--success)" sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+          <StatusColumn 
+            title="Pending" 
+            items={sortItems(data.pending)} 
+            color="var(--warning)" 
+            moveLabel="Stitched" 
+            onMove={(ids) => handleTailoringMove(ids, "Stitched")} 
+            sortKey={sortKey} 
+            onSort={handleSort} 
+            sortDir={sortDir} 
+          />
+          <StatusColumn 
+            title="Stitched" 
+            items={sortItems(data.stitched)} 
+            color="var(--info)" 
+            moveLabel="Delivered" 
+            onMove={(ids) => handleTailoringMove(ids, "Delivered")} 
+            onMoveBack={(ids) => handleTailoringMoveBack(ids, "Stitched")}
+            moveBackLabel="to Pending"
+            sortKey={sortKey} 
+            onSort={handleSort} 
+            sortDir={sortDir} 
+          />
+          <StatusColumn 
+            title="Delivered" 
+            items={sortItems(data.delivered)} 
+            color="var(--success)" 
+            onMoveBack={(ids) => handleTailoringMoveBack(ids, "Delivered")}
+            moveBackLabel="to Stitched"
+            sortKey={sortKey} 
+            onSort={handleSort} 
+            sortDir={sortDir} 
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatusColumn title="Required" items={sortItems(data.required)} color="var(--warning)" moveLabel="In Progress" onMove={handleEmbRequiredMove} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
-          <StatusColumn title="In Progress" items={sortItems(data.in_progress)} color="var(--info)" moveLabel="Finished" onMove={handleEmbProgressMove} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
-          <StatusColumn title="Finished" items={sortItems(data.finished)} color="var(--success)" sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+          <StatusColumn 
+            title="Required" 
+            items={sortItems(data.required)} 
+            color="var(--warning)" 
+            moveLabel="In Progress" 
+            onMove={handleEmbRequiredMove} 
+            sortKey={sortKey} 
+            onSort={handleSort} 
+            sortDir={sortDir} 
+          />
+          <StatusColumn 
+            title="In Progress" 
+            items={sortItems(data.in_progress)} 
+            color="var(--info)" 
+            moveLabel="Finished" 
+            onMove={handleEmbProgressMove} 
+            onMoveBack={(ids) => handleEmbMoveBack(ids, "In Progress")}
+            moveBackLabel="to Required"
+            onItemDoubleClick={handleEditInProgress}
+            sortKey={sortKey} 
+            onSort={handleSort} 
+            sortDir={sortDir} 
+          />
+          <StatusColumn 
+            title="Finished" 
+            items={sortItems(data.finished)} 
+            color="var(--success)" 
+            onMoveBack={(ids) => handleEmbMoveBack(ids, "Finished")}
+            moveBackLabel="to In Progress"
+            onItemDoubleClick={handleEditFinished}
+            sortKey={sortKey} 
+            onSort={handleSort} 
+            sortDir={sortDir} 
+          />
         </div>
       )}
     </div>

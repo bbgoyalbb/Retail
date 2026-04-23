@@ -20,6 +20,22 @@
   --border-strong: #D6D1C4;
 }
 
+.dark {
+  --bg: #1a1917;
+  --surface: #252422;
+  --text-primary: #F0EBE4;
+  --text-secondary: #9A9590;
+  --brand: #D97B5D;
+  --brand-hover: #E88B6D;
+  --brand-fg: #FFFFFF;
+  --success: #5A7360;
+  --warning: #E4A852;
+  --info: #6C9AB0;
+  --error: #B5574D;
+  --border-subtle: #3A3834;
+  --border-strong: #4A4844;
+}
+
 body {
   margin: 0;
   font-family: 'IBM Plex Sans', -apple-system, sans-serif;
@@ -27,6 +43,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg);
   color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 code {
@@ -49,10 +66,17 @@ h1, h2, h3, h4, h5, h6 {
   font-family: 'IBM Plex Mono', monospace;
 }
 
+/* Smooth scrolling + text-size safety */
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: var(--bg);
@@ -63,6 +87,52 @@ h1, h2, h3, h4, h5, h6 {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
+}
+
+/* Better focus rings — keyboard-only, not mouse */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Minimum tap target size on mobile */
+@media (max-width: 768px) {
+  button, a, [role="button"] {
+    min-height: 40px;
+  }
+}
+
+/* Form elements: inherit theme colors in dark mode */
+input, select, textarea {
+  background-color: var(--surface);
+  color: var(--text-primary);
+}
+option {
+  background-color: var(--surface);
+  color: var(--text-primary);
+}
+
+/* Selection color */
+::selection {
+  background-color: #C86B4D22;
+  color: var(--text-primary);
+}
+
+/* Print: hide sidebar and show content full width */
+@media print {
+  aside, button, nav {
+    display: none !important;
+  }
+  main {
+    width: 100% !important;
+  }
+  .no-print {
+    display: none !important;
+  }
 }
 
 @layer base {

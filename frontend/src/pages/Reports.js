@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { getRevenueReport, getCustomerReport, getSummaryReport } from "@/api";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
-import { ChartBar, Users, TrendUp } from "@phosphor-icons/react";
+import { ChartBar, Users, TrendUp, Spinner, Warning } from "@phosphor-icons/react";
 
 const COLORS = ["#C86B4D", "#455D4A", "#5C8A9E", "#D49842", "#9E473D", "#6C6760", "#B35A3E"];
 
@@ -19,7 +19,7 @@ function SummaryCards({ summary }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
       {cards.map(c => (
-        <div key={c.label} className="bg-white border border-[var(--border-subtle)] p-4 rounded-sm">
+        <div key={c.label} className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm">
           <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] mb-1">{c.label}</p>
           <p className="font-heading text-xl font-light tracking-tight" style={{ color: c.color }}>{c.value}</p>
         </div>
@@ -36,25 +36,40 @@ export default function Reports() {
   const [revenueData, setRevenueData] = useState([]);
   const [customerData, setCustomerData] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const params = { period };
-    if (dateFrom) params.date_from = dateFrom;
-    if (dateTo) params.date_to = dateTo;
-    getRevenueReport(params).then(res => setRevenueData(res.data)).catch(console.error);
-    getSummaryReport(params).then(res => setSummary(res.data)).catch(console.error);
+    const loadReports = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = { period };
+        if (dateFrom) params.date_from = dateFrom;
+        if (dateTo) params.date_to = dateTo;
+        const [revenueRes, summaryRes, customerRes] = await Promise.all([
+          getRevenueReport(params),
+          getSummaryReport(params),
+          getCustomerReport()
+        ]);
+        setRevenueData(revenueRes.data);
+        setSummary(summaryRes.data);
+        setCustomerData(customerRes.data);
+      } catch (err) {
+        setError("Failed to load reports. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadReports();
   }, [period, dateFrom, dateTo]);
-
-  useEffect(() => {
-    getCustomerReport().then(res => setCustomerData(res.data)).catch(console.error);
-  }, []);
 
   const fmt = (n) => new Intl.NumberFormat('en-IN').format(Math.round(n || 0));
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload) return null;
     return (
-      <div className="bg-white border border-[var(--border-subtle)] p-3 rounded-sm shadow-sm">
+      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-3 rounded-sm shadow-sm">
         <p className="text-xs font-medium mb-1">{label}</p>
         {payload.map((p, i) => (
           <p key={i} className="text-xs" style={{ color: p.color }}>
@@ -68,12 +83,28 @@ export default function Reports() {
   return (
     <div data-testid="reports-page" className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-light tracking-tight">Reports & Analytics</h1>
+        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Reports & Analytics</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">Revenue, customer, and business insights</p>
       </div>
 
+      {/* Error State */}
+      {error && (
+        <div className="p-4 border border-[var(--error)] bg-[#9E473D10] rounded-sm flex items-center gap-3 text-[var(--error)]">
+          <Warning size={20} />
+          <span className="text-sm">{error}</span>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div className="p-12 text-center">
+          <Spinner size={32} className="animate-spin mx-auto text-[var(--brand)] mb-3" />
+          <p className="text-sm text-[var(--text-secondary)]">Loading reports...</p>
+        </div>
+      )}
+
       {/* Summary */}
-      {summary && <SummaryCards summary={summary} />}
+      {!loading && summary && <SummaryCards summary={summary} />}
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-[var(--border-subtle)]">
@@ -97,7 +128,7 @@ export default function Reports() {
       {/* Revenue Tab */}
       {tab === "revenue" && (
         <div className="space-y-4">
-          <div className="bg-white border border-[var(--border-subtle)] p-4 rounded-sm flex flex-wrap gap-3 items-center">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm grid grid-cols-1 sm:flex sm:flex-wrap gap-3 items-center">
             <select data-testid="report-period" value={period} onChange={e => setPeriod(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
@@ -107,8 +138,13 @@ export default function Reports() {
             <input data-testid="report-date-to" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm" />
           </div>
 
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
             <h3 className="font-heading text-base font-medium mb-4">Fabric Sales Over Time</h3>
+            {!loading && revenueData.length === 0 && (
+              <div className="p-8 text-center text-sm text-[var(--text-secondary)]">
+                No data available for selected period
+              </div>
+            )}
             <div style={{ width: "100%", height: 350 }}>
               <ResponsiveContainer>
                 <BarChart data={revenueData}>
@@ -123,7 +159,7 @@ export default function Reports() {
             </div>
           </div>
 
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
             <h3 className="font-heading text-base font-medium mb-4">Revenue Trend (Received)</h3>
             <div style={{ width: "100%", height: 300 }}>
               <ResponsiveContainer>
@@ -143,7 +179,7 @@ export default function Reports() {
 
       {/* Customers Tab */}
       {tab === "customers" && (
-        <div className="bg-white border border-[var(--border-subtle)] rounded-sm">
+        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm">
           <div className="p-4 border-b border-[var(--border-subtle)]">
             <h3 className="font-heading text-base font-medium">Customer Revenue Ranking</h3>
           </div>
@@ -179,7 +215,7 @@ export default function Reports() {
       {tab === "breakdown" && summary && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Payment Mode Distribution */}
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
             <h3 className="font-heading text-base font-medium mb-4">Payment Mode Distribution</h3>
             {summary.payment_modes?.length > 0 ? (
               <div style={{ width: "100%", height: 300 }}>
@@ -208,7 +244,7 @@ export default function Reports() {
           </div>
 
           {/* Article Type Distribution */}
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
             <h3 className="font-heading text-base font-medium mb-4">Article Type Distribution</h3>
             {summary.article_types?.length > 0 ? (
               <div style={{ width: "100%", height: 300 }}>
@@ -228,7 +264,7 @@ export default function Reports() {
           </div>
 
           {/* Revenue Breakdown Table */}
-          <div className="lg:col-span-2 bg-white border border-[var(--border-subtle)] p-6 rounded-sm">
+          <div className="lg:col-span-2 bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
             <h3 className="font-heading text-base font-medium mb-4">Detailed Revenue Breakdown</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[

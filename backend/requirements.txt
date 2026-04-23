@@ -11,9 +11,12 @@ pymongo==4.5.0
 # Data handling
 pydantic>=2.6.4
 openpyxl==3.1.5
-
-# PDF generation
-reportlab==4.4.10
+httpx
+email-validator
+pytz
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-jose[cryptography]
 
 # Utilities
 python-multipart>=0.0.9

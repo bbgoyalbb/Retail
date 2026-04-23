@@ -1,30 +1,537 @@
-import { useState, useEffect, useCallback } from "react";
-import { getItems, getCustomers, updateItem, deleteItem, getInvoiceUrl } from "@/api";
-import { PencilSimple, Trash, FloppyDisk, X, FilePdf, CaretDown, CaretRight, MagnifyingGlass } from "@phosphor-icons/react";
+﻿import { useState, useEffect, useCallback } from "react";
+import { getItems, getCustomers, updateItem, deleteItem, getAdvances, createAdvance, updateAdvance, deleteAdvance } from "@/api";
+import { PencilSimple, Trash, FloppyDisk, X, Printer, CaretDown, CaretRight, MagnifyingGlass, Check, Plus } from "@phosphor-icons/react";
+import InvoiceModal from "@/components/InvoiceModal";
+
+// ==========================================
+// SECTION CONFIGURATION
+// ==========================================
+const SECTIONS = {
+  items: {
+    label: "Items",
+    description: "Basic item details and fabric payment",
+    fields: [
+      { key: "date", label: "Date", type: "date" },
+      { key: "name", label: "Customer Name", type: "text" },
+      { key: "ref", label: "Reference", type: "text" },
+      { key: "barcode", label: "Barcode", type: "text" },
+      { key: "price", label: "Price", type: "number" },
+      { key: "qty", label: "Quantity", type: "number", step: 0.1 },
+      { key: "discount", label: "Discount %", type: "number", step: 0.01 },
+      { key: "fabric_amount", label: "Fabric Amount", type: "number", computed: true },
+      { key: "fabric_received", label: "Fabric Received", type: "number" },
+      { key: "fabric_pending", label: "Fabric Pending", type: "number", computed: true },
+      { key: "fabric_pay_date", label: "Fabric Pay Date", type: "date" },
+      { key: "fabric_pay_mode", label: "Fabric Pay Mode", type: "select", options: ["Pending", "Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer", "Partially Settled", "Settled"] },
+      { key: "tally_fabric", label: "Tally Fabric", type: "checkbox" },
+    ]
+  },
+  tailoring: {
+    label: "Tailoring",
+    description: "Tailoring order and labour details",
+    fields: [
+      { key: "order_no", label: "Order No", type: "text" },
+      { key: "article_type", label: "Article Type", type: "select", options: ["N/A", "Shirt", "Pant", "Gurkha Pant", "Kurta", "Pajama", "Blazer", "Safari Shirt", "Indo", "Sherwani", "Jacket", "W Coat"] },
+      { key: "delivery_date", label: "Delivery Date", type: "date" },
+      { key: "tailoring_status", label: "Tailoring Status", type: "select", options: ["N/A", "Awaiting Order", "Pending", "Stitched", "Delivered"] },
+      { key: "tailoring_amount", label: "Tailoring Amount", type: "number" },
+      { key: "tailoring_received", label: "Tailoring Received", type: "number" },
+      { key: "tailoring_pending", label: "Tailoring Pending", type: "number", computed: true },
+      { key: "tailoring_pay_date", label: "Tailoring Pay Date", type: "date" },
+      { key: "tailoring_pay_mode", label: "Tailoring Pay Mode", type: "select", options: ["N/A", "Pending", "Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer", "Partially Settled", "Settled"] },
+      { key: "labour_amount", label: "Labour Amount", type: "number" },
+      { key: "labour_paid", label: "Labour Paid", type: "select", options: ["N/A", "Yes"] },
+      { key: "labour_pay_date", label: "Labour Pay Date", type: "date" },
+      { key: "labour_payment_mode", label: "Labour Payment Mode", type: "select", options: ["N/A", "Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer"] },
+      { key: "tally_tailoring", label: "Tally Tailoring", type: "checkbox" },
+    ]
+  },
+  embroidery: {
+    label: "Embroidery",
+    description: "Embroidery and karigar details",
+    fields: [
+      { key: "embroidery_status", label: "Embroidery Status", type: "select", options: ["N/A", "Not Required", "Required", "In Progress", "Finished"] },
+      { key: "karigar", label: "Karigar", type: "text" },
+      { key: "embroidery_amount", label: "Embroidery Amount", type: "number" },
+      { key: "embroidery_received", label: "Embroidery Received", type: "number" },
+      { key: "embroidery_pending", label: "Embroidery Pending", type: "number", computed: true },
+      { key: "embroidery_pay_date", label: "Embroidery Pay Date", type: "date" },
+      { key: "embroidery_pay_mode", label: "Embroidery Pay Mode", type: "select", options: ["N/A", "Pending", "Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer", "Partially Settled", "Settled"] },
+      { key: "emb_labour_amount", label: "Emb. Labour Amount", type: "number" },
+      { key: "emb_labour_paid", label: "Emb. Labour Paid", type: "select", options: ["N/A", "Yes"] },
+      { key: "emb_labour_date", label: "Emb. Labour Date", type: "date" },
+      { key: "emb_labour_payment_mode", label: "Emb. Labour Payment Mode", type: "select", options: ["N/A", "Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer"] },
+      { key: "tally_embroidery", label: "Tally Embroidery", type: "checkbox" },
+    ]
+  },
+  addon: {
+    label: "Add-on",
+    description: "Add-on details",
+    fields: [
+      { key: "addon_desc", label: "Add-on Description", type: "text" },
+      { key: "addon_amount", label: "Add-on Amount", type: "number" },
+      { key: "addon_received", label: "Add-on Received", type: "number" },
+      { key: "addon_pending", label: "Add-on Pending", type: "number", computed: true },
+      { key: "addon_pay_date", label: "Add-on Pay Date", type: "date" },
+      { key: "addon_pay_mode", label: "Add-on Pay Mode", type: "select", options: ["N/A", "Pending", "Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer", "Partially Settled", "Settled"] },
+      { key: "tally_addon", label: "Tally Add-on", type: "checkbox" },
+    ]
+  },
+  advances: {
+    label: "Advances",
+    description: "Advance payments for this reference",
+    fields: [
+      { key: "date", label: "Date", type: "date" },
+      { key: "name", label: "Customer Name", type: "text" },
+      { key: "ref", label: "Reference", type: "text" },
+      { key: "amount", label: "Amount", type: "number" },
+      { key: "mode", label: "Payment Mode", type: "text" },
+      { key: "tally", label: "Tally", type: "checkbox" },
+    ],
+    isAdvanceSection: true
+  }
+};
+
+// ==========================================
+// UTILITY FUNCTIONS
+// ==========================================
+const computeFabricAmount = (price, qty, discount) => {
+  const discountedPrice = price - (price * (discount || 0) / 100);
+  return Math.round(discountedPrice * qty);
+};
+
+const computePending = (total, received) => Math.max(0, Math.round(total - (received || 0)));
 
 export default function ItemsManager() {
   const [allItems, setAllItems] = useState([]);
+  const [advances, setAdvances] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [nameFilter, setNameFilter] = useState("");
   const [orderFilter, setOrderFilter] = useState("");
   const [expanded, setExpanded] = useState({});
-  const [editingId, setEditingId] = useState(null);
-  const [editData, setEditData] = useState({});
   const [message, setMessage] = useState(null);
-  const [delConfirm, setDelConfirm] = useState(null);
   const [sortKey, setSortKey] = useState("date");
   const [sortDir, setSortDir] = useState("desc");
+  
+  // Edit modal states
+  const [showSectionSelector, setShowSectionSelector] = useState(false);
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [editMode, setEditMode] = useState(null); // 'item' or 'order'
+  const [editItems, setEditItems] = useState([]); // Array of items being edited
+  const [editData, setEditData] = useState({}); // { [itemId]: { field: value } }
+  const [originalData, setOriginalData] = useState({}); // For cancel
+  const [saving, setSaving] = useState(false);
+  
+  // Advances editing state
+  const [advanceData, setAdvanceData] = useState({}); // { [advanceId]: { field: value } }
+  const [originalAdvanceData, setOriginalAdvanceData] = useState({});
+  const [refAdvances, setRefAdvances] = useState([]);
+  const [newAdvances, setNewAdvances] = useState([]); // New advances to be created
+  const [deletedAdvances, setDeletedAdvances] = useState([]); // IDs to delete
+  
+  // Delete confirmation
+  const [delConfirm, setDelConfirm] = useState(null);
+  const [delMode, setDelMode] = useState(null); // 'item' or 'order'
+  const [invoiceRef, setInvoiceRef] = useState(null);
+  
+  // Amount mismatch detection
+  const [mismatchPrompt, setMismatchPrompt] = useState(null); // { refs: [], mismatches: [] }
+  const [pendingRedirect, setPendingRedirect] = useState(null);
 
-  useEffect(() => { getCustomers().then(res => setCustomers(res.data)).catch(() => {}); }, []);
+  useEffect(() => { 
+    getCustomers().then(res => setCustomers(res.data)).catch(() => {}); 
+  }, []);
 
-  const loadItems = useCallback(() => {
+  const loadData = useCallback(async () => {
     const params = { limit: 2000 };
     if (nameFilter) params.name = nameFilter;
     if (orderFilter) params.order_no = orderFilter;
-    getItems(params).then(res => setAllItems(res.data.items)).catch(console.error);
+    
+    try {
+      const [itemsRes, advancesRes] = await Promise.all([
+        getItems(params),
+        nameFilter ? getAdvances({ name: nameFilter }) : getAdvances()
+      ]);
+      setAllItems(itemsRes.data.items || []);
+      setAdvances(advancesRes.data || []);
+    } catch (err) {
+      // silenced
+    }
   }, [nameFilter, orderFilter]);
 
-  useEffect(() => { loadItems(); }, [loadItems]);
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // ==========================================
+  // EDIT HANDLERS
+  // ==========================================
+  const startEdit = async (sectionKey, items, mode = 'item') => {
+    setSelectedSection(sectionKey);
+    setEditMode(mode);
+    setEditItems(Array.isArray(items) ? items : [items]);
+    
+    // Initialize edit data with current values
+    const initialData = {};
+    const origData = {};
+    const itemList = Array.isArray(items) ? items : [items];
+    
+    itemList.forEach(item => {
+      initialData[item.id] = { ...item };
+      origData[item.id] = { ...item };
+    });
+    
+    setEditData(initialData);
+    setOriginalData(origData);
+    
+    // If advances section, load advances for this reference
+    if (sectionKey === 'advances' && itemList.length > 0) {
+      const ref = itemList[0].ref;
+      try {
+        const res = await getAdvances({ ref });
+        const advances = res.data || [];
+        setRefAdvances(advances);
+        
+        // Initialize advance data
+        const advInitial = {};
+        const advOrig = {};
+        advances.forEach(adv => {
+          advInitial[adv.id] = { ...adv };
+          advOrig[adv.id] = { ...adv };
+        });
+        setAdvanceData(advInitial);
+        setOriginalAdvanceData(advOrig);
+        setNewAdvances([]);
+        setDeletedAdvances([]);
+      } catch (err) {
+        // silenced
+        setRefAdvances([]);
+      }
+    }
+    
+    setShowSectionSelector(false);
+  };
+
+  // Handle advance field changes
+  const handleAdvanceChange = (advanceId, fieldKey, value) => {
+    setAdvanceData(prev => ({
+      ...prev,
+      [advanceId]: { ...prev[advanceId], [fieldKey]: value }
+    }));
+  };
+
+  // Handle new advance changes
+  const handleNewAdvanceChange = (index, fieldKey, value) => {
+    setNewAdvances(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [fieldKey]: value };
+      return updated;
+    });
+  };
+
+  // Add new advance row
+  const addNewAdvance = () => {
+    const ref = editItems[0]?.ref || '';
+    const name = editItems[0]?.name || '';
+    setNewAdvances(prev => [...prev, { 
+      id: `new_${Date.now()}`, 
+      date: new Date().toISOString().split('T')[0], 
+      name, 
+      ref, 
+      amount: 0, 
+      mode: 'Cash',
+      tally: false 
+    }]);
+  };
+
+  // Remove new advance (before it's saved)
+  const removeNewAdvance = (index) => {
+    setNewAdvances(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Mark existing advance for deletion
+  const markAdvanceForDelete = (advanceId) => {
+    setDeletedAdvances(prev => [...prev, advanceId]);
+    setAdvanceData(prev => {
+      const updated = { ...prev };
+      delete updated[advanceId];
+      return updated;
+    });
+  };
+
+  const handleFieldChange = (itemId, fieldKey, value) => {
+    setEditData(prev => {
+      const updated = { 
+        ...prev, 
+        [itemId]: { ...prev[itemId], [fieldKey]: value } 
+      };
+      
+      // Compute dependent fields
+      const item = updated[itemId];
+      
+      // Compute fabric_amount if price, qty, or discount changed
+      if (['price', 'qty', 'discount'].includes(fieldKey)) {
+        updated[itemId].fabric_amount = computeFabricAmount(
+          parseFloat(item.price) || 0,
+          parseFloat(item.qty) || 0,
+          parseFloat(item.discount) || 0
+        );
+      }
+      
+      // Compute pending amounts if total or received changed
+      if (fieldKey === 'fabric_received' || fieldKey === 'fabric_amount') {
+        updated[itemId].fabric_pending = computePending(
+          parseFloat(updated[itemId].fabric_amount) || 0,
+          parseFloat(updated[itemId].fabric_received) || 0
+        );
+      }
+      
+      if (fieldKey === 'tailoring_received' || fieldKey === 'tailoring_amount') {
+        updated[itemId].tailoring_pending = computePending(
+          parseFloat(item.tailoring_amount) || 0,
+          parseFloat(item.tailoring_received) || 0
+        );
+      }
+      
+      if (fieldKey === 'embroidery_received' || fieldKey === 'embroidery_amount') {
+        updated[itemId].embroidery_pending = computePending(
+          parseFloat(item.embroidery_amount) || 0,
+          parseFloat(item.embroidery_received) || 0
+        );
+      }
+      
+      if (fieldKey === 'addon_received' || fieldKey === 'addon_amount') {
+        updated[itemId].addon_pending = computePending(
+          parseFloat(item.addon_amount) || 0,
+          parseFloat(item.addon_received) || 0
+        );
+      }
+      
+      return updated;
+    });
+  };
+
+  // Check if any amounts have decreased below what's already received
+  const detectMismatches = (itemId, original, current) => {
+    const mismatches = [];
+    
+    const checkMismatch = (amountKey, receivedKey, label) => {
+      const originalAmount = parseFloat(original[amountKey]) || 0;
+      const newAmount = parseFloat(current[amountKey]) || 0;
+      const received = parseFloat(original[receivedKey]) || 0;
+      
+      // If amount decreased and is now less than what's received
+      if (newAmount < originalAmount && newAmount < received) {
+        mismatches.push({
+          itemId,
+          ref: original.ref,
+          type: label,
+          oldAmount: originalAmount,
+          newAmount,
+          received,
+          overage: received - newAmount
+        });
+      }
+    };
+    
+    checkMismatch('fabric_amount', 'fabric_received', 'Fabric');
+    checkMismatch('tailoring_amount', 'tailoring_received', 'Tailoring');
+    checkMismatch('embroidery_amount', 'embroidery_received', 'Embroidery');
+    checkMismatch('addon_amount', 'addon_received', 'Add-on');
+    
+    return mismatches;
+  };
+
+  const saveEdits = async () => {
+    setSaving(true);
+    const isAdvanceSection = selectedSection === 'advances';
+    
+    // Handle advances section
+    if (isAdvanceSection) {
+      let advSuccess = 0;
+      let advFailed = 0;
+      
+      // Delete marked advances
+      for (const advanceId of deletedAdvances) {
+        try {
+          await deleteAdvance(advanceId);
+          advSuccess++;
+        } catch (err) {
+          // silenced
+          advFailed++;
+        }
+      }
+      
+      // Update existing advances
+      for (const [advanceId, data] of Object.entries(advanceData)) {
+        try {
+          const original = originalAdvanceData[advanceId];
+          const changedFields = {};
+          
+          Object.keys(data).forEach(key => {
+            if (JSON.stringify(data[key]) !== JSON.stringify(original[key])) {
+              changedFields[key] = data[key];
+            }
+          });
+          
+          if (Object.keys(changedFields).length > 0) {
+            await updateAdvance(advanceId, changedFields);
+            advSuccess++;
+          }
+        } catch (err) {
+          // silenced
+          advFailed++;
+        }
+      }
+      
+      // Create new advances
+      for (const newAdvance of newAdvances) {
+        try {
+          const { id, ...data } = newAdvance; // Remove temp id
+          await createAdvance(data);
+          advSuccess++;
+        } catch (err) {
+          // silenced
+          advFailed++;
+        }
+      }
+      
+      setSaving(false);
+      setSelectedSection(null);
+      setAdvanceData({});
+      setOriginalAdvanceData({});
+      setNewAdvances([]);
+      setDeletedAdvances([]);
+      setRefAdvances([]);
+      setEditItems([]);
+      
+      if (advFailed === 0) {
+        setMessage({ type: "success", text: `Advances saved successfully` });
+      } else {
+        setMessage({ type: "error", text: `${advFailed} advance operation(s) failed, ${advSuccess} succeeded` });
+      }
+      setTimeout(() => setMessage(null), 3000);
+      loadData();
+      return;
+    }
+    
+    // Handle regular items
+    const itemIds = Object.keys(editData);
+    let success = 0;
+    let failed = 0;
+    const allMismatches = [];
+    const affectedRefs = new Set();
+    
+    for (const itemId of itemIds) {
+      try {
+        // Only send changed fields
+        const original = originalData[itemId];
+        const current = editData[itemId];
+        const changedFields = {};
+        
+        Object.keys(current).forEach(key => {
+          if (JSON.stringify(current[key]) !== JSON.stringify(original[key])) {
+            changedFields[key] = current[key];
+          }
+        });
+        
+        // Check for amount mismatches before saving
+        const mismatches = detectMismatches(itemId, original, current);
+        if (mismatches.length > 0) {
+          allMismatches.push(...mismatches);
+          affectedRefs.add(original.ref);
+        }
+        
+        if (Object.keys(changedFields).length > 0) {
+          await updateItem(itemId, changedFields);
+          success++;
+        }
+      } catch (err) {
+        // silenced
+        failed++;
+      }
+    }
+    
+    setSaving(false);
+    setSelectedSection(null);
+    setEditData({});
+    setOriginalData({});
+    setEditItems([]);
+    
+    if (failed === 0) {
+      if (allMismatches.length > 0) {
+        // Show mismatch prompt instead of success message
+        setMismatchPrompt({
+          refs: Array.from(affectedRefs),
+          mismatches: allMismatches
+        });
+      } else {
+        setMessage({ type: "success", text: `${success} item(s) updated successfully` });
+        setTimeout(() => setMessage(null), 3000);
+      }
+    } else {
+      setMessage({ type: "error", text: `${failed} update(s) failed, ${success} succeeded` });
+      setTimeout(() => setMessage(null), 3000);
+    }
+    
+    loadData();
+  };
+
+  const handleMismatchConfirm = () => {
+    // Close the prompt
+    setMismatchPrompt(null);
+    
+    // Redirect to settlement page with refs as query params
+    if (pendingRedirect && pendingRedirect.length > 0) {
+      const refsParam = pendingRedirect.join(',');
+      window.location.href = `/settlements?refs=${encodeURIComponent(refsParam)}`;
+    }
+    setPendingRedirect(null);
+  };
+
+  const handleMismatchCancel = () => {
+    setMismatchPrompt(null);
+    setPendingRedirect(null);
+  };
+
+  const cancelEdit = () => {
+    setSelectedSection(null);
+    setEditData({});
+    setOriginalData({});
+    setEditItems([]);
+    setShowSectionSelector(false);
+    // Reset advance states
+    setAdvanceData({});
+    setOriginalAdvanceData({});
+    setRefAdvances([]);
+    setNewAdvances([]);
+    setDeletedAdvances([]);
+  };
+
+  // ==========================================
+  // DELETE HANDLERS
+  // ==========================================
+  const handleDelete = async () => {
+    if (!delConfirm) return;
+    
+    try {
+      if (delMode === 'order') {
+        // Delete all items in the order
+        const itemIds = delConfirm.items.map(i => i.id);
+        for (const id of itemIds) {
+          await deleteItem(id);
+        }
+        setMessage({ type: "success", text: `Order ${delConfirm.ref} deleted (${itemIds.length} items)` });
+      } else {
+        // Delete single item
+        await deleteItem(delConfirm.id);
+        setMessage({ type: "success", text: "Item deleted" });
+      }
+      setDelConfirm(null);
+      loadData();
+    } catch (err) {
+      setMessage({ type: "error", text: "Failed to delete" });
+    }
+    setTimeout(() => setMessage(null), 3000);
+  };
 
   // Group items by reference
   const grouped = {};
@@ -39,48 +546,485 @@ export default function ItemsManager() {
   });
 
   const refs = Object.values(grouped).sort((a, b) => {
-    const va = a[sortKey] || ""; const vb = b[sortKey] || "";
-    const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+    let va = a[sortKey];
+    let vb = b[sortKey];
+    
+    // Handle missing values
+    if (va === undefined || va === null) va = "";
+    if (vb === undefined || vb === null) vb = "";
+    
+    // Check if values are dates (YYYY-MM-DD format)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    const isDateA = dateRegex.test(String(va));
+    const isDateB = dateRegex.test(String(vb));
+    
+    if (isDateA && isDateB) {
+      // Compare dates using localeCompare for proper sorting
+      const cmp = String(va).localeCompare(String(vb));
+      return sortDir === "desc" ? -cmp : cmp;
+    }
+    
+    // Check if numeric
+    if (typeof va === "number" && typeof vb === "number") {
+      const cmp = va - vb;
+      return sortDir === "desc" ? -cmp : cmp;
+    }
+    
+    // Default string comparison
+    const cmp = String(va).localeCompare(String(vb));
     return sortDir === "desc" ? -cmp : cmp;
   });
 
   const orderNos = [...new Set(allItems.map(i => i.order_no).filter(o => o && o !== "N/A"))].sort();
 
   const toggleExpand = (ref) => setExpanded(prev => ({ ...prev, [ref]: !prev[ref] }));
-  const startEdit = (item) => { setEditingId(item.id); setEditData({ ...item }); };
-  const cancelEdit = () => { setEditingId(null); setEditData({}); };
-
-  const saveEdit = async () => {
-    try {
-      await updateItem(editingId, editData);
-      setMessage({ type: "success", text: "Item updated" });
-      setEditingId(null);
-      loadItems();
-    } catch (err) { setMessage({ type: "error", text: "Failed to update" }); }
-    setTimeout(() => setMessage(null), 3000);
-  };
-
-  const handleDelete = async (id) => {
-    try {
-      await deleteItem(id);
-      setMessage({ type: "success", text: "Item deleted" });
-      setDelConfirm(null);
-      loadItems();
-    } catch (err) { setMessage({ type: "error", text: "Failed" }); }
-    setTimeout(() => setMessage(null), 3000);
-  };
-
   const handleSort = (key) => {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortKey(key); setSortDir("desc"); }
   };
-
   const fmt = (n) => n ? new Intl.NumberFormat('en-IN').format(Math.round(n)) : "-";
+
+  // ==========================================
+  // MODAL COMPONENTS (inline)
+  // ==========================================
+  const SectionSelectorModal = () => (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-[var(--surface)] rounded-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-[var(--border-subtle)]">
+          <h2 className="font-heading text-xl font-medium">Select Section to Edit</h2>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            {editMode === 'order' ? `Editing order with ${editItems.length} items` : 'Editing single item'}
+          </p>
+        </div>
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Object.entries(SECTIONS).map(([key, section]) => (
+            <button
+              key={key}
+              onClick={() => startEdit(key, editItems, editMode)}
+              className="p-4 border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:bg-[#C86B4D08] text-left transition-colors"
+            >
+              <h3 className="font-medium text-[var(--brand)]">{section.label}</h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">{section.description}</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-2">{section.fields.length} fields</p>
+            </button>
+          ))}
+        </div>
+        <div className="p-4 border-t border-[var(--border-subtle)] flex justify-end">
+          <button onClick={() => { setShowSectionSelector(false); setEditItems([]); }} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const SectionEditModal = () => {
+    const section = SECTIONS[selectedSection];
+    const isAdvance = section.isAdvanceSection;
+    
+    // For advances section, filter advances for this reference
+    const refAdvances = isAdvance && editItems.length > 0 
+      ? advances.filter(a => a.ref === editItems[0].ref)
+      : [];
+
+    const renderFieldInput = (field, itemId, value) => {
+      const commonClasses = "w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:border-[var(--brand)] focus:outline-none";
+      
+      switch (field.type) {
+        case 'date':
+          return (
+            <input
+              type="date"
+              value={value || ''}
+              onChange={e => handleFieldChange(itemId, field.key, e.target.value)}
+              className={commonClasses}
+            />
+          );
+        case 'number':
+          return (
+            <input
+              type="number"
+              step={field.step || 1}
+              value={value || 0}
+              onChange={e => handleFieldChange(itemId, field.key, parseFloat(e.target.value) || 0)}
+              disabled={field.computed}
+              className={`${commonClasses} ${field.computed ? 'bg-[var(--bg)] text-[var(--text-secondary)]' : ''}`}
+            />
+          );
+        case 'select':
+          return (
+            <select
+              value={value || ''}
+              onChange={e => handleFieldChange(itemId, field.key, e.target.value)}
+              className={commonClasses}
+            >
+              {field.options.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          );
+        case 'checkbox':
+          return (
+            <input
+              type="checkbox"
+              checked={!!value}
+              onChange={e => handleFieldChange(itemId, field.key, e.target.checked)}
+              className="w-4 h-4 accent-[var(--brand)]"
+            />
+          );
+        default:
+          return (
+            <input
+              type="text"
+              value={value || ''}
+              onChange={e => handleFieldChange(itemId, field.key, e.target.value)}
+              className={commonClasses}
+            />
+          );
+      }
+    };
+
+    // Render field input for existing advances
+    const renderAdvanceField = (field, advanceId, value) => {
+      const commonClasses = "w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:border-[var(--brand)] focus:outline-none";
+      
+      switch (field.type) {
+        case 'date':
+          return (
+            <input
+              type="date"
+              value={value || ''}
+              onChange={e => handleAdvanceChange(advanceId, field.key, e.target.value)}
+              className={commonClasses}
+            />
+          );
+        case 'number':
+          return (
+            <input
+              type="number"
+              step={field.step || 1}
+              value={value || 0}
+              onChange={e => handleAdvanceChange(advanceId, field.key, parseFloat(e.target.value) || 0)}
+              className={commonClasses}
+            />
+          );
+        case 'select':
+          return (
+            <select
+              value={value || ''}
+              onChange={e => handleAdvanceChange(advanceId, field.key, e.target.value)}
+              className={commonClasses}
+            >
+              {field.options.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          );
+        case 'checkbox':
+          return (
+            <input
+              type="checkbox"
+              checked={!!value}
+              onChange={e => handleAdvanceChange(advanceId, field.key, e.target.checked)}
+              className="w-4 h-4 accent-[var(--brand)]"
+            />
+          );
+        default:
+          return (
+            <input
+              type="text"
+              value={value || ''}
+              onChange={e => handleAdvanceChange(advanceId, field.key, e.target.value)}
+              className={commonClasses}
+            />
+          );
+      }
+    };
+
+    // Render field input for new advances
+    const renderNewAdvanceField = (field, index, value) => {
+      const commonClasses = "w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:border-[var(--brand)] focus:outline-none";
+      
+      switch (field.type) {
+        case 'date':
+          return (
+            <input
+              type="date"
+              value={value || ''}
+              onChange={e => handleNewAdvanceChange(index, field.key, e.target.value)}
+              className={commonClasses}
+            />
+          );
+        case 'number':
+          return (
+            <input
+              type="number"
+              step={field.step || 1}
+              value={value || 0}
+              onChange={e => handleNewAdvanceChange(index, field.key, parseFloat(e.target.value) || 0)}
+              className={commonClasses}
+            />
+          );
+        case 'select':
+          return (
+            <select
+              value={value || ''}
+              onChange={e => handleNewAdvanceChange(index, field.key, e.target.value)}
+              className={commonClasses}
+            >
+              {field.options.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          );
+        case 'checkbox':
+          return (
+            <input
+              type="checkbox"
+              checked={!!value}
+              onChange={e => handleNewAdvanceChange(index, field.key, e.target.checked)}
+              className="w-4 h-4 accent-[var(--brand)]"
+            />
+          );
+        default:
+          return (
+            <input
+              type="text"
+              value={value || ''}
+              onChange={e => handleNewAdvanceChange(index, field.key, e.target.value)}
+              className={commonClasses}
+            />
+          );
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="bg-[var(--surface)] rounded-sm max-w-[95vw] w-full max-h-[90vh] flex flex-col">
+          <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
+            <div>
+              <h2 className="font-heading text-lg font-medium">{section.label}</h2>
+              <p className="text-xs text-[var(--text-secondary)]">
+                {editMode === 'order' ? `Editing ${editItems.length} items` : 'Editing 1 item'} • {section.description}
+              </p>
+            </div>
+            <button onClick={cancelEdit} className="p-1 hover:bg-[var(--bg)] rounded-sm">
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-auto p-4">
+            {isAdvance ? (
+              // Advances table - EDITABLE
+              <div className="overflow-x-auto">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-xs text-[var(--text-secondary)]">
+                    Editing advances for: <span className="font-mono font-medium">{editItems[0]?.ref}</span>
+                  </span>
+                  <button
+                    onClick={addNewAdvance}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[var(--success)] text-white rounded-sm hover:bg-[#3d4a3f]"
+                  >
+                    <Plus size={12} /> Add Advance
+                  </button>
+                </div>
+                
+                {/* Existing Advances */}
+                {Object.keys(advanceData).length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-xs font-semibold text-[var(--text-secondary)] mb-2">Existing Advances</h4>
+                    <table className="w-full border border-[var(--border-subtle)]">
+                      <thead className="bg-[var(--bg)] sticky top-0">
+                        <tr>
+                          {section.fields.map(field => (
+                            <th key={field.key} className="px-2 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">
+                              {field.label}
+                            </th>
+                          ))}
+                          <th className="px-2 py-2 text-center text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-16">
+                            Action
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(advanceData).map(([advId, adv]) => (
+                          <tr key={advId} className="border-b border-[var(--border-subtle)] last:border-0">
+                            {section.fields.map(field => (
+                              <td key={field.key} className="px-2 py-2">
+                                {renderAdvanceField(field, advId, adv[field.key])}
+                              </td>
+                            ))}
+                            <td className="px-2 py-2 text-center">
+                              <button
+                                onClick={() => markAdvanceForDelete(advId)}
+                                className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"
+                                title="Delete Advance"
+                              >
+                                <Trash size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                
+                {/* New Advances */}
+                {newAdvances.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-xs font-semibold text-[var(--success)] mb-2">New Advances (to be created)</h4>
+                    <table className="w-full border border-[var(--border-subtle)]">
+                      <thead className="bg-[var(--bg)] sticky top-0">
+                        <tr>
+                          {section.fields.map(field => (
+                            <th key={field.key} className="px-2 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">
+                              {field.label}
+                            </th>
+                          ))}
+                          <th className="px-2 py-2 text-center text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-16">
+                            Action
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {newAdvances.map((adv, idx) => (
+                          <tr key={adv.id} className="border-b border-[var(--border-subtle)] last:border-0 bg-[#455D4A08]">
+                            {section.fields.map(field => (
+                              <td key={field.key} className="px-2 py-2">
+                                {renderNewAdvanceField(field, idx, adv[field.key])}
+                              </td>
+                            ))}
+                            <td className="px-2 py-2 text-center">
+                              <button
+                                onClick={() => removeNewAdvance(idx)}
+                                className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"
+                                title="Remove"
+                              >
+                                <X size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                
+                {/* Deleted Advances Indicator */}
+                {deletedAdvances.length > 0 && (
+                  <div className="mb-3 p-2 bg-[#9E473D10] border border-[var(--error)] rounded-sm text-xs">
+                    <span className="text-[var(--error)]">
+                      {deletedAdvances.length} advance(s) marked for deletion
+                    </span>
+                  </div>
+                )}
+                
+                {/* Empty State */}
+                {Object.keys(advanceData).length === 0 && newAdvances.length === 0 && (
+                  <div className="p-4 text-center text-sm text-[var(--text-secondary)] border border-dashed border-[var(--border-subtle)] rounded-sm">
+                    No advances for this reference. Click "Add Advance" to create one.
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Regular items table
+              <div className="overflow-x-auto">
+                <table className="w-full border border-[var(--border-subtle)]">
+                  <thead className="bg-[var(--bg)] sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-20">
+                        Item
+                      </th>
+                      {section.fields.map(field => (
+                        <th key={field.key} className="px-3 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] min-w-[100px]">
+                          {field.label} {field.computed && <span className="text-[var(--info)]">(auto)</span>}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editItems.map((item, idx) => (
+                      <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D05]">
+                        <td className="px-3 py-2 align-top">
+                          <div className="text-xs font-mono text-[var(--brand)]">#{idx + 1}</div>
+                          <div className="text-[10px] text-[var(--text-secondary)] truncate max-w-[100px]">{item.barcode}</div>
+                        </td>
+                        {section.fields.map(field => (
+                          <td key={field.key} className="px-2 py-2 align-top">
+                            {renderFieldInput(field, item.id, editData[item.id]?.[field.key])}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          
+          <div className="p-4 border-t border-[var(--border-subtle)] flex justify-between items-center">
+            <button 
+              onClick={() => setShowSectionSelector(true)} 
+              className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]"
+            >
+              ← Change Section
+            </button>
+            <div className="flex gap-3">
+              <button 
+                onClick={cancelEdit} 
+                className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={saveEdits} 
+                disabled={saving}
+                className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 flex items-center gap-2"
+              >
+                {saving ? 'Saving...' : <><Check size={14} /> Confirm Changes</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const DeleteConfirmModal = () => (
+    <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setDelConfirm(null)}>
+      <div data-testid="delete-confirm-modal" className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+        <h3 className="font-heading text-lg font-medium mb-2">
+          Delete {delMode === 'order' ? 'Order' : 'Item'}?
+        </h3>
+        <p className="text-sm text-[var(--text-secondary)] mb-4">
+          {delMode === 'order' ? (
+            <>
+              Order: <span className="font-mono font-medium">{delConfirm.ref}</span><br/>
+              <span className="text-xs">{delConfirm.items?.length || 0} items will be deleted</span>
+            </>
+          ) : (
+            <>Item: <span className="font-mono">{delConfirm.barcode}</span></>
+          )}
+        </p>
+        <div className="flex gap-3 justify-end">
+          <button onClick={() => setDelConfirm(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm">Cancel</button>
+          <button 
+            data-testid="confirm-delete-btn" 
+            onClick={handleDelete} 
+            className="px-4 py-2 text-sm bg-[var(--error)] text-white rounded-sm hover:bg-[var(--error)]/90"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div data-testid="items-manager-page" className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-light tracking-tight">Manage Orders</h1>
+        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Manage Orders</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">View, edit and manage all orders grouped by reference</p>
       </div>
 
@@ -89,7 +1033,7 @@ export default function ItemsManager() {
       )}
 
       {/* Filters */}
-      <div className="bg-white border border-[var(--border-subtle)] p-4 rounded-sm flex flex-wrap gap-3 items-center">
+      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm flex flex-wrap gap-3 items-center">
         <select data-testid="orders-customer-filter" value={nameFilter} onChange={e => setNameFilter(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
           <option value="">All Customers</option>
           {customers.map(c => <option key={c} value={c}>{c}</option>)}
@@ -101,15 +1045,65 @@ export default function ItemsManager() {
         <span className="ml-auto text-xs text-[var(--text-secondary)]">{refs.length} references, {allItems.length} items</span>
       </div>
 
-      {/* Delete Confirmation */}
-      {delConfirm && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setDelConfirm(null)}>
-          <div data-testid="delete-confirm-modal" className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm mx-4" onClick={e => e.stopPropagation()}>
-            <h3 className="font-heading text-lg font-medium mb-2">Delete Item?</h3>
-            <p className="text-sm text-[var(--text-secondary)] mb-4">Item: <span className="font-mono">{delConfirm.barcode}</span></p>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setDelConfirm(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm">Cancel</button>
-              <button data-testid="confirm-delete-btn" onClick={() => handleDelete(delConfirm.id)} className="px-4 py-2 text-sm bg-[var(--error)] text-white rounded-sm">Delete</button>
+      {/* Modals */}
+      {showSectionSelector && <SectionSelectorModal />}
+      {selectedSection && <SectionEditModal />}
+      {delConfirm && <DeleteConfirmModal />}
+      
+      {/* Amount Mismatch Prompt */}
+      {mismatchPrompt && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--surface)] rounded-sm max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-[var(--border-subtle)] bg-[#9E473D10]">
+              <h3 className="font-heading text-lg font-medium text-[var(--error)]">⚠️ Amount Mismatch Detected</h3>
+              <p className="text-sm text-[var(--text-secondary)] mt-1">
+                Some amounts were reduced below what has already been received. You need to reconfigure the settlement.
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <table className="w-full text-xs">
+                <thead className="bg-[var(--bg)] sticky top-0">
+                  <tr>
+                    <th className="px-2 py-2 text-left">Ref</th>
+                    <th className="px-2 py-2 text-left">Type</th>
+                    <th className="px-2 py-2 text-right">Old</th>
+                    <th className="px-2 py-2 text-right">New</th>
+                    <th className="px-2 py-2 text-right">Received</th>
+                    <th className="px-2 py-2 text-right text-[var(--error)]">Overage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mismatchPrompt.mismatches.map((m, i) => (
+                    <tr key={i} className="border-b border-[var(--border-subtle)]">
+                      <td className="px-2 py-2 font-mono">{m.ref}</td>
+                      <td className="px-2 py-2">{m.type}</td>
+                      <td className="px-2 py-2 text-right font-mono">₹{fmt(m.oldAmount)}</td>
+                      <td className="px-2 py-2 text-right font-mono">₹{fmt(m.newAmount)}</td>
+                      <td className="px-2 py-2 text-right font-mono text-[var(--success)]">₹{fmt(m.received)}</td>
+                      <td className="px-2 py-2 text-right font-mono text-[var(--error)] font-medium">₹{fmt(m.overage)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-4 border-t border-[var(--border-subtle)] bg-[var(--bg)] flex justify-between items-center">
+              <span className="text-xs text-[var(--text-secondary)]">
+                {mismatchPrompt.refs.length} order(s) affected
+              </span>
+              <div className="flex gap-3">
+                <button 
+                  onClick={handleMismatchCancel}
+                  className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)]"
+                >
+                  I'll fix it later
+                </button>
+                <button 
+                  onClick={() => { setPendingRedirect(mismatchPrompt.refs); handleMismatchConfirm(); }}
+                  className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] flex items-center gap-2"
+                >
+                  Go to Settlement →
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -132,7 +1126,7 @@ export default function ItemsManager() {
         </div>
 
         {refs.map(group => (
-          <div key={group.ref} className="bg-white border border-[var(--border-subtle)] rounded-sm overflow-hidden">
+          <div key={group.ref} className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
             {/* Collapsed Reference Row */}
             <div className="px-4 py-3 flex items-center cursor-pointer hover:bg-[#C86B4D05] transition-colors" onClick={() => toggleExpand(group.ref)}>
               <span className="w-6 text-[var(--text-secondary)]">{expanded[group.ref] ? <CaretDown size={14} /> : <CaretRight size={14} />}</span>
@@ -144,9 +1138,26 @@ export default function ItemsManager() {
               <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.embroidery)}</span>
               <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.addon)}</span>
               <span className="w-16 text-center font-mono text-xs">{group.items.length}</span>
-              <a href={getInvoiceUrl(group.ref)} target="_blank" rel="noopener noreferrer" className="w-10 text-center" onClick={e => e.stopPropagation()}>
-                <FilePdf size={16} className="text-[var(--brand)] hover:text-[var(--brand-hover)] inline" />
-              </a>
+              {/* Order-level Actions - always visible */}
+              <div className="flex items-center gap-1 mr-2" onClick={e => e.stopPropagation()}>
+                <button 
+                  onClick={() => { setEditItems(group.items); setEditMode('order'); setShowSectionSelector(true); }}
+                  className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm"
+                  title="Edit Order"
+                >
+                  <PencilSimple size={14} />
+                </button>
+                <button 
+                  onClick={() => { setDelConfirm(group); setDelMode('order'); }}
+                  className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"
+                  title="Delete Order"
+                >
+                  <Trash size={14} />
+                </button>
+              </div>
+              <button onClick={e => { e.stopPropagation(); setInvoiceRef(group.ref); }} className="w-10 text-center">
+                <Printer size={16} className="text-[var(--brand)] hover:text-[var(--brand-hover)] inline" />
+              </button>
             </div>
 
             {/* Expanded Detail Rows */}
@@ -163,18 +1174,10 @@ export default function ItemsManager() {
                   <tbody>
                     {group.items.map(item => (
                       <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D05]">
-                        <td className="px-3 py-2 text-xs max-w-[100px] truncate">
-                          {editingId === item.id ? <input value={editData.barcode||""} onChange={e => setEditData(p=>({...p, barcode: e.target.value}))} className="w-20 px-1 py-0.5 text-xs border border-[var(--brand)] rounded-sm" /> : item.barcode}
-                        </td>
-                        <td className="px-3 py-2 font-mono text-xs">
-                          {editingId === item.id ? <input type="number" value={editData.price||""} onChange={e => setEditData(p=>({...p, price: parseFloat(e.target.value)||0}))} className="w-14 px-1 py-0.5 text-xs border border-[var(--brand)] rounded-sm" /> : `₹${fmt(item.price)}`}
-                        </td>
-                        <td className="px-3 py-2 font-mono text-xs">
-                          {editingId === item.id ? <input type="number" step="0.1" value={editData.qty||""} onChange={e => setEditData(p=>({...p, qty: parseFloat(e.target.value)||0}))} className="w-12 px-1 py-0.5 text-xs border border-[var(--brand)] rounded-sm" /> : item.qty}
-                        </td>
-                        <td className="px-3 py-2 font-mono text-xs">
-                          {editingId === item.id ? <input type="number" value={editData.discount||""} onChange={e => setEditData(p=>({...p, discount: parseFloat(e.target.value)||0}))} className="w-10 px-1 py-0.5 text-xs border border-[var(--brand)] rounded-sm" /> : (item.discount ? `${item.discount}%` : "-")}
-                        </td>
+                        <td className="px-3 py-2 text-xs max-w-[100px] truncate">{item.barcode}</td>
+                        <td className="px-3 py-2 font-mono text-xs">₹{fmt(item.price)}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{item.qty}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{item.discount ? `${item.discount}%` : "-"}</td>
                         <td className="px-3 py-2 font-mono text-xs font-medium">₹{fmt(item.fabric_amount)}</td>
                         <td className="px-3 py-2 text-xs">{item.article_type !== "N/A" ? item.article_type : "-"}</td>
                         <td className="px-3 py-2 font-mono text-xs">{item.order_no !== "N/A" ? item.order_no : "-"}</td>
@@ -184,17 +1187,20 @@ export default function ItemsManager() {
                         <td className="px-3 py-2 text-xs max-w-[80px] truncate">{item.addon_desc !== "N/A" ? item.addon_desc : "-"}</td>
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-0.5">
-                            {editingId === item.id ? (
-                              <>
-                                <button onClick={saveEdit} className="p-1 text-[var(--success)] hover:bg-[#455D4A10] rounded-sm"><FloppyDisk size={14} /></button>
-                                <button onClick={cancelEdit} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm"><X size={14} /></button>
-                              </>
-                            ) : (
-                              <>
-                                <button onClick={() => startEdit(item)} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm"><PencilSimple size={14} /></button>
-                                <button onClick={() => setDelConfirm(item)} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"><Trash size={14} /></button>
-                              </>
-                            )}
+                            <button 
+                              onClick={() => { setEditItems([item]); setEditMode('item'); setShowSectionSelector(true); }}
+                              className="p-1 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm"
+                              title="Edit Item"
+                            >
+                              <PencilSimple size={14} />
+                            </button>
+                            <button 
+                              onClick={() => { setDelConfirm(item); setDelMode('item'); }}
+                              className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"
+                              title="Delete Item"
+                            >
+                              <Trash size={14} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -206,6 +1212,10 @@ export default function ItemsManager() {
           </div>
         ))}
       </div>
+
+      {invoiceRef && (
+        <InvoiceModal billRef={invoiceRef} onClose={() => setInvoiceRef(null)} />
+      )}
     </div>
   );
 }

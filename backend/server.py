@@ -1,7 +1,10 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query, UploadFile, File
-from fastapi.responses import StreamingResponse, JSONResponse
+﻿from fastapi import FastAPI, APIRouter, HTTPException, Query, UploadFile, File, Depends, Header, Body, status, Request
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.security import HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
@@ -22,22 +25,7 @@ from data_quality import (
     normalize_low_risk_data as dq_normalize_low_risk_data,
     repair_high_risk_data as dq_repair_high_risk_data,
 )
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI()
-
-# This tells the backend to trust EVERY request (Perfect for troubleshooting)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ... rest of your routes (like @app.get("/") etc.) follow here
+import auth as auth_module
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -52,6 +40,38 @@ api_router = APIRouter(prefix="/api")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# --- Auth dependency ---
+async def get_current_user_dep(credentials: HTTPAuthorizationCredentials = Depends(auth_module.security)):
+    return await auth_module.get_current_user(credentials, db)
+
+# --- Auth models ---
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class UserCreateRequest(BaseModel):
+    username: str
+    password: str
+    full_name: str
+    role: str = "cashier"
+    allowed_pages: List[str] = []
+
+# --- Rate limiting ---
+_login_attempts: dict = {}
+_RATE_LIMIT_MAX = 5
+_RATE_LIMIT_WINDOW = 900  # 15 minutes
+
+def _check_rate_limit(ip: str):
+    now = datetime.now(timezone.utc).timestamp()
+    attempts = [t for t in _login_attempts.get(ip, []) if now - t < _RATE_LIMIT_WINDOW]
+    _login_attempts[ip] = attempts
+    if len(attempts) >= _RATE_LIMIT_MAX:
+        raise HTTPException(status_code=429, detail="Too many login attempts. Try again in 15 minutes.")
+    _login_attempts[ip].append(now)
+
+def _clear_rate_limit(ip: str):
+    _login_attempts.pop(ip, None)
 
 # ==========================================
 # MODELS
@@ -634,7 +654,7 @@ async def generate_data_audit(limit: int = 100) -> dict:
 # ==========================================
 
 @api_router.post("/seed")
-async def seed_data():
+async def seed_data(current_user: dict = Depends(get_current_user_dep)):
     count = await db.items.count_documents({})
     if count > 0:
         return {"message": "Data already seeded", "items_count": count}
@@ -1785,17 +1805,12 @@ async def search_items(
     return {"items": items, "total": total}
 
 # ==========================================
-# PDF INVOICE GENERATION
+# HTML INVOICE (print-ready, loads in iframe)
 # ==========================================
 
 @api_router.get("/invoice")
 async def generate_invoice(ref_id: str = Query(..., alias="ref")):
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.units import mm
-    from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+    from fastapi.responses import HTMLResponse
 
     items = await db.items.find({"ref": ref_id}, {"_id": 0}).to_list(100)
     if not items:
@@ -1803,285 +1818,297 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
 
     advances = await db.advances.find({"ref": ref_id}, {"_id": 0}).to_list(50)
     stored_settings = await db.settings.find_one({"key": "app_settings"}, {"_id": 0})
-    settings = merge_settings(stored_settings)
+    s = merge_settings(stored_settings)
 
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=12*mm, bottomMargin=12*mm, leftMargin=12*mm, rightMargin=12*mm)
+    GST_RATE = float(s.get("gst_rate", DEFAULT_SETTINGS["gst_rate"]))
+    brand_color = s.get("firm_name_color", "#C86B4D")
+    firm_name = s.get("firm_name", DEFAULT_SETTINGS["firm_name"])
+    firm_name_case = s.get("firm_name_case", "uppercase")
+    firm_name_size = s.get("firm_name_size", "16")
+    firm_address = s.get("firm_address", DEFAULT_SETTINGS["firm_address"])
+    firm_phones = s.get("firm_phones", DEFAULT_SETTINGS["firm_phones"])
+    firm_gstin = s.get("firm_gstin", DEFAULT_SETTINGS["firm_gstin"])
+    firm_logo = s.get("firm_logo", "")
 
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('Title', parent=styles['Title'], fontSize=16, textColor=colors.HexColor('#C86B4D'), spaceAfter=1*mm, alignment=TA_CENTER)
-    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#6C6760'), alignment=TA_CENTER)
-    heading_style = ParagraphStyle('Heading', parent=styles['Heading2'], fontSize=10, textColor=colors.HexColor('#2D2A26'), spaceBefore=4*mm, spaceAfter=2*mm)
-    small_style = ParagraphStyle('Small', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#6C6760'))
-    right_style = ParagraphStyle('Right', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT)
-    bold_style = ParagraphStyle('Bold', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#2D2A26'))
-
-    elements = []
-    hdr_fill = colors.HexColor('#F5F3EE')
-    brand = colors.HexColor('#C86B4D')
-    txt = colors.HexColor('#2D2A26')
-    grey = colors.HexColor('#6C6760')
-    border_c = colors.HexColor('#EBE8E1')
-
-    # ---- HEADER ----
-    elements.append(Paragraph(settings.get("firm_name", DEFAULT_SETTINGS["firm_name"]).upper(), title_style))
-    elements.append(Paragraph(settings.get("firm_address", DEFAULT_SETTINGS["firm_address"]), subtitle_style))
-    elements.append(
-        Paragraph(
-            f"Mobile: {settings.get('firm_phones', DEFAULT_SETTINGS['firm_phones'])} | GSTIN: {settings.get('firm_gstin', DEFAULT_SETTINGS['firm_gstin'])}",
-            subtitle_style,
-        )
-    )
-    elements.append(Spacer(1, 3*mm))
-    elements.append(HRFlowable(width="100%", thickness=0.5, color=brand))
-    elements.append(Spacer(1, 3*mm))
-
-    # ---- INVOICE INFO ----
     customer_name = items[0].get("name", "N/A")
     order_date = items[0].get("date", "N/A")
-    info_data = [
-        ["Invoice Ref:", ref_id, "Date:", order_date],
-        ["Customer:", customer_name, "Items:", str(len(items))],
-    ]
-    info_table = Table(info_data, colWidths=[55, 180, 55, 170])
-    info_table.setStyle(TableStyle([
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
-        ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'),
-        ('TEXTCOLOR', (0,0), (-1,-1), txt),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
-    ]))
-    elements.append(info_table)
-    elements.append(Spacer(1, 3*mm))
 
-    # ---- GST CALCULATION HELPERS ----
-    GST_RATE = float(settings.get("gst_rate", DEFAULT_SETTINGS["gst_rate"]))
+    def fmt(n):
+        try:
+            return f"{float(n):,.0f}"
+        except:
+            return "0"
 
-    def calc_gst(inclusive_amount):
-        base = round(inclusive_amount / (1 + GST_RATE / 100), 2)
-        gst = round(inclusive_amount - base, 2)
+    def calc_gst(amt):
+        base = round(float(amt) / (1 + GST_RATE / 100), 2)
+        gst = round(float(amt) - base, 2)
         return base, gst
 
-    # ---- SECTION 1: FABRIC ITEMS (with GST) ----
-    elements.append(Paragraph("A. Fabric Items", heading_style))
-    fab_headers = ["#", "Article", "Item/Barcode", "Price/m", "Qty", "Disc%", "Amount", "Base Amt", "GST (5%)"]
-    fab_data = [fab_headers]
+    # ---- Fabric rows ----
     fab_total = 0
     fab_gst_total = 0
-
+    fab_rows_html = ""
     for i, item in enumerate(items, 1):
-        amt = item.get("fabric_amount", 0)
+        amt = float(item.get("fabric_amount", 0))
         fab_total += amt
         base, gst = calc_gst(amt)
         fab_gst_total += gst
-        art = item.get("article_type", "N/A")
-        fab_data.append([
-            str(i), art if art != "N/A" else "-", str(item.get("barcode",""))[:18],
-            f"{item.get('price',0):,.0f}", f"{item.get('qty',0)}", f"{item.get('discount',0):.0f}%",
-            f"{amt:,.0f}", f"{base:,.2f}", f"{gst:,.2f}"
-        ])
-
+        art = item.get("article_type", "") or "-"
+        fab_rows_html += f"""
+        <tr>
+          <td>{i}</td><td>{art}</td>
+          <td>{str(item.get("barcode",""))[:20]}</td>
+          <td class="r">₹{fmt(item.get("price",0))}</td>
+          <td class="r">{item.get("qty",0)}</td>
+          <td class="r">{float(item.get("discount",0)):.0f}%</td>
+          <td class="r">₹{fmt(amt)}</td>
+          <td class="r">₹{base:,.2f}</td>
+          <td class="r">₹{gst:,.2f}</td>
+        </tr>"""
     fab_base_total = round(fab_total - fab_gst_total, 2)
-    fab_data.append(["", "", "", "", "", "TOTAL", f"{fab_total:,.0f}", f"{fab_base_total:,.2f}", f"{fab_gst_total:,.2f}"])
+    fab_foot = f"""<tr class="foot">
+      <td colspan="6" class="r">TOTAL</td>
+      <td class="r">₹{fmt(fab_total)}</td>
+      <td class="r">₹{fab_base_total:,.2f}</td>
+      <td class="r">₹{fab_gst_total:,.2f}</td>
+    </tr>"""
 
-    fab_table = Table(fab_data, colWidths=[18, 55, 95, 45, 30, 30, 55, 55, 50])
-    fab_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), hdr_fill),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 7),
-        ('TEXTCOLOR', (0,0), (-1,-1), txt),
-        ('GRID', (0,0), (-1,-2), 0.3, border_c),
-        ('LINEABOVE', (0,-1), (-1,-1), 0.8, txt),
-        ('ALIGN', (3,0), (-1,-1), 'RIGHT'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-        ('TOPPADDING', (0,0), (-1,-1), 3),
-    ]))
-    elements.append(fab_table)
-
-    # ---- SECTION 2: TAILORING (if any) ----
-    tail_items = [i for i in items if i.get("tailoring_status") not in ("N/A", None, "", "Awaiting Order") and i.get("tailoring_amount", 0) > 0]
+    # ---- Tailoring section ----
+    tail_items = [x for x in items if x.get("tailoring_status") not in ("N/A", None, "", "Awaiting Order") and float(x.get("tailoring_amount", 0)) > 0]
+    tail_section = ""
+    tail_total = 0
     if tail_items:
-        elements.append(Paragraph("B. Tailoring", heading_style))
-        tail_data = [["#", "Article", "Order#", "Delivery", "Tailoring Amt", "Labour Amt", "Payment"]]
-        tail_total = 0
-        for idx, ti in enumerate(tail_items, 1):
-            t_amt = ti.get("tailoring_amount", 0)
+        rows = ""
+        for i, ti in enumerate(tail_items, 1):
+            t_amt = float(ti.get("tailoring_amount", 0))
             tail_total += t_amt
-            pay_mode = ti.get("tailoring_pay_mode", "N/A")
-            status = "Settled" if str(pay_mode).startswith("Settled") else pay_mode
-            tail_data.append([
-                str(idx), ti.get("article_type",""), ti.get("order_no",""),
-                ti.get("delivery_date",""), f"{t_amt:,.0f}", f"{ti.get('labour_amount',0):,.0f}", status
-            ])
-        tail_data.append(["", "", "", "", f"{tail_total:,.0f}", "", ""])
-        tail_table = Table(tail_data, colWidths=[18, 70, 50, 65, 70, 60, 100])
-        tail_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), hdr_fill),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,-1), 7),
-            ('GRID', (0,0), (-1,-2), 0.3, border_c),
-            ('LINEABOVE', (0,-1), (-1,-1), 0.8, txt),
-            ('ALIGN', (4,0), (5,-1), 'RIGHT'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3),
-        ]))
-        elements.append(tail_table)
+            pm = ti.get("tailoring_pay_mode", "N/A")
+            status_lbl = "Settled" if str(pm).startswith("Settled") else pm
+            rows += f"""<tr>
+              <td>{i}</td><td>{ti.get("article_type","")}</td><td>{ti.get("order_no","")}</td>
+              <td>{ti.get("delivery_date","")}</td><td class="r">₹{fmt(t_amt)}</td>
+              <td class="r">₹{fmt(ti.get("labour_amount",0))}</td><td>{status_lbl}</td>
+            </tr>"""
+        rows += f'<tr class="foot"><td colspan="4" class="r">TOTAL</td><td class="r">₹{fmt(tail_total)}</td><td></td><td></td></tr>'
+        tail_section = f"""
+        <h3 class="sec-title">B. Tailoring</h3>
+        <table><thead><tr><th>#</th><th>Article</th><th>Order#</th><th>Delivery</th><th class="r">Tailoring</th><th class="r">Labour</th><th>Payment</th></tr></thead>
+        <tbody>{rows}</tbody></table>"""
 
-    # ---- SECTION 3: EMBROIDERY (if any) ----
-    emb_items = [i for i in items if i.get("embroidery_status") not in ("N/A", "Not Required", None, "")]
+    # ---- Embroidery section ----
+    emb_items = [x for x in items if x.get("embroidery_status") not in ("N/A", "Not Required", None, "")]
+    emb_section = ""
+    emb_total = 0
     if emb_items:
-        elements.append(Paragraph("C. Embroidery", heading_style))
-        emb_data = [["#", "Article", "Status", "Karigar", "Amount", "Payment"]]
-        emb_total = 0
-        for idx, ei in enumerate(emb_items, 1):
-            e_amt = ei.get("embroidery_amount", 0)
+        rows = ""
+        for i, ei in enumerate(emb_items, 1):
+            e_amt = float(ei.get("embroidery_amount", 0))
             emb_total += e_amt
-            emb_data.append([
-                str(idx), ei.get("article_type",""), ei.get("embroidery_status",""),
-                ei.get("karigar","N/A"), f"{e_amt:,.0f}",
-                "Settled" if str(ei.get("embroidery_pay_mode","")).startswith("Settled") else ei.get("embroidery_pay_mode","N/A")
-            ])
-        emb_data.append(["", "", "", "", f"{emb_total:,.0f}", ""])
-        emb_table = Table(emb_data, colWidths=[18, 70, 70, 80, 60, 130])
-        emb_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), hdr_fill),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,-1), 7),
-            ('GRID', (0,0), (-1,-2), 0.3, border_c),
-            ('LINEABOVE', (0,-1), (-1,-1), 0.8, txt),
-            ('ALIGN', (4,0), (4,-1), 'RIGHT'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3),
-        ]))
-        elements.append(emb_table)
+            pm = ei.get("embroidery_pay_mode", "N/A")
+            rows += f"""<tr>
+              <td>{i}</td><td>{ei.get("article_type","")}</td><td>{ei.get("embroidery_status","")}</td>
+              <td>{ei.get("karigar","N/A")}</td><td class="r">₹{fmt(e_amt)}</td>
+              <td>{"Settled" if str(pm).startswith("Settled") else pm}</td>
+            </tr>"""
+        rows += f'<tr class="foot"><td colspan="4" class="r">TOTAL</td><td class="r">₹{fmt(emb_total)}</td><td></td></tr>'
+        emb_section = f"""
+        <h3 class="sec-title">C. Embroidery</h3>
+        <table><thead><tr><th>#</th><th>Article</th><th>Status</th><th>Karigar</th><th class="r">Amount</th><th>Payment</th></tr></thead>
+        <tbody>{rows}</tbody></table>"""
 
-    # ---- SECTION 4: ADD-ONS (if any) ----
-    addon_items = [i for i in items if i.get("addon_desc") not in ("N/A", None, "")]
+    # ---- Add-ons section ----
+    addon_items = [x for x in items if x.get("addon_desc") not in ("N/A", None, "")]
+    addon_section = ""
+    addon_total = 0
     if addon_items:
-        elements.append(Paragraph("D. Add-ons", heading_style))
-        add_data = [["#", "Article", "Add-ons", "Amount", "Payment"]]
-        add_total = 0
-        for idx, ai in enumerate(addon_items, 1):
-            a_amt = ai.get("addon_amount", 0)
-            add_total += a_amt
-            add_data.append([
-                str(idx), ai.get("article_type",""), ai.get("addon_desc",""), f"{a_amt:,.0f}",
-                "Settled" if str(ai.get("addon_pay_mode","")).startswith("Settled") else ai.get("addon_pay_mode","N/A")
-            ])
-        add_data.append(["", "", "", f"{add_total:,.0f}", ""])
-        add_table = Table(add_data, colWidths=[18, 70, 180, 60, 100])
-        add_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), hdr_fill),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,-1), 7),
-            ('GRID', (0,0), (-1,-2), 0.3, border_c),
-            ('LINEABOVE', (0,-1), (-1,-1), 0.8, txt),
-            ('ALIGN', (3,0), (3,-1), 'RIGHT'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3),
-        ]))
-        elements.append(add_table)
+        rows = ""
+        for i, ai in enumerate(addon_items, 1):
+            a_amt = float(ai.get("addon_amount", 0))
+            addon_total += a_amt
+            pm = ai.get("addon_pay_mode", "N/A")
+            rows += f"""<tr>
+              <td>{i}</td><td>{ai.get("article_type","")}</td><td>{ai.get("addon_desc","")}</td>
+              <td class="r">₹{fmt(a_amt)}</td>
+              <td>{"Settled" if str(pm).startswith("Settled") else pm}</td>
+            </tr>"""
+        rows += f'<tr class="foot"><td colspan="3" class="r">TOTAL</td><td class="r">₹{fmt(addon_total)}</td><td></td></tr>'
+        addon_section = f"""
+        <h3 class="sec-title">D. Add-ons</h3>
+        <table><thead><tr><th>#</th><th>Article</th><th>Add-on</th><th class="r">Amount</th><th>Payment</th></tr></thead>
+        <tbody>{rows}</tbody></table>"""
 
-    # ---- SECTION 5: ADVANCES ----
-    total_adv = sum(a.get("amount", 0) for a in advances)
+    # ---- Advances section ----
+    total_adv = sum(float(a.get("amount", 0)) for a in advances)
+    adv_section = ""
     if total_adv != 0:
-        elements.append(Paragraph("E. Advances", heading_style))
-        adv_data = [["Date", "Amount", "Mode"]]
-        for a in advances:
-            adv_data.append([a.get("date",""), f"{a.get('amount',0):,.0f}", a.get("mode","")])
-        adv_data.append(["Net Advance", f"{total_adv:,.0f}", ""])
-        adv_table = Table(adv_data, colWidths=[120, 80, 230])
-        adv_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), hdr_fill),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,-1), 7),
-            ('GRID', (0,0), (-1,-2), 0.3, border_c),
-            ('LINEABOVE', (0,-1), (-1,-1), 0.8, txt),
-            ('ALIGN', (1,0), (1,-1), 'RIGHT'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3),
-        ]))
-        elements.append(adv_table)
+        rows = "".join(f'<tr><td>{a.get("date","")}</td><td class="r">₹{fmt(a.get("amount",0))}</td><td>{a.get("mode","")}</td></tr>' for a in advances)
+        rows += f'<tr class="foot"><td>Net Advance</td><td class="r">₹{fmt(total_adv)}</td><td></td></tr>'
+        adv_section = f"""
+        <h3 class="sec-title">E. Advances</h3>
+        <table><thead><tr><th>Date</th><th class="r">Amount</th><th>Mode</th></tr></thead>
+        <tbody>{rows}</tbody></table>"""
 
-    # ---- PAYMENT SUMMARY ----
-    elements.append(Spacer(1, 4*mm))
-    elements.append(HRFlowable(width="100%", thickness=0.5, color=brand))
-    elements.append(Paragraph("Payment Summary", heading_style))
-
-    fab_received = sum(i.get("fabric_received", 0) for i in items)
-    fab_pending = sum(i.get("fabric_pending", 0) for i in items if i.get("fabric_pay_mode") == "Pending")
-    tail_total_amt = sum(i.get("tailoring_amount", 0) for i in items)
-    tail_received = sum(i.get("tailoring_received", 0) for i in items)
-    tail_pending_amt = sum(i.get("tailoring_pending", 0) for i in items if i.get("tailoring_pay_mode") == "Pending")
-    emb_total_amt = sum(i.get("embroidery_amount", 0) for i in items)
-    emb_received = sum(i.get("embroidery_received", 0) for i in items)
-    emb_pending_amt = sum(i.get("embroidery_pending", 0) for i in items if i.get("embroidery_pay_mode") == "Pending")
-    addon_total_amt = sum(i.get("addon_amount", 0) for i in items)
-    addon_received = sum(i.get("addon_received", 0) for i in items)
-    addon_pending_amt = sum(i.get("addon_pending", 0) for i in items if i.get("addon_pay_mode") == "Pending")
+    # ---- Payment summary ----
+    fab_received = sum(float(i.get("fabric_received", 0)) for i in items)
+    fab_pending = sum(float(i.get("fabric_pending", 0)) for i in items if i.get("fabric_pay_mode") == "Pending")
+    tail_total_amt = sum(float(i.get("tailoring_amount", 0)) for i in items)
+    tail_received = sum(float(i.get("tailoring_received", 0)) for i in items)
+    tail_pending_amt = sum(float(i.get("tailoring_pending", 0)) for i in items if i.get("tailoring_pay_mode") == "Pending")
+    emb_total_amt = sum(float(i.get("embroidery_amount", 0)) for i in items)
+    emb_received = sum(float(i.get("embroidery_received", 0)) for i in items)
+    emb_pending_amt = sum(float(i.get("embroidery_pending", 0)) for i in items if i.get("embroidery_pay_mode") == "Pending")
+    addon_total_amt = sum(float(i.get("addon_amount", 0)) for i in items)
+    addon_received = sum(float(i.get("addon_received", 0)) for i in items)
+    addon_pending_amt = sum(float(i.get("addon_pending", 0)) for i in items if i.get("addon_pay_mode") == "Pending")
 
     grand_total = fab_total + tail_total_amt + emb_total_amt + addon_total_amt
     total_received = fab_received + tail_received + emb_received + addon_received
     total_pending = fab_pending + tail_pending_amt + emb_pending_amt + addon_pending_amt
-    net_with_advance = total_pending - max(total_adv, 0)
+    net_payable = total_pending - max(total_adv, 0)
 
-    sum_data = [["Category", "Total", "Received", "Pending"]]
-    sum_data.append(["Fabric (incl. GST 5%)", f"{fab_total:,.0f}", f"{fab_received:,.0f}", f"{fab_pending:,.0f}"])
+    summary_rows = f"""
+      <tr><td>Fabric (incl. GST {GST_RATE:.0f}%)</td><td class="r">₹{fmt(fab_total)}</td><td class="r">₹{fmt(fab_received)}</td><td class="r">₹{fmt(fab_pending)}</td></tr>"""
     if tail_total_amt > 0:
-        sum_data.append(["Tailoring", f"{tail_total_amt:,.0f}", f"{tail_received:,.0f}", f"{tail_pending_amt:,.0f}"])
+        summary_rows += f'<tr><td>Tailoring</td><td class="r">₹{fmt(tail_total_amt)}</td><td class="r">₹{fmt(tail_received)}</td><td class="r">₹{fmt(tail_pending_amt)}</td></tr>'
     if emb_total_amt > 0:
-        sum_data.append(["Embroidery", f"{emb_total_amt:,.0f}", f"{emb_received:,.0f}", f"{emb_pending_amt:,.0f}"])
+        summary_rows += f'<tr><td>Embroidery</td><td class="r">₹{fmt(emb_total_amt)}</td><td class="r">₹{fmt(emb_received)}</td><td class="r">₹{fmt(emb_pending_amt)}</td></tr>'
     if addon_total_amt > 0:
-        sum_data.append(["Add-ons", f"{addon_total_amt:,.0f}", f"{addon_received:,.0f}", f"{addon_pending_amt:,.0f}"])
-    sum_data.append(["", "", "", ""])
-    sum_data.append(["GRAND TOTAL", f"{grand_total:,.0f}", f"{total_received:,.0f}", f"{total_pending:,.0f}"])
+        summary_rows += f'<tr><td>Add-ons</td><td class="r">₹{fmt(addon_total_amt)}</td><td class="r">₹{fmt(addon_received)}</td><td class="r">₹{fmt(addon_pending_amt)}</td></tr>'
+    summary_rows += f"""
+      <tr class="foot grand"><td>GRAND TOTAL</td><td class="r">₹{fmt(grand_total)}</td><td class="r">₹{fmt(total_received)}</td><td class="r">₹{fmt(total_pending)}</td></tr>"""
     if total_adv > 0:
-        sum_data.append(["Less: Advance", "", f"{total_adv:,.0f}", ""])
-        sum_data.append(["NET PAYABLE", "", "", f"{net_with_advance:,.0f}"])
+        summary_rows += f'<tr><td>Less: Advance</td><td></td><td class="r">₹{fmt(total_adv)}</td><td></td></tr>'
+        summary_rows += f'<tr class="foot net"><td colspan="3" class="r">NET PAYABLE</td><td class="r">₹{fmt(net_payable)}</td></tr>'
 
-    total_row_idx = len(sum_data) - (3 if total_adv > 0 else 1)
-    sum_table = Table(sum_data, colWidths=[120, 90, 90, 90])
-    sum_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), hdr_fill),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('GRID', (0,0), (-1,total_row_idx-1), 0.3, border_c),
-        ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
-        ('FONTNAME', (0,total_row_idx), (-1,total_row_idx), 'Helvetica-Bold'),
-        ('LINEABOVE', (0,total_row_idx), (-1,total_row_idx), 0.8, txt),
-        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
-        ('TEXTCOLOR', (3,-1), (3,-1), brand),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3),
-    ]))
-    elements.append(sum_table)
+    logo_html = ""
+    if firm_logo:
+        logo_url = firm_logo if firm_logo.startswith("http") else f"{firm_logo}"
+        logo_html = f'<img src="{logo_url}" alt="logo" class="logo" />'
 
-    # ---- TERMS & CONDITIONS ----
-    elements.append(Spacer(1, 6*mm))
-    elements.append(HRFlowable(width="100%", thickness=0.3, color=border_c))
-    elements.append(Spacer(1, 2*mm))
-    terms = [
-        "1. All prices are inclusive of GST @ 5%.",
-        "2. Goods once sold will not be taken back or exchanged.",
-        "3. Tailoring orders are subject to delivery timelines agreed at the time of order.",
-        "4. Advance payments are non-refundable and adjusted against the final bill.",
-        "5. Any dispute is subject to Ambala jurisdiction.",
-    ]
-    for t in terms:
-        elements.append(Paragraph(t, small_style))
+    gen_time = datetime.now().strftime("%d-%m-%Y %H:%M")
 
-    elements.append(Spacer(1, 4*mm))
-    elements.append(Paragraph(f"Generated on {datetime.now().strftime('%d-%m-%Y %H:%M')} | Thank you for your business!", subtitle_style))
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Invoice – {ref_id}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ font-family: 'Inter', Arial, sans-serif; font-size: 12px; color: #2D2A26; background: #fff; padding: 24px; }}
+  .invoice-wrap {{ max-width: 860px; margin: 0 auto; }}
 
-    doc.build(elements)
-    buffer.seek(0)
+  /* Header */
+  .header {{ display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 14px; border-bottom: 2px solid {brand_color}; margin-bottom: 14px; }}
+  .header-left {{ display: flex; align-items: center; gap: 14px; }}
+  .logo {{ width: 64px; height: 64px; object-fit: contain; border-radius: 4px; }}
+  .firm-name {{ font-size: {firm_name_size}pt; font-weight: 700; color: {brand_color}; text-transform: {firm_name_case}; letter-spacing: 0.04em; }}
+  .firm-sub {{ font-size: 10px; color: #6C6760; margin-top: 2px; }}
+  .header-right {{ text-align: right; }}
+  .invoice-label {{ font-size: 20px; font-weight: 700; color: {brand_color}; letter-spacing: 0.1em; text-transform: uppercase; }}
+  .invoice-ref {{ font-size: 11px; color: #6C6760; margin-top: 2px; }}
 
-    safe_ref = ref_id.replace("/", "_")
-    return StreamingResponse(
-        buffer,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=invoice_{safe_ref}.pdf"}
-    )
+  /* Meta info */
+  .meta-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; margin-bottom: 18px; padding: 10px 14px; background: #F5F3EE; border-radius: 4px; }}
+  .meta-grid span {{ font-size: 11px; color: #6C6760; }}
+  .meta-grid strong {{ font-size: 12px; color: #2D2A26; }}
+
+  /* Section titles */
+  .sec-title {{ font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: {brand_color}; margin: 18px 0 6px; padding-bottom: 3px; border-bottom: 1px solid #EBE8E1; }}
+
+  /* Tables */
+  table {{ width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 4px; }}
+  thead tr {{ background: #F5F3EE; }}
+  th {{ padding: 5px 7px; font-weight: 600; text-align: left; color: #2D2A26; border-bottom: 1px solid #EBE8E1; white-space: nowrap; }}
+  td {{ padding: 5px 7px; border-bottom: 1px solid #EBE8E1; vertical-align: top; }}
+  tr:last-child td {{ border-bottom: none; }}
+  tr.foot td {{ font-weight: 700; background: #F5F3EE; border-top: 1.5px solid #2D2A26; }}
+  .r {{ text-align: right; }}
+
+  /* Summary */
+  .summary-wrap {{ margin-top: 20px; }}
+  tr.grand td {{ font-size: 13px; font-weight: 700; background: #F5F3EE; border-top: 2px solid #2D2A26; }}
+  tr.net td {{ font-size: 14px; font-weight: 700; color: {brand_color}; background: #fff8f5; border-top: 1.5px solid {brand_color}; }}
+
+  /* Terms */
+  .terms {{ margin-top: 20px; padding-top: 12px; border-top: 1px solid #EBE8E1; }}
+  .terms p {{ font-size: 10px; color: #6C6760; margin-bottom: 3px; }}
+
+  /* Footer */
+  .inv-footer {{ margin-top: 14px; font-size: 10px; color: #9C9690; text-align: center; }}
+
+  /* Print */
+  @media print {{
+    body {{ padding: 0; }}
+    .no-print {{ display: none !important; }}
+    @page {{ margin: 12mm; size: A4; }}
+  }}
+</style>
+</head>
+<body>
+<div class="invoice-wrap">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      {logo_html}
+      <div>
+        <div class="firm-name">{firm_name}</div>
+        <div class="firm-sub">{firm_address}</div>
+        <div class="firm-sub">Ph: {firm_phones} &nbsp;|&nbsp; GSTIN: {firm_gstin}</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="invoice-label">Invoice</div>
+      <div class="invoice-ref">{ref_id}</div>
+    </div>
+  </div>
+
+  <!-- META -->
+  <div class="meta-grid">
+    <div><span>Customer&nbsp;&nbsp;</span><strong>{customer_name}</strong></div>
+    <div><span>Date&nbsp;&nbsp;</span><strong>{order_date}</strong></div>
+    <div><span>Reference&nbsp;&nbsp;</span><strong>{ref_id}</strong></div>
+    <div><span>Items&nbsp;&nbsp;</span><strong>{len(items)}</strong></div>
+  </div>
+
+  <!-- FABRIC -->
+  <h3 class="sec-title">A. Fabric Items</h3>
+  <table>
+    <thead><tr><th>#</th><th>Article</th><th>Barcode</th><th class="r">Price/m</th><th class="r">Qty</th><th class="r">Disc%</th><th class="r">Amount</th><th class="r">Base Amt</th><th class="r">GST ({GST_RATE:.0f}%)</th></tr></thead>
+    <tbody>{fab_rows_html}{fab_foot}</tbody>
+  </table>
+
+  {tail_section}
+  {emb_section}
+  {addon_section}
+  {adv_section}
+
+  <!-- PAYMENT SUMMARY -->
+  <div class="summary-wrap">
+    <h3 class="sec-title">Payment Summary</h3>
+    <table>
+      <thead><tr><th>Category</th><th class="r">Total</th><th class="r">Received</th><th class="r">Pending</th></tr></thead>
+      <tbody>{summary_rows}</tbody>
+    </table>
+  </div>
+
+  <!-- TERMS -->
+  <div class="terms">
+    <p>1. All fabric prices are inclusive of GST @ {GST_RATE:.0f}%.</p>
+    <p>2. Goods once sold will not be taken back or exchanged.</p>
+    <p>3. Tailoring orders are subject to delivery timelines agreed at time of order.</p>
+    <p>4. Advance payments are non-refundable and adjusted against the final bill.</p>
+    <p>5. Any dispute is subject to local jurisdiction.</p>
+  </div>
+
+  <div class="inv-footer">Generated on {gen_time} &nbsp;|&nbsp; Thank you for your business!</div>
+</div>
+</body>
+</html>"""
+
+    return HTMLResponse(content=html, status_code=200)
 
 # ==========================================
 # REPORTS & ANALYTICS
@@ -2534,7 +2561,7 @@ async def repair_db_data(limit: int = 100):
     return await dq_repair_high_risk_data(db, safe_limit)
 
 # ==========================================
-# SETTINGS
+# SETTINGS (authenticated)
 # ==========================================
 
 DEFAULT_SETTINGS = {
@@ -2547,6 +2574,10 @@ DEFAULT_SETTINGS = {
     "firm_address": "Jasmeet Nagar, Near Kalka Chowk, Ambala City, Pin: 134003, Haryana",
     "firm_phones": "9467902343, 7056212655",
     "firm_gstin": "06ADMPG9353K1Z4",
+    "firm_logo": None,
+    "firm_name_color": "#C86B4D",
+    "firm_name_size": "16",
+    "firm_name_case": "uppercase",
 }
 
 def merge_settings(stored_settings: Optional[dict] = None) -> dict:
@@ -2555,27 +2586,178 @@ def merge_settings(stored_settings: Optional[dict] = None) -> dict:
         merged.update({k: v for k, v in stored_settings.items() if k != "key"})
     return merged
 
+@api_router.get("/settings/public")
+async def get_public_settings():
+    settings = await db.settings.find_one({"key": "app_settings"}, {"_id": 0})
+    merged = merge_settings(settings)
+    return {"firm_name": merged.get("firm_name", "Retail Book")}
+
 @api_router.get("/settings")
-async def get_settings():
+async def get_settings(current_user: dict = Depends(get_current_user_dep)):
     settings = await db.settings.find_one({"key": "app_settings"}, {"_id": 0})
     return merge_settings(settings)
 
 @api_router.put("/settings")
-async def update_settings(data: dict):
+async def update_settings(data: dict, current_user: dict = Depends(get_current_user_dep)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can update settings")
     data["key"] = "app_settings"
     await db.settings.update_one({"key": "app_settings"}, {"$set": data}, upsert=True)
     settings = await db.settings.find_one({"key": "app_settings"}, {"_id": 0})
     return merge_settings(settings)
 
 # ==========================================
-# HEALTH
+# LOGO UPLOAD
 # ==========================================
 
-@api_router.get("/")
-async def root():
-    return {"message": "Retail Management API", "status": "running"}
+@api_router.post("/upload/logo")
+async def upload_logo(file: UploadFile = File(...)):
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files allowed")
+    if file.size and file.size > 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image too large (max 1MB)")
+    upload_dir = ROOT_DIR / "static" / "uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else "png"
+    safe_name = f"logo_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.urandom(4).hex()}.{ext}"
+    file_path = upload_dir / safe_name
+    contents = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(contents)
+    return {"url": f"/uploads/{safe_name}"}
+
+# ==========================================
+# AUTH ENDPOINTS
+# ==========================================
+
+@api_router.post("/auth/login")
+async def login(req: LoginRequest, request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip)
+    user = await db.users.find_one({"username": req.username})
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    if not auth_module.verify_password(req.password, user.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    if not user.get("is_active", True):
+        raise HTTPException(status_code=403, detail="User is disabled")
+    _clear_rate_limit(client_ip)
+    token = auth_module.create_access_token({"sub": user["username"]})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "username": user["username"],
+            "full_name": user.get("full_name", ""),
+            "role": user.get("role", "cashier"),
+            "is_active": user.get("is_active", True),
+            "allowed_pages": user.get("allowed_pages", []),
+        }
+    }
+
+@api_router.post("/auth/logout")
+async def logout(current_user: dict = Depends(get_current_user_dep)):
+    return {"message": "Logged out"}
+
+@api_router.get("/auth/me")
+async def get_me(current_user: dict = Depends(get_current_user_dep)):
+    return {
+        "username": current_user["username"],
+        "full_name": current_user.get("full_name", ""),
+        "role": current_user.get("role", "cashier"),
+        "is_active": current_user.get("is_active", True),
+        "allowed_pages": current_user.get("allowed_pages", []),
+    }
+
+@api_router.post("/auth/register")
+async def register_user(req: UserCreateRequest, current_user: dict = Depends(get_current_user_dep)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can create users")
+    existing = await db.users.find_one({"username": req.username})
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    new_user = {
+        "username": req.username,
+        "password_hash": auth_module.get_password_hash(req.password),
+        "full_name": req.full_name,
+        "role": req.role,
+        "is_active": True,
+        "allowed_pages": req.allowed_pages,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.users.insert_one(new_user)
+    logger.info(f"User '{req.username}' created by '{current_user['username']}'")
+    return {"message": "User created successfully", "username": req.username}
+
+@api_router.get("/auth/users")
+async def list_users(current_user: dict = Depends(get_current_user_dep)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can list users")
+    users = await db.users.find({}, {"password_hash": 0}).to_list(None)
+    for u in users:
+        u["_id"] = str(u["_id"])
+    return users
+
+@api_router.put("/auth/users/{username}")
+async def update_user(username: str, data: dict, current_user: dict = Depends(get_current_user_dep)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can update users")
+    if username == "admin" and current_user["username"] != "admin":
+        raise HTTPException(status_code=403, detail="Cannot modify the admin account")
+    update = {}
+    if "full_name" in data: update["full_name"] = data["full_name"]
+    if "role" in data: update["role"] = data["role"]
+    if "is_active" in data: update["is_active"] = data["is_active"]
+    if "allowed_pages" in data: update["allowed_pages"] = data["allowed_pages"]
+    if "password" in data and data["password"]:
+        update["password_hash"] = auth_module.get_password_hash(data["password"])
+    if not update:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    result = await db.users.update_one({"username": username}, {"$set": update})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    logger.info(f"User '{username}' updated by '{current_user['username']}'")
+    return {"message": "User updated successfully"}
+
+@api_router.delete("/auth/users/{username}")
+async def delete_user(username: str, current_user: dict = Depends(get_current_user_dep)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can delete users")
+    if username == current_user["username"]:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    if username == "admin":
+        raise HTTPException(status_code=400, detail="Cannot delete the admin account")
+    result = await db.users.delete_one({"username": username})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    logger.info(f"User '{username}' deleted by '{current_user['username']}'")
+    return {"message": "User deleted successfully"}
+
+# ==========================================
+# AUDIT LOGS
+# ==========================================
+
+@api_router.get("/audit-logs")
+async def list_audit_logs(
+    limit: int = Query(50, ge=1, le=500),
+    skip: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user_dep),
+):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can view audit logs")
+    cursor = db.audit_logs.find().sort("timestamp", -1).skip(skip).limit(limit)
+    docs = await cursor.to_list(length=limit)
+    for d in docs:
+        d["_id"] = str(d["_id"])
+    return {"logs": docs, "count": len(docs)}
+
+# ==========================================
+# APP SETUP
+# ==========================================
 
 app.include_router(api_router)
+
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 app.add_middleware(
     CORSMiddleware,
@@ -2584,6 +2766,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+uploads_dir = ROOT_DIR / "static" / "uploads"
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+
+build_dir = ROOT_DIR / "frontend" / "build"
+if build_dir.exists():
+    app.mount("/static", StaticFiles(directory=build_dir / "static"), name="react-static")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_fallback(full_path: str):
+        index = build_dir / "index.html"
+        return FileResponse(str(index))
+
+@app.on_event("startup")
+async def startup_db_client():
+    await db.items.create_index("id", unique=True, background=True)
+    await db.items.create_index("ref", background=True)
+    await db.items.create_index("barcode", background=True)
+    await db.items.create_index("name", background=True)
+    await db.items.create_index("date", background=True)
+    await db.items.create_index("order_no", background=True)
+    await db.items.create_index("karigar", background=True)
+    await db.advances.create_index("id", unique=True, background=True)
+    await db.advances.create_index("ref", background=True)
+    await db.advances.create_index("date", background=True)
+    await db.settings.create_index("key", unique=True, background=True)
+    logger.info("MongoDB indexes ensured.")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

@@ -55,12 +55,36 @@ let webpackConfig = {
       if (config.enableHealthCheck && healthPluginInstance) {
         webpackConfig.plugins.push(healthPluginInstance);
       }
+
+      // Suppress source map warnings for html5-qrcode (source files not included in package)
+      webpackConfig.module.rules.forEach(rule => {
+        if (rule.use) {
+          const usesSourceMapLoader = Array.isArray(rule.use)
+            ? rule.use.some(u => (u.loader && u.loader.includes('source-map-loader')) || u === 'source-map-loader')
+            : (rule.use.loader && rule.use.loader.includes('source-map-loader')) || rule.use === 'source-map-loader';
+          
+          if (usesSourceMapLoader) {
+            // Exclude html5-qrcode and its dependencies from source map processing
+            const currentExclude = rule.exclude || [];
+            rule.exclude = Array.isArray(currentExclude)
+              ? [...currentExclude, /node_modules[/\\]html5-qrcode/, /node_modules[/\\]@zxing/]
+              : [currentExclude, /node_modules[/\\]html5-qrcode/, /node_modules[/\\]@zxing/];
+          }
+        }
+      });
+
       return webpackConfig;
     },
   },
 };
 
 webpackConfig.devServer = (devServerConfig) => {
+  // Disable the red runtime error overlay — benign errors (e.g. play() interrupted
+  // from Html5Qrcode camera init) would otherwise block the UI in development.
+  devServerConfig.client = {
+    ...devServerConfig.client,
+    overlay: false,
+  };
   // Add health check endpoints if enabled
   if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
     const originalSetupMiddlewares = devServerConfig.setupMiddlewares;

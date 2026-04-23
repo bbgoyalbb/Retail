@@ -1,15 +1,64 @@
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// In production (build_and_run.bat), React is served by FastAPI on the same port —
+// use current origin. In dev (port 3000), point explicitly to the backend port 8001.
+const BACKEND_URL = window.location.port === "3000"
+  ? `https://${window.location.hostname}:8001`
+  : window.location.origin;
+
 const api = axios.create({ baseURL: `${BACKEND_URL}/api` });
+
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (err) => Promise.reject(err)
+);
+
+// Normalize error messages from backend detail field
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      const hadToken = !!localStorage.getItem("token");
+      localStorage.removeItem("token");
+      if (hadToken) {
+        window.dispatchEvent(new CustomEvent("auth:expired"));
+      }
+    }
+    if (err.response?.data?.detail) {
+      err.message = err.response.data.detail;
+    }
+    return Promise.reject(err);
+  }
+);
 
 export const seedData = () => api.post("/seed");
 export const getDashboard = () => api.get("/dashboard");
-export const getCustomers = () => api.get("/customers");
+let _customersCache = null;
+let _customersCacheTime = 0;
+const CUSTOMERS_CACHE_TTL = 60000;
+export const getCustomers = () => {
+  const now = Date.now();
+  if (_customersCache && now - _customersCacheTime < CUSTOMERS_CACHE_TTL) {
+    return Promise.resolve(_customersCache);
+  }
+  return api.get("/customers").then(res => {
+    _customersCache = res;
+    _customersCacheTime = Date.now();
+    return res;
+  });
+};
+export const invalidateCustomersCache = () => { _customersCache = null; };
 export const getItems = (params) => api.get("/items", { params });
 export const getItem = (id) => api.get(`/items/${id}`);
 export const getRefs = (name) => api.get("/refs", { params: { name } });
 export const getOrders = () => api.get("/orders");
+export const getOrderStatus = (params) => api.get("/orders/status", { params });
 
 export const createBill = (data) => api.post("/bills", data);
 
@@ -33,8 +82,12 @@ export const tallyEntries = (data) => api.post("/daybook/tally", data);
 export const getLabourItems = (params) => api.get("/labour", { params });
 export const getKarigars = () => api.get("/labour/karigars");
 export const payLabour = (data) => api.post("/labour/pay", data);
+export const deleteLabourPayment = (data) => api.post("/labour/delete-payment", data);
 
 export const getAdvances = (params) => api.get("/advances", { params });
+export const createAdvance = (data) => api.post("/advances", data);
+export const updateAdvance = (id, data) => api.put(`/advances/${id}`, data);
+export const deleteAdvance = (id) => api.delete(`/advances/${id}`);
 
 // Edit & Delete
 export const updateItem = (id, data) => api.put(`/items/${id}`, data);
@@ -44,7 +97,7 @@ export const bulkDeleteItems = (ids) => api.delete("/items/bulk/delete", { data:
 // Search
 export const searchItems = (params) => api.get("/search", { params });
 
-// PDF Invoice
+// Invoice (HTML only)
 export const getInvoiceUrl = (ref) => `${BACKEND_URL}/api/invoice?ref=${encodeURIComponent(ref)}`;
 
 // Reports
@@ -63,7 +116,20 @@ export const normalizeDbData = (params) => api.post("/db/normalize", null, { par
 export const repairDbData = (params) => api.post("/db/repair", null, { params });
 
 // Settings
+export const getPublicSettings = () => api.get("/settings/public").then(r => r.data);
 export const getSettings = () => api.get("/settings");
 export const updateSettings = (data) => api.put("/settings", data);
+export const uploadLogo = (formData) => api.post("/upload/logo", formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+
+// Auth
+export const login = (username, password) => api.post("/auth/login", { username, password }).then(r => r.data);
+export const getMe = () => api.get("/auth/me").then(r => r.data);
+export const registerUser = (data) => api.post("/auth/register", data);
+export const listUsers = () => api.get("/auth/users").then(r => r.data);
+export const updateUser = (username, data) => api.put(`/auth/users/${username}`, data);
+export const deleteUser = (username) => api.delete(`/auth/users/${username}`);
+export const listAuditLogs = (params) => api.get("/audit-logs", { params });
 
 export default api;

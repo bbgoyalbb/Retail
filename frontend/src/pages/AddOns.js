@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { getCustomers, getRefs, getItems, addAddons } from "@/api";
+﻿import { useState, useEffect } from "react";
+import { getCustomers, getRefs, getItems, addAddons, getSettings } from "@/api";
 import { PlusCircle, CheckCircle } from "@phosphor-icons/react";
 
-const ADDON_ITEMS = ["Bow", "Tie", "Cufflinks", "Stall", "Buttons", "Saffa", "Dye", "Malla", "Kalangi"];
+const DEFAULT_ADDON_ITEMS = ["Bow", "Tie", "Cufflinks", "Stall", "Buttons", "Saffa", "Dye", "Malla", "Kalangi"];
 
 export default function AddOns() {
   const [customers, setCustomers] = useState([]);
@@ -11,10 +11,20 @@ export default function AddOns() {
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [selectedRef, setSelectedRef] = useState("");
   const [selectedArticle, setSelectedArticle] = useState(null);
-  const [addons, setAddons] = useState(ADDON_ITEMS.map(name => ({ name, checked: false, price: "" })));
+  const [addonItems, setAddonItems] = useState(DEFAULT_ADDON_ITEMS);
+  const [addons, setAddons] = useState(DEFAULT_ADDON_ITEMS.map(name => ({ name, checked: false, price: "" })));
   const [message, setMessage] = useState(null);
 
-  useEffect(() => { getCustomers().then(res => setCustomers(res.data)).catch(() => {}); }, []);
+  useEffect(() => {
+    getCustomers().then(res => setCustomers(res.data)).catch(() => {});
+    getSettings().then(res => {
+      const s = res.data || {};
+      if (Array.isArray(s.addon_items) && s.addon_items.length > 0) {
+        setAddonItems(s.addon_items);
+        setAddons(s.addon_items.map(name => ({ name, checked: false, price: "" })));
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (selectedCustomer) {
@@ -47,7 +57,7 @@ export default function AddOns() {
         addons: selected.map(a => ({ name: a.name, price: parseFloat(a.price) })),
       });
       setMessage({ type: "success", text: `Add-ons saved! Total: ₹${res.data.addon_amount}` });
-      setAddons(ADDON_ITEMS.map(name => ({ name, checked: false, price: "" })));
+      setAddons(addonItems.map(name => ({ name, checked: false, price: "" })));
       // Refresh articles
       getItems({ name: selectedCustomer, ref: selectedRef }).then(res => setArticles(res.data.items));
     } catch (err) {
@@ -58,7 +68,7 @@ export default function AddOns() {
   return (
     <div data-testid="addons-page" className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-light tracking-tight">Add-ons</h1>
+        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Add-ons</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">Add accessories to articles</p>
       </div>
 
@@ -71,7 +81,7 @@ export default function AddOns() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           {/* Filters */}
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Customer</label>
@@ -92,7 +102,7 @@ export default function AddOns() {
 
           {/* Articles */}
           {articles.length > 0 && (
-            <div className="bg-white border border-[var(--border-subtle)] rounded-sm">
+            <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm">
               <div className="p-4 border-b border-[var(--border-subtle)]">
                 <h3 className="font-heading text-sm font-medium">Articles ({articles.length})</h3>
               </div>
@@ -122,7 +132,7 @@ export default function AddOns() {
         </div>
 
         {/* Add-ons Panel */}
-        <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
+        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
           <h3 className="font-heading text-base font-medium">Accessories</h3>
           {!selectedArticle ? (
             <p className="text-sm text-[var(--text-secondary)]">Select an article to add accessories</p>

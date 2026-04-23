@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { importExcel, exportExcelUrl, backupUrl, restoreBackup, getDbStats, getDbAudit, normalizeDbData, repairDbData } from "@/api";
 import { Upload, DownloadSimple, Database, ArrowsClockwise, Warning, CheckCircle, FileXls, FileCsv } from "@phosphor-icons/react";
 
@@ -18,7 +18,7 @@ export default function DataManager() {
   const [repairResult, setRepairResult] = useState(null);
 
   const loadStats = useCallback(() => {
-    getDbStats().then(res => setStats(res.data)).catch(console.error);
+    getDbStats().then(res => setStats(res.data)).catch(() => {});
   }, []);
 
   useEffect(() => { loadStats(); }, [loadStats]);
@@ -100,6 +100,11 @@ export default function DataManager() {
       return;
     }
 
+    const confirmed = window.confirm(
+      "⚠️ RESTORE BACKUP\n\nThis will permanently overwrite ALL current data with the contents of this backup file.\n\nThis action cannot be undone.\n\nAre you absolutely sure?"
+    );
+    if (!confirmed) return;
+
     setRestoring(true);
     setMessage(null);
     try {
@@ -132,14 +137,14 @@ export default function DataManager() {
   return (
     <div data-testid="data-manager-page" className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-light tracking-tight">Data Manager</h1>
+        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Data Manager</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">Import Excel data, export records, and backup/restore your database</p>
       </div>
 
       {/* DB Stats */}
       {stats && (
         <div className="flex gap-4">
-          <div className="bg-white border border-[var(--border-subtle)] px-5 py-3 rounded-sm flex items-center gap-3">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] px-5 py-3 rounded-sm flex items-center gap-3">
             <Database size={20} weight="duotone" className="text-[var(--brand)]" />
             <div>
               <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">Database</p>
@@ -179,7 +184,7 @@ export default function DataManager() {
       {/* Import Tab */}
       {tab === "import" && (
         <div className="max-w-2xl space-y-4">
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
             <h3 className="font-heading text-base font-medium">Import from Excel</h3>
             <p className="text-sm text-[var(--text-secondary)]">
               Upload your <code className="bg-[var(--bg)] px-1.5 py-0.5 rounded text-xs font-mono">New Retail Book.xlsm</code> file.
@@ -236,7 +241,7 @@ export default function DataManager() {
       {/* Export Tab */}
       {tab === "export" && (
         <div className="max-w-2xl space-y-4">
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
             <h3 className="font-heading text-base font-medium">Export to Excel</h3>
             <p className="text-sm text-[var(--text-secondary)]">
               Download all your data as an Excel file with the same column structure as your original workbook.
@@ -264,7 +269,7 @@ export default function DataManager() {
       {tab === "backup" && (
         <div className="max-w-2xl space-y-4">
           {/* Backup */}
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
             <h3 className="font-heading text-base font-medium">Create Backup</h3>
             <p className="text-sm text-[var(--text-secondary)]">
               Download a complete backup of your database as a JSON file. You can restore from this file later.
@@ -281,7 +286,7 @@ export default function DataManager() {
           </div>
 
           {/* Restore */}
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
             <h3 className="font-heading text-base font-medium">Restore from Backup</h3>
             <p className="text-sm text-[var(--text-secondary)]">
               Upload a previously downloaded backup file to restore your data.
@@ -317,7 +322,7 @@ export default function DataManager() {
 
       {tab === "audit" && (
         <div className="space-y-4">
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="font-heading text-base font-medium">Data Consistency Audit</h3>
@@ -410,7 +415,7 @@ export default function DataManager() {
 
           {audit && (
             <>
-              <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-3">
+              <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-3">
                 <h3 className="font-heading text-base font-medium">Issue Breakdown</h3>
                 {Object.keys(audit.issue_counts || {}).length === 0 ? (
                   <p className="text-sm text-[var(--success)]">No issues detected in the current audit sample.</p>
@@ -425,7 +430,7 @@ export default function DataManager() {
                 )}
               </div>
 
-              <div className="bg-white border border-[var(--border-subtle)] rounded-sm overflow-hidden">
+              <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
                 <div className="p-4 border-b border-[var(--border-subtle)]">
                   <h3 className="font-heading text-base font-medium">Sample Issues</h3>
                 </div>
@@ -462,7 +467,7 @@ export default function DataManager() {
               </div>
 
               {normalizationResult?.changes?.length ? (
-                <div className="bg-white border border-[var(--border-subtle)] rounded-sm overflow-hidden">
+                <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
                   <div className="p-4 border-b border-[var(--border-subtle)]">
                     <h3 className="font-heading text-base font-medium">Sample Normalization Changes</h3>
                   </div>
@@ -492,7 +497,7 @@ export default function DataManager() {
               ) : null}
 
               {repairResult?.changes?.length ? (
-                <div className="bg-white border border-[var(--border-subtle)] rounded-sm overflow-hidden">
+                <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
                   <div className="p-4 border-b border-[var(--border-subtle)]">
                     <h3 className="font-heading text-base font-medium">Sample Repair Changes</h3>
                   </div>

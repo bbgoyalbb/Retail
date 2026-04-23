@@ -1,6 +1,13 @@
-import { useState, useEffect } from "react";
-import { getSettings, updateSettings } from "@/api";
-import { FloppyDisk, Plus, Trash, Gear, CheckCircle } from "@phosphor-icons/react";
+﻿import { useState, useEffect, useRef } from "react";
+import { getSettings, updateSettings, uploadLogo } from "@/api";
+import { FloppyDisk, Plus, Trash, Gear, CheckCircle, Warning } from "@phosphor-icons/react";
+
+const getLogoUrl = (path) => {
+  if (!path) return null;
+  if (path.startsWith("http")) return path;
+  if (path.startsWith("/")) return `${window.location.origin}${path}`;
+  return path;
+};
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState(null);
@@ -9,20 +16,30 @@ export default function SettingsPage() {
   const [newArticle, setNewArticle] = useState("");
   const [newMode, setNewMode] = useState("");
   const [newAddon, setNewAddon] = useState("");
+  const [logoPreview, setLogoPreview] = useState(null);
+  const msgTimerRef = useRef(null);
 
-  useEffect(() => { getSettings().then(res => setSettings(res.data)).catch(console.error); }, []);
+  // Clear timeout on unmount to prevent memory leak
+  useEffect(() => () => { if (msgTimerRef.current) clearTimeout(msgTimerRef.current); }, []);
+
+  const showMessage = (msg) => {
+    setMessage(msg);
+    if (msgTimerRef.current) clearTimeout(msgTimerRef.current);
+    msgTimerRef.current = setTimeout(() => setMessage(null), 3000);
+  };
+
+  useEffect(() => { getSettings().then(res => setSettings(res.data)).catch(() => {}); }, []);
 
   const save = async () => {
     setSaving(true);
     try {
       const res = await updateSettings(settings);
       setSettings(res.data);
-      setMessage({ type: "success", text: "Settings saved!" });
+      showMessage({ type: "success", text: "Settings saved successfully!" });
     } catch (err) {
-      setMessage({ type: "error", text: "Failed to save" });
+      showMessage({ type: "error", text: err.message || "Failed to save settings" });
     } finally {
       setSaving(false);
-      setTimeout(() => setMessage(null), 3000);
     }
   };
 
@@ -63,7 +80,7 @@ export default function SettingsPage() {
     <div data-testid="settings-page" className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-3xl font-light tracking-tight">Settings</h1>
+          <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Settings</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">Configure article types, rates, payment modes, and more</p>
         </div>
         <button data-testid="save-settings-btn" onClick={save} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 transition-all">
@@ -73,13 +90,13 @@ export default function SettingsPage() {
 
       {message && (
         <div className={`p-3 border rounded-sm text-sm flex items-center gap-2 ${message.type === 'success' ? 'bg-[#455D4A10] border-[var(--success)] text-[var(--success)]' : 'bg-[#9E473D10] border-[var(--error)] text-[var(--error)]'}`}>
-          <CheckCircle size={16} /> {message.text}
+          {message.type === 'success' ? <CheckCircle size={16} /> : <Warning size={16} />} {message.text}
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Article Types & Rates */}
-        <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
+        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
           <h3 className="font-heading text-base font-medium">Article Types & Rates</h3>
           <div className="space-y-2">
             <div className="grid grid-cols-12 gap-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] px-1">
@@ -105,7 +122,7 @@ export default function SettingsPage() {
 
         {/* Payment Modes */}
         <div className="space-y-6">
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-3">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-3">
             <h3 className="font-heading text-base font-medium">Payment Modes</h3>
             <div className="flex flex-wrap gap-2">
               {settings.payment_modes?.map(m => (
@@ -122,7 +139,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Add-on Items */}
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-3">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-3">
             <h3 className="font-heading text-base font-medium">Add-on Items</h3>
             <div className="flex flex-wrap gap-2">
               {settings.addon_items?.map(a => (
@@ -139,10 +156,109 @@ export default function SettingsPage() {
           </div>
 
           {/* Firm Info */}
-          <div className="bg-white border border-[var(--border-subtle)] p-6 rounded-sm space-y-3">
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-3">
             <h3 className="font-heading text-base font-medium">Firm Details (PDF Invoice)</h3>
-            <div className="space-y-2">
+            <div className="space-y-3">
+              {/* Logo Upload */}
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Company Logo</label>
+                <div className="flex items-center gap-3">
+                  {(logoPreview || settings.firm_logo) && (
+                    <img 
+                      src={getLogoUrl(logoPreview) || getLogoUrl(settings.firm_logo)} 
+                      alt="Logo preview" 
+                      className="w-16 h-16 object-contain border border-[var(--border-subtle)] rounded-sm"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={async e => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        // Validate file size (max 1MB)
+                        if (file.size > 1024 * 1024) {
+                          showMessage({ type: "error", text: "Logo image too large. Maximum size is 1MB." });
+                          return;
+                        }
+                        try {
+                          const formData = new FormData();
+                          formData.append("file", file);
+                          showMessage({ type: "success", text: "Uploading logo..." });
+                          const res = await uploadLogo(formData);
+                          setLogoPreview(res.data.url);
+                          setSettings(p => ({...p, firm_logo: res.data.url}));
+                          showMessage({ type: "success", text: "Logo uploaded. Click Save Settings to apply." });
+                        } catch (err) {
+                          showMessage({ type: "error", text: err.message || "Failed to upload logo" });
+                        }
+                      }}
+                      className="w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-xs file:bg-[var(--brand)] file:text-white hover:file:bg-[var(--brand-hover)]"
+                    />
+                  </div>
+                  {(logoPreview || settings.firm_logo) && (
+                    <button 
+                      onClick={() => { setLogoPreview(null); setSettings(p => ({...p, firm_logo: ''})); }}
+                      className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"
+                      title="Remove logo"
+                    >
+                      <Trash size={16} />
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-[var(--text-secondary)]">Upload PNG/JPG logo (recommended: 200x200px, will be auto-resized)</p>
+              </div>
+
               <input value={settings.firm_name || ""} onChange={e => setSettings(p => ({...p, firm_name: e.target.value}))} placeholder="Firm Name" className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
+              
+              {/* Company Name Styling */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-secondary)] block mb-1">Font Color</label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="color" 
+                      value={settings.firm_name_color || '#C86B4D'} 
+                      onChange={e => setSettings(p => ({...p, firm_name_color: e.target.value}))}
+                      className="w-8 h-8 rounded-sm border border-[var(--border-subtle)] cursor-pointer"
+                    />
+                    <input 
+                      type="text" 
+                      value={settings.firm_name_color || '#C86B4D'} 
+                      onChange={e => setSettings(p => ({...p, firm_name_color: e.target.value}))}
+                      className="flex-1 px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm"
+                      placeholder="#C86B4D"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-secondary)] block mb-1">Font Size</label>
+                  <select 
+                    value={settings.firm_name_size || '16'} 
+                    onChange={e => setSettings(p => ({...p, firm_name_size: e.target.value}))}
+                    className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]"
+                  >
+                    <option value="14">Small (14pt)</option>
+                    <option value="16">Medium (16pt)</option>
+                    <option value="18">Large (18pt)</option>
+                    <option value="20">Extra Large (20pt)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-secondary)] block mb-1">Case</label>
+                  <select 
+                    value={settings.firm_name_case || 'uppercase'} 
+                    onChange={e => setSettings(p => ({...p, firm_name_case: e.target.value}))}
+                    className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]"
+                  >
+                    <option value="uppercase">UPPERCASE</option>
+                    <option value="capitalize">Capitalize</option>
+                    <option value="normal">As Typed</option>
+                  </select>
+                </div>
+              </div>
+
               <input value={settings.firm_address || ""} onChange={e => setSettings(p => ({...p, firm_address: e.target.value}))} placeholder="Address" className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
               <div className="grid grid-cols-2 gap-2">
                 <input value={settings.firm_phones || ""} onChange={e => setSettings(p => ({...p, firm_phones: e.target.value}))} placeholder="Phone numbers" className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
