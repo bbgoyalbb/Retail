@@ -2221,15 +2221,23 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
 
   /* ── Print ── */
   @media print {{
-    body {{ padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+    body {{ padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; color: #1A1A1A; }}
     .no-print {{ display: none !important; }}
     thead tr {{ background: #3D3A36 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
     th {{ color: #F5F3EE !important; }}
     tr.foot td {{ background: #EDEBE6 !important; }}
     tr.grand td {{ background: #3D3A36 !important; color: #F5F3EE !important; }}
     tr.net td {{ background: {brand_color} !important; color: #fff !important; }}
-    .meta-strip {{ border: 1px solid #E0DDD7 !important; }}
+    .meta-strip {{ border: 1px solid #AAAAAA !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+    .meta-cell {{ border-right: 1px solid #AAAAAA !important; }}
+    .meta-label {{ color: #444444 !important; }}
+    .meta-value {{ color: #1A1A1A !important; }}
     .header {{ border-bottom: 2.5px solid {brand_color} !important; }}
+    .firm-sub {{ color: #444444 !important; }}
+    .sec-title {{ color: {brand_color} !important; border-bottom-color: #AAAAAA !important; }}
+    .terms p {{ color: #444444 !important; }}
+    .inv-footer {{ color: #555555 !important; border-top-color: #AAAAAA !important; }}
+    td em {{ color: #555555 !important; }}
     @page {{ margin: 10mm 12mm; size: A4; }}
   }}
 </style>
