@@ -548,12 +548,15 @@ export default function ItemsManager() {
   const grouped = {};
   allItems.forEach(item => {
     const ref = item.ref;
-    if (!grouped[ref]) grouped[ref] = { ref, name: item.name, date: item.date, items: [], totals: { fabric: 0, tailoring: 0, embroidery: 0, addon: 0 } };
+    if (!grouped[ref]) grouped[ref] = { ref, name: item.name, date: item.date, items: [], totals: { fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0 } };
     grouped[ref].items.push(item);
     grouped[ref].totals.fabric += item.fabric_amount || 0;
     grouped[ref].totals.tailoring += item.tailoring_amount || 0;
     grouped[ref].totals.embroidery += item.embroidery_amount || 0;
     grouped[ref].totals.addon += item.addon_amount || 0;
+  });
+  advances.forEach(adv => {
+    if (grouped[adv.ref]) grouped[adv.ref].totals.advance += adv.amount || 0;
   });
 
   const refs = Object.values(grouped).sort((a, b) => {
@@ -855,14 +858,15 @@ export default function ItemsManager() {
         <div className="hidden sm:flex bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-4 py-2 items-center text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">
           <span className="w-6"></span>
           <button onClick={() => handleSort("date")} className="w-24 text-left hover:text-[var(--brand)]">Date {sortKey === 'date' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
-          <button onClick={() => handleSort("ref")} className="w-28 text-left hover:text-[var(--brand)]">Ref {sortKey === 'ref' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
-          <button onClick={() => handleSort("name")} className="flex-1 text-left hover:text-[var(--brand)]">Customer {sortKey === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
+          <button onClick={() => handleSort("ref")} className="w-24 text-left hover:text-[var(--brand)]">Ref {sortKey === 'ref' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
+          <button onClick={() => handleSort("name")} className="w-44 text-left hover:text-[var(--brand)]">Customer {sortKey === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
           <span className="w-20 text-right">Fabric</span>
           <span className="w-20 text-right">Tailoring</span>
-          <span className="w-20 text-right">Emb.</span>
-          <span className="w-20 text-right">Add-on</span>
-          <span className="w-16 text-center">Items</span>
-          <span className="w-10"></span>
+          <span className="w-16 text-right">Emb.</span>
+          <span className="w-16 text-right">Add-on</span>
+          <span className="w-16 text-right">Advance</span>
+          <span className="w-12 text-center">Items</span>
+          <span className="w-20"></span>
         </div>
 
         {loading ? (
@@ -904,13 +908,14 @@ export default function ItemsManager() {
               <div className="hidden sm:flex items-center">
                 <span className="w-6 text-[var(--text-secondary)]">{expanded[group.ref] ? <CaretDown size={14} /> : <CaretRight size={14} />}</span>
                 <span className="w-24 font-mono text-xs">{group.date}</span>
-                <span className="w-28 font-mono text-xs text-[var(--brand)] font-medium">{group.ref}</span>
-                <span className="flex-1 text-sm font-medium truncate">{group.name}</span>
-                <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.fabric)}</span>
-                <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.tailoring)}</span>
-                <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.embroidery)}</span>
-                <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.addon)}</span>
-                <span className="w-16 text-center font-mono text-xs">{group.items.length}</span>
+                <span className="w-24 font-mono text-xs text-[var(--brand)] font-medium">{group.ref}</span>
+                <span className="w-44 text-sm font-medium truncate">{group.name}</span>
+                <span className="w-20 font-mono text-xs text-right">{group.totals.fabric > 0 ? fmt(group.totals.fabric) : '-'}</span>
+                <span className="w-20 font-mono text-xs text-right">{group.totals.tailoring > 0 ? fmt(group.totals.tailoring) : '-'}</span>
+                <span className="w-16 font-mono text-xs text-right">{group.totals.embroidery > 0 ? fmt(group.totals.embroidery) : '-'}</span>
+                <span className="w-16 font-mono text-xs text-right">{group.totals.addon > 0 ? fmt(group.totals.addon) : '-'}</span>
+                <span className="w-16 font-mono text-xs text-right">{group.totals.advance > 0 ? fmt(group.totals.advance) : '-'}</span>
+                <span className="w-12 text-center font-mono text-xs">{group.items.length}</span>
                 <div className="flex items-center gap-1 mr-2" onClick={e => e.stopPropagation()}>
                   <button onClick={() => { setEditItems(group.items); setEditMode('order'); setShowSectionSelector(true); }} className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm" title="Edit Order"><PencilSimple size={14} /></button>
                   <button onClick={() => { setDelConfirm(group); setDelMode('order'); }} className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm" title="Delete Order"><Trash size={14} /></button>
