@@ -4,11 +4,11 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowClockwise } from "@phosphor-icons/react";
 
 const ACTION_COLORS = {
-  create: "text-green-600 bg-green-50",
-  update: "text-blue-600 bg-blue-50",
-  delete: "text-red-600 bg-red-50",
-  login:  "text-purple-600 bg-purple-50",
-  logout: "text-slate-600 bg-slate-100",
+  create: "text-[var(--success)] bg-[#455D4A10]",
+  update: "text-[var(--info)] bg-[#5C8A9E10]",
+  delete: "text-[var(--error)] bg-[#9E473D10]",
+  login:  "text-[var(--brand)] bg-[#C86B4D10]",
+  logout: "text-[var(--text-secondary)] bg-[var(--bg)]",
 };
 
 function badge(action = "") {
@@ -28,7 +28,7 @@ export default function AuditLogPage() {
     setLoading(true);
     try {
       const res = await listAuditLogs({ limit: PAGE_SIZE, skip: pageNum * PAGE_SIZE });
-      const items = res.logs ?? [];
+      const items = res.data.logs ?? [];
       setLogs(items);
       setHasMore(items.length === PAGE_SIZE);
     } catch (err) {
