@@ -1436,29 +1436,33 @@ async def process_settlement(req: SettlementRequest):
     # Pool-match is validated on the frontend as a warning, not a hard block here.
 
     async def apply_pro_rata(ref, pay_mode_field, pay_date_field, received_field, pending_field, total_to_pay):
-        items = await db.items.find({
-            "ref": ref,
-            pending_field: {"$gt": 0}
-        }, {"_id": 0}).to_list(500)
+        # Derive the amount field name from the pending field name
+        # e.g. "fabric_pending" -> "fabric_amount", "tailoring_pending" -> "tailoring_amount"
+        amount_field = pending_field.replace("_pending", "_amount")
 
-        pending_items = [i for i in items if i.get(pending_field, 0) > 0]
-        if not pending_items:
+        # Fetch ALL items for this ref that have a non-zero category amount.
+        # We cannot filter by pending>0 because over-payment must also reach
+        # already-settled items (pending=0). Pro-rata weight = category amount.
+        all_items = await db.items.find({"ref": ref}, {"_id": 0}).to_list(500)
+        eligible = [i for i in all_items if dq_round_money(i.get(amount_field, 0)) > 0]
+        if not eligible:
             return
 
-        total_pending = sum(i.get(pending_field, 0) for i in pending_items)
+        total_weight = sum(dq_round_money(i.get(amount_field, 0)) for i in eligible)
         running_paid = 0
 
-        for idx, item in enumerate(pending_items):
+        for idx, item in enumerate(eligible):
+            weight = dq_round_money(item.get(amount_field, 0))
             bal = dq_round_money(item.get(pending_field, 0))
-            if idx == len(pending_items) - 1:
+            if idx == len(eligible) - 1:
                 share = dq_round_money(total_to_pay - running_paid)
             else:
-                share = dq_round_money((bal / total_pending) * total_to_pay) if total_pending > 0 else 0
+                share = dq_round_money((weight / total_weight) * total_to_pay) if total_weight > 0 else 0
                 running_paid += share
 
             existing_received = dq_round_money(item.get(received_field, 0))
             new_received = dq_round_money(existing_received + share)
-            new_balance = dq_round_money(bal - share)  # allowed to be negative (over-payment)
+            new_balance = dq_round_money(bal - share)  # negative when over-paid
             update = {
                 pay_date_field: req.payment_date,
                 received_field: new_received,
