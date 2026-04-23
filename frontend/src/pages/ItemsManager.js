@@ -1111,8 +1111,8 @@ export default function ItemsManager() {
 
       {/* Grouped References */}
       <div className="space-y-2">
-        {/* Header row */}
-        <div className="bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-4 py-2 flex items-center text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">
+        {/* Header row — desktop only */}
+        <div className="hidden sm:flex bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-4 py-2 items-center text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">
           <span className="w-6"></span>
           <button onClick={() => handleSort("date")} className="w-24 text-left hover:text-[var(--brand)]">Date {sortKey === 'date' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
           <button onClick={() => handleSort("ref")} className="w-28 text-left hover:text-[var(--brand)]">Ref {sortKey === 'ref' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
@@ -1128,85 +1128,112 @@ export default function ItemsManager() {
         {refs.map(group => (
           <div key={group.ref} className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
             {/* Collapsed Reference Row */}
-            <div className="px-4 py-3 flex items-center cursor-pointer hover:bg-[#C86B4D05] transition-colors" onClick={() => toggleExpand(group.ref)}>
-              <span className="w-6 text-[var(--text-secondary)]">{expanded[group.ref] ? <CaretDown size={14} /> : <CaretRight size={14} />}</span>
-              <span className="w-24 font-mono text-xs">{group.date}</span>
-              <span className="w-28 font-mono text-xs text-[var(--brand)] font-medium">{group.ref}</span>
-              <span className="flex-1 text-sm font-medium truncate">{group.name}</span>
-              <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.fabric)}</span>
-              <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.tailoring)}</span>
-              <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.embroidery)}</span>
-              <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.addon)}</span>
-              <span className="w-16 text-center font-mono text-xs">{group.items.length}</span>
-              {/* Order-level Actions - always visible */}
-              <div className="flex items-center gap-1 mr-2" onClick={e => e.stopPropagation()}>
-                <button 
-                  onClick={() => { setEditItems(group.items); setEditMode('order'); setShowSectionSelector(true); }}
-                  className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm"
-                  title="Edit Order"
-                >
-                  <PencilSimple size={14} />
-                </button>
-                <button 
-                  onClick={() => { setDelConfirm(group); setDelMode('order'); }}
-                  className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"
-                  title="Delete Order"
-                >
-                  <Trash size={14} />
-                </button>
+            <div className="px-3 py-3 cursor-pointer hover:bg-[#C86B4D05] transition-colors" onClick={() => toggleExpand(group.ref)}>
+              {/* Mobile layout */}
+              <div className="flex sm:hidden items-start gap-2">
+                <span className="mt-1 text-[var(--text-secondary)] flex-shrink-0">{expanded[group.ref] ? <CaretDown size={14} /> : <CaretRight size={14} />}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs text-[var(--brand)] font-medium">{group.ref}</span>
+                    <span className="text-xs text-[var(--text-secondary)]">{group.date}</span>
+                  </div>
+                  <div className="text-sm font-medium truncate mt-0.5">{group.name}</div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                    {group.totals.fabric > 0 && <span className="text-[10px] text-[var(--text-secondary)]">Fab: <span className="font-mono text-[var(--text-primary)]">{fmt(group.totals.fabric)}</span></span>}
+                    {group.totals.tailoring > 0 && <span className="text-[10px] text-[var(--text-secondary)]">Tail: <span className="font-mono text-[var(--text-primary)]">{fmt(group.totals.tailoring)}</span></span>}
+                    {group.totals.embroidery > 0 && <span className="text-[10px] text-[var(--text-secondary)]">Emb: <span className="font-mono text-[var(--text-primary)]">{fmt(group.totals.embroidery)}</span></span>}
+                    {group.totals.addon > 0 && <span className="text-[10px] text-[var(--text-secondary)]">Add-on: <span className="font-mono text-[var(--text-primary)]">{fmt(group.totals.addon)}</span></span>}
+                    <span className="text-[10px] text-[var(--text-secondary)]">{group.items.length} items</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => { setEditItems(group.items); setEditMode('order'); setShowSectionSelector(true); }} className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm" title="Edit Order"><PencilSimple size={14} /></button>
+                  <button onClick={() => { setDelConfirm(group); setDelMode('order'); }} className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm" title="Delete Order"><Trash size={14} /></button>
+                  <button onClick={e => { e.stopPropagation(); setInvoiceRef(group.ref); }} className="p-1.5"><Printer size={15} className="text-[var(--brand)] inline" /></button>
+                </div>
               </div>
-              <button onClick={e => { e.stopPropagation(); setInvoiceRef(group.ref); }} className="w-10 text-center">
-                <Printer size={16} className="text-[var(--brand)] hover:text-[var(--brand-hover)] inline" />
-              </button>
+              {/* Desktop layout */}
+              <div className="hidden sm:flex items-center">
+                <span className="w-6 text-[var(--text-secondary)]">{expanded[group.ref] ? <CaretDown size={14} /> : <CaretRight size={14} />}</span>
+                <span className="w-24 font-mono text-xs">{group.date}</span>
+                <span className="w-28 font-mono text-xs text-[var(--brand)] font-medium">{group.ref}</span>
+                <span className="flex-1 text-sm font-medium truncate">{group.name}</span>
+                <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.fabric)}</span>
+                <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.tailoring)}</span>
+                <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.embroidery)}</span>
+                <span className="w-20 font-mono text-xs text-right">{fmt(group.totals.addon)}</span>
+                <span className="w-16 text-center font-mono text-xs">{group.items.length}</span>
+                <div className="flex items-center gap-1 mr-2" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => { setEditItems(group.items); setEditMode('order'); setShowSectionSelector(true); }} className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm" title="Edit Order"><PencilSimple size={14} /></button>
+                  <button onClick={() => { setDelConfirm(group); setDelMode('order'); }} className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm" title="Delete Order"><Trash size={14} /></button>
+                </div>
+                <button onClick={e => { e.stopPropagation(); setInvoiceRef(group.ref); }} className="w-10 text-center"><Printer size={16} className="text-[var(--brand)] hover:text-[var(--brand-hover)] inline" /></button>
+              </div>
             </div>
 
             {/* Expanded Detail Rows */}
             {expanded[group.ref] && (
               <div className="border-t border-[var(--border-subtle)]">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-[var(--bg)]">
-                      {["Barcode", "Price", "Qty", "Disc%", "Fabric Amt", "Article", "Order#", "Delivery", "Tail. Amt", "Emb. Amt", "Add-on", "Actions"].map(h => (
-                        <th key={h} className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.items.map(item => (
-                      <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D05]">
-                        <td className="px-3 py-2 text-xs max-w-[100px] truncate">{item.barcode}</td>
-                        <td className="px-3 py-2 font-mono text-xs">₹{fmt(item.price)}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{item.qty}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{item.discount ? `${item.discount}%` : "-"}</td>
-                        <td className="px-3 py-2 font-mono text-xs font-medium">₹{fmt(item.fabric_amount)}</td>
-                        <td className="px-3 py-2 text-xs">{item.article_type !== "N/A" ? item.article_type : "-"}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{item.order_no !== "N/A" ? item.order_no : "-"}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{item.delivery_date !== "N/A" ? item.delivery_date : "-"}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{item.tailoring_amount ? `₹${fmt(item.tailoring_amount)}` : "-"}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{item.embroidery_amount ? `₹${fmt(item.embroidery_amount)}` : "-"}</td>
-                        <td className="px-3 py-2 text-xs max-w-[80px] truncate">{item.addon_desc !== "N/A" ? item.addon_desc : "-"}</td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-0.5">
-                            <button 
-                              onClick={() => { setEditItems([item]); setEditMode('item'); setShowSectionSelector(true); }}
-                              className="p-1 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm"
-                              title="Edit Item"
-                            >
-                              <PencilSimple size={14} />
-                            </button>
-                            <button 
-                              onClick={() => { setDelConfirm(item); setDelMode('item'); }}
-                              className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"
-                              title="Delete Item"
-                            >
-                              <Trash size={14} />
-                            </button>
-                          </div>
-                        </td>
+                {/* Mobile: card per item */}
+                <div className="sm:hidden divide-y divide-[var(--border-subtle)]">
+                  {group.items.map((item, idx) => (
+                    <div key={item.id} className="p-3 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs text-[var(--brand)] font-medium">#{idx+1} {item.barcode}</span>
+                        <div className="flex gap-1">
+                          <button onClick={() => { setEditItems([item]); setEditMode('item'); setShowSectionSelector(true); }} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm"><PencilSimple size={14} /></button>
+                          <button onClick={() => { setDelConfirm(item); setDelMode('item'); }} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"><Trash size={14} /></button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+                        <span className="text-[var(--text-secondary)]">Article: <span className="text-[var(--text-primary)]">{item.article_type !== 'N/A' ? item.article_type : '-'}</span></span>
+                        <span className="text-[var(--text-secondary)]">Fabric: <span className="font-mono text-[var(--text-primary)] font-medium">₹{fmt(item.fabric_amount)}</span></span>
+                        <span className="text-[var(--text-secondary)]">Price: <span className="font-mono text-[var(--text-primary)]">₹{fmt(item.price)} × {item.qty}</span></span>
+                        {item.discount > 0 && <span className="text-[var(--text-secondary)]">Disc: <span className="font-mono text-[var(--text-primary)]">{item.discount}%</span></span>}
+                        {item.order_no !== 'N/A' && <span className="text-[var(--text-secondary)]">Order#: <span className="font-mono text-[var(--text-primary)]">{item.order_no}</span></span>}
+                        {item.delivery_date !== 'N/A' && <span className="text-[var(--text-secondary)]">Delivery: <span className="font-mono text-[var(--text-primary)]">{item.delivery_date}</span></span>}
+                        {item.tailoring_amount > 0 && <span className="text-[var(--text-secondary)]">Tailoring: <span className="font-mono text-[var(--text-primary)]">₹{fmt(item.tailoring_amount)}</span></span>}
+                        {item.embroidery_amount > 0 && <span className="text-[var(--text-secondary)]">Emb: <span className="font-mono text-[var(--text-primary)]">₹{fmt(item.embroidery_amount)}</span></span>}
+                        {item.addon_desc && item.addon_desc !== 'N/A' && <span className="text-[var(--text-secondary)]">Add-on: <span className="text-[var(--text-primary)]">{item.addon_desc}</span></span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Desktop: full table */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-[var(--bg)]">
+                        {["Barcode", "Price", "Qty", "Disc%", "Fabric Amt", "Article", "Order#", "Delivery", "Tail. Amt", "Emb. Amt", "Add-on", "Actions"].map(h => (
+                          <th key={h} className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {group.items.map(item => (
+                        <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D05]">
+                          <td className="px-3 py-2 text-xs max-w-[100px] truncate">{item.barcode}</td>
+                          <td className="px-3 py-2 font-mono text-xs">₹{fmt(item.price)}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{item.qty}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{item.discount ? `${item.discount}%` : "-"}</td>
+                          <td className="px-3 py-2 font-mono text-xs font-medium">₹{fmt(item.fabric_amount)}</td>
+                          <td className="px-3 py-2 text-xs">{item.article_type !== "N/A" ? item.article_type : "-"}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{item.order_no !== "N/A" ? item.order_no : "-"}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{item.delivery_date !== "N/A" ? item.delivery_date : "-"}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{item.tailoring_amount ? `₹${fmt(item.tailoring_amount)}` : "-"}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{item.embroidery_amount ? `₹${fmt(item.embroidery_amount)}` : "-"}</td>
+                          <td className="px-3 py-2 text-xs max-w-[80px] truncate">{item.addon_desc !== "N/A" ? item.addon_desc : "-"}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-0.5">
+                              <button onClick={() => { setEditItems([item]); setEditMode('item'); setShowSectionSelector(true); }} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm" title="Edit Item"><PencilSimple size={14} /></button>
+                              <button onClick={() => { setDelConfirm(item); setDelMode('item'); }} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm" title="Delete Item"><Trash size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>

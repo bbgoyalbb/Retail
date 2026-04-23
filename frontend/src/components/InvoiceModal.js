@@ -11,9 +11,11 @@ export default function InvoiceModal({ billRef, onClose }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-[var(--surface)] rounded-sm w-full max-w-3xl h-[85vh] flex flex-col shadow-2xl">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center sm:p-4">
+      <div className="bg-[var(--surface)] rounded-none sm:rounded-sm w-full sm:max-w-3xl h-full sm:h-[85vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)] flex-shrink-0">
           <p className="font-heading text-sm font-semibold text-[var(--text-primary)]">Invoice Preview — {billRef}</p>
@@ -29,18 +31,22 @@ export default function InvoiceModal({ billRef, onClose }) {
             </a>
             <button
               onClick={() => {
-                try {
-                  const iframe = document.getElementById("invoice-iframe");
-                  if (iframe?.contentWindow?.print) {
-                    iframe.contentWindow.print();
-                  } else {
+                if (isMobile) {
+                  window.open(url, "_blank");
+                } else {
+                  try {
+                    const iframe = document.getElementById("invoice-iframe");
+                    if (iframe?.contentWindow?.print) {
+                      iframe.contentWindow.print();
+                    } else {
+                      window.open(url, "_blank");
+                    }
+                  } catch {
                     window.open(url, "_blank");
                   }
-                } catch {
-                  window.open(url, "_blank");
                 }
               }}
-              title="Print"
+              title={isMobile ? "Open to Print" : "Print"}
               className="p-1.5 rounded-sm hover:bg-[var(--bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
             >
               <Printer size={16} />
