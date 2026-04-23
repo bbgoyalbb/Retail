@@ -2127,16 +2127,16 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
 
     # ---- Payment summary ----
     fab_received = sum(float(i.get("fabric_received", 0)) for i in items)
-    fab_pending = sum(max(float(i.get("fabric_pending", 0)), 0) for i in items)
+    fab_pending = sum(float(i.get("fabric_pending", 0)) for i in items if i.get("fabric_pay_mode") == "Pending")
     tail_total_amt = sum(float(i.get("tailoring_amount", 0)) for i in items)
     tail_received = sum(float(i.get("tailoring_received", 0)) for i in items)
-    tail_pending_amt = sum(max(float(i.get("tailoring_pending", 0)), 0) for i in items)
+    tail_pending_amt = sum(float(i.get("tailoring_pending", 0)) for i in items if i.get("tailoring_pay_mode") == "Pending")
     emb_total_amt = sum(float(i.get("embroidery_amount", 0)) for i in items)
     emb_received = sum(float(i.get("embroidery_received", 0)) for i in items)
-    emb_pending_amt = sum(max(float(i.get("embroidery_pending", 0)), 0) for i in items)
+    emb_pending_amt = sum(float(i.get("embroidery_pending", 0)) for i in items if i.get("embroidery_pay_mode") == "Pending")
     addon_total_amt = sum(float(i.get("addon_amount", 0)) for i in items)
     addon_received = sum(float(i.get("addon_received", 0)) for i in items)
-    addon_pending_amt = sum(max(float(i.get("addon_pending", 0)), 0) for i in items)
+    addon_pending_amt = sum(float(i.get("addon_pending", 0)) for i in items if i.get("addon_pay_mode") == "Pending")
 
     grand_total = fab_total + tail_total_amt + emb_total_amt + addon_total_amt
     total_received = fab_received + tail_received + emb_received + addon_received
