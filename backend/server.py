@@ -2823,7 +2823,7 @@ async def upload_logo(file: UploadFile = File(...)):
 async def login(req: LoginRequest, request: Request):
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip)
-    user = await db.users.find_one({"username": req.username})
+    user = await db.users.find_one({"username": req.username.lower().strip()})
     if not user:
         raise HTTPException(status_code=401, detail="Invalid username or password")
     if not auth_module.verify_password(req.password, user.get("password_hash", "")):
@@ -2862,7 +2862,7 @@ async def get_me(current_user: dict = Depends(get_current_user_dep)):
 async def register_user(req: UserCreateRequest, current_user: dict = Depends(get_current_user_dep)):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Only admins can create users")
-    existing = await db.users.find_one({"username": req.username})
+    existing = await db.users.find_one({"username": req.username.lower().strip()})
     if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
     new_user = {
@@ -2874,9 +2874,10 @@ async def register_user(req: UserCreateRequest, current_user: dict = Depends(get
         "allowed_pages": req.allowed_pages,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    new_user["username"] = req.username.lower().strip()
     await db.users.insert_one(new_user)
-    logger.info(f"User '{req.username}' created by '{current_user['username']}'")
-    return {"message": "User created successfully", "username": req.username}
+    logger.info(f"User '{new_user['username']}' created by '{current_user['username']}'")
+    return {"message": "User created successfully", "username": new_user["username"]}
 
 @api_router.get("/auth/users")
 async def list_users(current_user: dict = Depends(get_current_user_dep)):

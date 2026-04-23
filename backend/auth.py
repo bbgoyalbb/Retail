@@ -112,7 +112,7 @@ async def get_current_user(
     if db is None:
         raise HTTPException(status_code=500, detail="Database not available")
 
-    user = await db.users.find_one({"username": username}, {"password_hash": 0})
+    user = await db.users.find_one({"username": username.lower().strip() if username else username}, {"password_hash": 0})
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
     if not user.get("is_active", True):
