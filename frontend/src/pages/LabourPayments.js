@@ -34,7 +34,7 @@ export default function LabourPayments() {
     }).catch(() => {});
   }, []);
 
-  useEffect(() => { loadData(); setSelected([]); }, [loadData, viewMode]);
+  useEffect(() => { loadData(); setSelected([]); }, [loadData]);
 
   const toggleSelect = (id) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -86,6 +86,7 @@ export default function LabourPayments() {
   const [expandedPayments, setExpandedPayments] = useState({});
   const [editingPayment, setEditingPayment] = useState(null);
   const [editSelectedItems, setEditSelectedItems] = useState([]);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const toggleDateExpand = (date) => {
     setExpandedDates(prev => ({ ...prev, [date]: !prev[date] }));
@@ -202,9 +203,11 @@ export default function LabourPayments() {
   };
 
   const handleDeletePayment = async (payment) => {
-    if (!confirm(`Delete this payment of ₹${fmt(payment.total)} from ${payment.date}?\n\nThis will mark ${payment.items.length} items as unpaid.`)) {
+    if (deleteConfirm?.payment_id !== payment.payment_id) {
+      setDeleteConfirm(payment);
       return;
     }
+    setDeleteConfirm(null);
     setSaving(true);
     try {
       await deleteLabourPayment({
@@ -423,17 +426,21 @@ No paid entries`}
                                   >
                                     <PencilSimple size={14} />
                                   </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeletePayment(payment);
-                                    }}
-                                    disabled={saving}
-                                    className="p-1.5 text-[var(--error)] hover:bg-[var(--bg)] rounded-sm transition-colors"
-                                    title="Delete payment"
-                                  >
-                                    <Trash size={14} />
-                                  </button>
+                                  {deleteConfirm?.payment_id === payment.payment_id ? (
+                                    <span className="flex items-center gap-1">
+                                      <button onClick={(e) => { e.stopPropagation(); handleDeletePayment(payment); }} className="px-1.5 py-0.5 bg-red-500 text-white rounded-sm text-[10px] hover:bg-red-600">Delete</button>
+                                      <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null); }} className="px-1.5 py-0.5 border border-[var(--border-subtle)] rounded-sm text-[10px] hover:bg-[var(--bg)]">Cancel</button>
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleDeletePayment(payment); }}
+                                      disabled={saving}
+                                      className="p-1.5 text-[var(--error)] hover:bg-[var(--bg)] rounded-sm transition-colors"
+                                      title="Delete payment"
+                                    >
+                                      <Trash size={14} />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>

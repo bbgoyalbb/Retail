@@ -298,22 +298,22 @@ export default function ItemsManager() {
       
       if (fieldKey === 'tailoring_received' || fieldKey === 'tailoring_amount') {
         updated[itemId].tailoring_pending = computePending(
-          parseFloat(item.tailoring_amount) || 0,
-          parseFloat(item.tailoring_received) || 0
+          parseFloat(updated[itemId].tailoring_amount) || 0,
+          parseFloat(updated[itemId].tailoring_received) || 0
         );
       }
       
       if (fieldKey === 'embroidery_received' || fieldKey === 'embroidery_amount') {
         updated[itemId].embroidery_pending = computePending(
-          parseFloat(item.embroidery_amount) || 0,
-          parseFloat(item.embroidery_received) || 0
+          parseFloat(updated[itemId].embroidery_amount) || 0,
+          parseFloat(updated[itemId].embroidery_received) || 0
         );
       }
       
       if (fieldKey === 'addon_received' || fieldKey === 'addon_amount') {
         updated[itemId].addon_pending = computePending(
-          parseFloat(item.addon_amount) || 0,
-          parseFloat(item.addon_received) || 0
+          parseFloat(updated[itemId].addon_amount) || 0,
+          parseFloat(updated[itemId].addon_received) || 0
         );
       }
       

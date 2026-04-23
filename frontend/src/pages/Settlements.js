@@ -170,6 +170,7 @@ export default function Settlements() {
     setBalances({ fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0 });
     setAllotFab(""); setAllotTail(""); setAllotEmb(""); setAllotAddon(""); setAllotAdv("");
     setFreshPay("");
+    setSelectedModes(["Cash"]);
   };
 
   return (

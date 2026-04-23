@@ -116,7 +116,7 @@ export default function NewBill() {
 
     resetItemForm();
     setTimeout(() => barcodeRef.current?.focus(), 50);
-  }, [barcode, qty, price, discount, editingIndex, defaultTailoring, defaultAddon]);
+  }, [barcode, qty, price, discount, editingIndex, dupWarning, items, defaultTailoring, defaultAddon]);
 
   const removeItem = (index) => {
     setItems(prev => prev.filter((_, i) => i !== index));
@@ -548,6 +548,7 @@ export default function NewBill() {
 // Tailoring Modal Component with Split Functionality
 function TailoringModal({ items, setItems, customerName, articleTypes, onClose }) {
   const [splitItem, setSplitItem] = useState(null);
+  const [splitError, setSplitError] = useState(null);
 
   const updateItemTailoring = (index, patch) => {
     setItems(prev => prev.map((row, idx) => idx === index ? { ...row, tailoring: { ...(row.tailoring || {}), ...patch } } : row));
@@ -595,9 +596,10 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
     if (!splitItem) return;
     const totalSplitQty = splitItem.splits.reduce((sum, s) => sum + (parseFloat(s.qty) || 0), 0);
     if (Math.abs(totalSplitQty - splitItem.originalQty) > 0.01) {
-      alert(`Total split quantity (${totalSplitQty.toFixed(2)}) must equal original quantity (${splitItem.originalQty.toFixed(2)})`);
+      setSplitError(`Total split qty (${totalSplitQty.toFixed(2)}) must equal original qty (${splitItem.originalQty.toFixed(2)})`);
       return;
     }
+    setSplitError(null);
 
     const originalItem = items[splitItem.itemIdx];
     const newItems = [...items];
@@ -719,8 +721,11 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
               {!isBalanced && ' (Must equal original quantity)'}
             </div>
           </div>
+          {splitError && (
+            <div className="mx-4 mb-0 mt-2 px-3 py-2 text-xs text-[var(--error)] bg-[#9E473D10] border border-[var(--error)] rounded-sm">{splitError}</div>
+          )}
           <div className="px-4 py-3 border-t border-[var(--border-subtle)] flex justify-between">
-            <button onClick={() => setSplitItem(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)]">Cancel</button>
+            <button onClick={() => { setSplitItem(null); setSplitError(null); }} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)]">Cancel</button>
             <button 
               onClick={applySplit} 
               disabled={!isBalanced}
