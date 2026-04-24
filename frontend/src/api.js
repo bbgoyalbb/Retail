@@ -53,11 +53,14 @@ export const getCustomers = () => {
     return res;
   });
 };
+export const getPendingCustomers = () => api.get("/customers", { params: { pending_only: true } });
 export const invalidateCustomersCache = () => { _customersCache = null; };
 export const getItems = (params) => api.get("/items", { params });
 export const getItem = (id) => api.get(`/items/${id}`);
 export const getRefs = (name) => api.get("/refs", { params: { name } });
+export const getPendingRefs = (name) => api.get("/refs", { params: { name, pending_only: true } });
 export const getOrders = () => api.get("/orders");
+export const getPendingOrders = () => api.get("/orders", { params: { pending_only: true } });
 export const getOrderStatus = (params) => api.get("/orders/status", { params });
 
 export const createBill = (data) => api.post("/bills", data);

@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
-import { getCustomers, getRefs, getBalances, processSettlement, getOrders, getItems, getSettings } from "@/api";
+import { getPendingCustomers, getPendingRefs, getPendingOrders, getBalances, processSettlement, getItems, getSettings } from "@/api";
 import { CurrencyDollar, CheckCircle } from "@phosphor-icons/react";
 
 export default function Settlements() {
@@ -19,7 +19,7 @@ export default function Settlements() {
   const [allotAddon, setAllotAddon] = useState("");
   const [allotAdv, setAllotAdv] = useState("");
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
-  const [selectedModes, setSelectedModes] = useState(["Cash"]);
+  const [selectedModes, setSelectedModes] = useState([]);
   const [message, setMessage] = useState(null);
   const [saving, setSaving] = useState(false);
   const [orderInfo, setOrderInfo] = useState(null);
@@ -28,14 +28,18 @@ export default function Settlements() {
   // Flag to prevent customer useEffect from clearing ref when set by order lookup
   const setByOrderRef = useRef(false);
 
+  const reloadFilters = useCallback(() => {
+    getPendingCustomers().then(res => setCustomers(res.data)).catch(() => {});
+    getPendingOrders().then(res => setOrders(res.data)).catch(() => {});
+  }, []);
+
   useEffect(() => {
-    getCustomers().then(res => setCustomers(res.data)).catch(() => {});
-    getOrders().then(res => setOrders(res.data)).catch(() => {});
+    reloadFilters();
     getSettings().then(res => {
       const s = res.data || {};
       if (Array.isArray(s.payment_modes) && s.payment_modes.length > 0) setPaymentModes(s.payment_modes);
     }).catch(() => {});
-  }, []);
+  }, [reloadFilters]);
 
   const loadBalances = useCallback((ref) => {
     getBalances({ ref }).then(res => {
@@ -54,7 +58,14 @@ export default function Settlements() {
       return;
     }
     if (selectedCustomer && mode === "customer") {
-      getRefs(selectedCustomer).then(res => setRefs(res.data)).catch(() => {});
+      getPendingRefs(selectedCustomer).then(res => {
+        const sorted = (res.data || []).slice().sort((a, b) => {
+          const parse = r => { const m = r.match(/^(\d+)\/(\d{2})(\d{2})(\d{2})$/); return m ? [`${m[4]}${m[3]}${m[2]}`, parseInt(m[1], 10)] : [r, 0]; };
+          const [da, sa] = parse(a); const [db, sb] = parse(b);
+          return da !== db ? db.localeCompare(da) : sb - sa;
+        });
+        setRefs(sorted);
+      }).catch(() => {});
       setSelectedRef("");
       setBalances({ fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0 });
     }
@@ -166,7 +177,10 @@ export default function Settlements() {
       });
       setMessage({ type: "success", text: "Settlement processed!" });
       setFreshPay(""); setAllotFab(""); setAllotTail(""); setAllotEmb(""); setAllotAddon(""); setAllotAdv("");
-      loadBalances(selectedRef);
+      setSelectedModes([]);
+      setSelectedCustomer(""); setSelectedRef(""); setSelectedOrder(""); setOrderInfo(null);
+      setBalances({ fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0 });
+      reloadFilters();
     } catch (err) {
       setMessage({ type: "error", text: err.response?.data?.detail || "Failed" });
     } finally {
@@ -190,7 +204,7 @@ export default function Settlements() {
     setAllotFab(""); setAllotTail(""); setAllotEmb(""); setAllotAddon(""); setAllotAdv("");
     setFreshPay("");
     setUseAdvance(false);
-    setSelectedModes(["Cash"]);
+    setSelectedModes([]);
   };
 
   return (
@@ -243,7 +257,7 @@ export default function Settlements() {
                 <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Order No.</label>
                 <select data-testid="settle-order" value={selectedOrder} onChange={e => setSelectedOrder(e.target.value)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
                   <option value="">Select order</option>
-                  {orders.sort().map(o => <option key={o} value={o}>{o}</option>)}
+                  {orders.slice().sort((a, b) => { const na = parseInt(a, 10), nb = parseInt(b, 10); return !isNaN(na) && !isNaN(nb) ? na - nb : a.localeCompare(b); }).map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
                 {orderInfo && (
                   <div className="mt-2 p-3 bg-[var(--bg)] rounded-sm text-sm">

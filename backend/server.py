@@ -838,7 +838,20 @@ async def get_dashboard():
 # ==========================================
 
 @api_router.get("/customers")
-async def get_customers():
+async def get_customers(pending_only: bool = False):
+    if pending_only:
+        _ns = {"$not": {"$regex": "^Settled"}}
+        pipeline = [
+            {"$match": {"$or": [
+                {"fabric_amount": {"$gt": 0}, "fabric_pay_mode": _ns},
+                {"tailoring_amount": {"$gt": 0}, "tailoring_pay_mode": _ns},
+                {"embroidery_amount": {"$gt": 0}, "embroidery_pay_mode": _ns},
+                {"addon_amount": {"$gt": 0}, "addon_pay_mode": _ns},
+            ]}},
+            {"$group": {"_id": "$name"}},
+        ]
+        result = await db.items.aggregate(pipeline).to_list(1000)
+        return sorted([r["_id"] for r in result if r["_id"] and r["_id"] != "N/A"])
     customers = await db.items.distinct("name")
     return sorted([c for c in customers if c and c != "N/A"])
 
@@ -883,10 +896,18 @@ async def get_item(item_id: str):
     return item
 
 @api_router.get("/refs")
-async def get_refs(name: Optional[str] = None):
+async def get_refs(name: Optional[str] = None, pending_only: bool = False):
     query = {}
     if name:
         query["name"] = name
+    if pending_only:
+        _ns = {"$not": {"$regex": "^Settled"}}
+        query["$or"] = [
+            {"fabric_amount": {"$gt": 0}, "fabric_pay_mode": _ns},
+            {"tailoring_amount": {"$gt": 0}, "tailoring_pay_mode": _ns},
+            {"embroidery_amount": {"$gt": 0}, "embroidery_pay_mode": _ns},
+            {"addon_amount": {"$gt": 0}, "addon_pay_mode": _ns},
+        ]
     pipeline = [
         {"$match": query},
         {"$group": {"_id": "$ref"}},
@@ -1788,7 +1809,20 @@ async def delete_advance(advance_id: str):
 # ==========================================
 
 @api_router.get("/orders")
-async def get_order_numbers():
+async def get_order_numbers(pending_only: bool = False):
+    if pending_only:
+        _ns = {"$not": {"$regex": "^Settled"}}
+        pipeline = [
+            {"$match": {"order_no": {"$nin": ["N/A", "", None]}, "$or": [
+                {"fabric_amount": {"$gt": 0}, "fabric_pay_mode": _ns},
+                {"tailoring_amount": {"$gt": 0}, "tailoring_pay_mode": _ns},
+                {"embroidery_amount": {"$gt": 0}, "embroidery_pay_mode": _ns},
+                {"addon_amount": {"$gt": 0}, "addon_pay_mode": _ns},
+            ]}},
+            {"$group": {"_id": "$order_no"}},
+        ]
+        result = await db.items.aggregate(pipeline).to_list(1000)
+        return sorted([r["_id"] for r in result if r["_id"]])
     orders = await db.items.distinct("order_no", {"order_no": {"$nin": ["N/A", "", None]}})
     return sorted([o for o in orders if o])
 
