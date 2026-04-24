@@ -1929,12 +1929,15 @@ async def update_item(item_id: str, req: ItemUpdateRequest):
 
     update_fields = {f: v for f, v in req.model_dump(exclude_unset=True).items()}
 
-    # Recalculate fabric_amount if price/qty/discount changed
+    # Recalculate fabric_amount and fabric_pending if price/qty/discount changed
     if any(f in update_fields for f in ["price", "qty", "discount"]):
         p = update_fields.get("price", item.get("price", 0))
         q = update_fields.get("qty", item.get("qty", 0))
         d = update_fields.get("discount", item.get("discount", 0))
-        update_fields["fabric_amount"] = round((p - (p * d / 100)) * q, 0)
+        new_fabric_amount = round((p - (p * d / 100)) * q, 0)
+        update_fields["fabric_amount"] = new_fabric_amount
+        fabric_received = update_fields.get("fabric_received", item.get("fabric_received", 0))
+        update_fields["fabric_pending"] = round(new_fabric_amount - (fabric_received or 0), 2)
 
     if update_fields:
         await db.items.update_one({"id": item_id}, {"$set": update_fields})

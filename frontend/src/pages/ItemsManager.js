@@ -293,7 +293,7 @@ export default function ItemsManager() {
       }
       
       // Compute pending amounts if total or received changed
-      if (fieldKey === 'fabric_received' || fieldKey === 'fabric_amount') {
+      if (['fabric_received', 'fabric_amount', 'price', 'qty', 'discount'].includes(fieldKey)) {
         updated[itemId].fabric_pending = computePending(
           parseFloat(updated[itemId].fabric_amount) || 0,
           parseFloat(updated[itemId].fabric_received) || 0
