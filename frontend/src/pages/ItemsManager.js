@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useCallback } from "react";
-import { getItems, getCustomers, updateItem, deleteItem, getAdvances, createAdvance, updateAdvance, deleteAdvance } from "@/api";
+import { getItems, updateItem, deleteItem, getAdvances, createAdvance, updateAdvance, deleteAdvance } from "@/api";
 import { PencilSimple, Trash, FloppyDisk, X, Printer, CaretDown, CaretRight, MagnifyingGlass, Check, Plus, CheckCircle } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
 
@@ -117,7 +117,6 @@ const renderFieldInput = (field, itemId, value, onChange) => {
 export default function ItemsManager() {
   const [allItems, setAllItems] = useState([]);
   const [advances, setAdvances] = useState([]);
-  const [customers, setCustomers] = useState([]);
   const [nameFilter, setNameFilter] = useState("");
   const [orderFilter, setOrderFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
@@ -151,20 +150,12 @@ export default function ItemsManager() {
   // Amount mismatch detection
   const [mismatchPrompt, setMismatchPrompt] = useState(null); // { refs: [], mismatches: [] }
 
-  useEffect(() => { 
-    getCustomers().then(res => setCustomers(res.data)).catch(() => {}); 
-  }, []);
-
   const loadData = useCallback(async () => {
-    const params = { limit: 2000 };
-    if (nameFilter) params.name = nameFilter;
-    if (orderFilter) params.order_no = orderFilter;
-    
     setLoading(true);
     try {
       const [itemsRes, advancesRes] = await Promise.all([
-        getItems(params),
-        nameFilter ? getAdvances({ name: nameFilter }) : getAdvances()
+        getItems({ limit: 2000 }),
+        getAdvances()
       ]);
       setAllItems(itemsRes.data.items || []);
       setAdvances(advancesRes.data || []);
@@ -174,7 +165,7 @@ export default function ItemsManager() {
     } finally {
       setLoading(false);
     }
-  }, [nameFilter, orderFilter]);
+  }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
