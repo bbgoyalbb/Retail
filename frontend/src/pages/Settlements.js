@@ -240,14 +240,14 @@ export default function Settlements() {
                 <div>
                   <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Customer</label>
                   <select data-testid="settle-customer" value={selectedCustomer} onChange={e => setSelectedCustomer(e.target.value)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-                    <option value="">Select customer</option>
+                    <option value="">All</option>
                     {customers.sort().map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Reference</label>
                   <select data-testid="settle-ref" value={selectedRef} onChange={e => setSelectedRef(e.target.value)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-                    <option value="">Select reference</option>
+                    <option value="">All</option>
                     {refs.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
@@ -256,7 +256,7 @@ export default function Settlements() {
               <div>
                 <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Order No.</label>
                 <select data-testid="settle-order" value={selectedOrder} onChange={e => setSelectedOrder(e.target.value)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-                  <option value="">Select order</option>
+                  <option value="">All</option>
                   {orders.slice().sort((a, b) => { const na = parseInt(a, 10), nb = parseInt(b, 10); return !isNaN(na) && !isNaN(nb) ? na - nb : a.localeCompare(b); }).map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
                 {orderInfo && (
