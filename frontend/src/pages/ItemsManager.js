@@ -548,7 +548,12 @@ export default function ItemsManager() {
   };
 
   const uniqueDates = [...new Set(allItems.map(i => i.date).filter(Boolean))].sort().reverse();
-  const filteredItems = dateFilter ? allItems.filter(i => i.date === dateFilter) : allItems;
+  const filteredByDate = dateFilter ? allItems.filter(i => i.date === dateFilter) : allItems;
+  const filteredCustomers = [...new Set(filteredByDate.map(i => i.name).filter(Boolean))].sort();
+  const filteredItems = filteredByDate.filter(i =>
+    (!nameFilter || i.name === nameFilter) &&
+    (!orderFilter || i.order_no === orderFilter)
+  );
 
   // Group items by reference
   const grouped = {};
@@ -639,7 +644,7 @@ export default function ItemsManager() {
           <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Customer</label>
           <select data-testid="orders-customer-filter" value={nameFilter} onChange={e => setNameFilter(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
             <option value="">All Customers</option>
-            {customers.map(c => <option key={c} value={c}>{c}</option>)}
+            {filteredCustomers.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
         <div className="flex items-center gap-2">
