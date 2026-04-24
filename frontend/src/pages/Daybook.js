@@ -30,7 +30,7 @@ function TallyButton({ isTallied, onClick, hasAmount, label, loading }) {
   );
 }
 
-function DaybookTable({ entries, onCategoryTally, loading, dateFilter }) {
+function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter, nameFilter }) {
   const { toast } = useToast();
   const [sortKey, setSortKey] = useState("date");
   const [sortDir, setSortDir] = useState("desc");
@@ -79,9 +79,11 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter }) {
     return activeCats(entry).every(c => ts[c]);
   };
 
-  const visibleEntries = localEntries.filter(entry =>
-    viewMode === "pending" ? !isFullyTallied(entry) : isFullyTallied(entry)
-  );
+  const visibleEntries = localEntries.filter(entry => {
+    if (refFilter  !== "All" && entry.ref  !== refFilter)  return false;
+    if (nameFilter !== "All" && entry.name !== nameFilter) return false;
+    return viewMode === "pending" ? !isFullyTallied(entry) : isFullyTallied(entry);
+  });
 
   const grandTotal = visibleEntries.reduce((s, e) => s + (e.total || 0), 0);
 
@@ -165,7 +167,7 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter }) {
   };
 
   // Show date dividers only when "All" dates selected and sorted by date
-  const showDateDividers = dateFilter === "All" && sortKey === "date";
+  const showDateDividers = dateFilter === "All" && refFilter === "All" && nameFilter === "All" && sortKey === "date";
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm">
@@ -315,9 +317,14 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter }) {
 
 export default function Daybook() {
   const [dateFilter, setDateFilter] = useState("All");
+  const [refFilter,  setRefFilter]  = useState("All");
+  const [nameFilter, setNameFilter] = useState("All");
   const [dates, setDates] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const uniqueRefs  = ["All", ...Array.from(new Set(entries.map(e => e.ref).filter(Boolean))).sort()];
+  const uniqueNames = ["All", ...Array.from(new Set(entries.map(e => e.name).filter(Boolean))).sort()];
 
   const loadData = useCallback(() => {
     setLoading(true);
@@ -341,13 +348,27 @@ export default function Daybook() {
         <p className="text-sm text-[var(--text-secondary)] mt-1">Daily transaction reconciliation</p>
       </div>
 
-      {/* Date Filter - Prominent position */}
-      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm flex flex-wrap items-center gap-3">
-        <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Filter by Date</label>
-        <select data-testid="daybook-date-filter" value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="flex-1 min-w-[150px] px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-          <option value="All">All Dates</option>
-          {[...dates].sort().reverse().map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
+      {/* Filters */}
+      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Date</label>
+          <select data-testid="daybook-date-filter" value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="min-w-[130px] px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
+            <option value="All">All Dates</option>
+            {[...dates].sort().reverse().map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Ref</label>
+          <select value={refFilter} onChange={e => setRefFilter(e.target.value)} className="min-w-[130px] px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
+            {uniqueRefs.map(r => <option key={r} value={r}>{r === "All" ? "All Refs" : r}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Customer</label>
+          <select value={nameFilter} onChange={e => setNameFilter(e.target.value)} className="min-w-[150px] px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
+            {uniqueNames.map(n => <option key={n} value={n}>{n === "All" ? "All Customers" : n}</option>)}
+          </select>
+        </div>
         <span className="ml-auto text-xs text-[var(--text-secondary)]">
           {entries.length} entries
         </span>
@@ -358,7 +379,7 @@ export default function Daybook() {
           {[1,2].map(i => <div key={i} className="h-32 bg-[var(--surface)] border border-[var(--border-subtle)] animate-pulse rounded-sm" />)}
         </div>
       ) : (
-        <DaybookTable entries={entries} onCategoryTally={handleCategoryTally} loading={loading} dateFilter={dateFilter} />
+        <DaybookTable entries={entries} onCategoryTally={handleCategoryTally} loading={loading} dateFilter={dateFilter} refFilter={refFilter} nameFilter={nameFilter} />
       )}
     </div>
   );
