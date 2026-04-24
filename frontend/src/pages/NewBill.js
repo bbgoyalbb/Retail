@@ -33,6 +33,19 @@ export default function NewBill() {
   const [showTailoringModal, setShowTailoringModal] = useState(false);
   const [showAddonModal, setShowAddonModal] = useState(false);
   const [dupWarning, setDupWarning] = useState(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const nameWrapRef = useRef(null);
+
+  const nameSuggestions = customerName.trim()
+    ? customers.filter(c => c.toLowerCase().includes(customerName.trim().toLowerCase())).slice(0, 8)
+    : customers.slice(0, 8);
+
+  useEffect(() => {
+    const handleClick = (e) => { if (nameWrapRef.current && !nameWrapRef.current.contains(e.target)) setShowSuggestions(false); };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
+    return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('touchstart', handleClick); };
+  }, []);
 
   const nameRef = useRef(null);
   const dateRef = useRef(null);
@@ -326,8 +339,26 @@ export default function NewBill() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Customer Name</label>
-              <input ref={nameRef} data-testid="customer-name-input" list="customers-list" value={customerName} onChange={e => setCustomerName(e.target.value)} onKeyDown={e => enterNav(e, dateRef)} maxLength={100} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" placeholder="Customer name" />
-              <datalist id="customers-list">{customers.map(c => <option key={c} value={c} />)}</datalist>
+              <div ref={nameWrapRef} className="relative">
+                <input ref={nameRef} data-testid="customer-name-input" value={customerName}
+                  onChange={e => { setCustomerName(e.target.value); setShowSuggestions(true); }}
+                  onFocus={() => setShowSuggestions(true)}
+                  onKeyDown={e => { if (e.key === 'Escape') setShowSuggestions(false); else enterNav(e, dateRef); }}
+                  maxLength={100} autoComplete="off"
+                  className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" placeholder="Customer name" />
+                {showSuggestions && nameSuggestions.length > 0 && (
+                  <ul className="absolute z-50 left-0 right-0 top-full mt-0.5 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm shadow-lg max-h-48 overflow-y-auto">
+                    {nameSuggestions.map(c => (
+                      <li key={c}
+                        onMouseDown={e => { e.preventDefault(); setCustomerName(c); setShowSuggestions(false); setTimeout(() => dateRef.current?.focus(), 50); }}
+                        onTouchEnd={e => { e.preventDefault(); setCustomerName(c); setShowSuggestions(false); setTimeout(() => dateRef.current?.focus(), 50); }}
+                        className="px-3 py-2 text-sm cursor-pointer hover:bg-[var(--bg)] active:bg-[var(--bg)]">
+                        {c}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
             <div>
               <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Order Date</label>
