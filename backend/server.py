@@ -1371,20 +1371,21 @@ async def get_settlement_balances(name: Optional[str] = None, ref: Optional[str]
     if not ref:
         return {"fabric": 0, "tailoring": 0, "embroidery": 0, "addon": 0, "advance": 0}
 
+    not_settled = {"$not": {"$regex": "^Settled"}}
     pipeline_fab = [
-        {"$match": {"ref": ref, "fabric_pending": {"$ne": 0}}},
+        {"$match": {"ref": ref, "fabric_amount": {"$gt": 0}, "fabric_pay_mode": not_settled}},
         {"$group": {"_id": None, "total": {"$sum": "$fabric_pending"}}}
     ]
     pipeline_tail = [
-        {"$match": {"ref": ref, "tailoring_pending": {"$ne": 0}}},
+        {"$match": {"ref": ref, "tailoring_amount": {"$gt": 0}, "tailoring_pay_mode": not_settled}},
         {"$group": {"_id": None, "total": {"$sum": "$tailoring_pending"}}}
     ]
     pipeline_emb = [
-        {"$match": {"ref": ref, "embroidery_pending": {"$ne": 0}}},
+        {"$match": {"ref": ref, "embroidery_amount": {"$gt": 0}, "embroidery_pay_mode": not_settled}},
         {"$group": {"_id": None, "total": {"$sum": "$embroidery_pending"}}}
     ]
     pipeline_addon = [
-        {"$match": {"ref": ref, "addon_pending": {"$ne": 0}}},
+        {"$match": {"ref": ref, "addon_amount": {"$gt": 0}, "addon_pay_mode": not_settled}},
         {"$group": {"_id": None, "total": {"$sum": "$addon_pending"}}}
     ]
     pipeline_adv = [
