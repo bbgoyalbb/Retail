@@ -1835,6 +1835,14 @@ class AdvanceCreateRequest(BaseModel):
     date: str
     mode: Optional[str] = "Cash"
 
+class AdvanceUpdateRequest(BaseModel):
+    ref: Optional[str] = None
+    name: Optional[str] = None
+    amount: Optional[float] = None
+    date: Optional[str] = None
+    mode: Optional[str] = None
+    tally: Optional[bool] = None
+
 @api_router.post("/advances")
 async def create_advance(req: AdvanceCreateRequest):
     import uuid
@@ -1844,8 +1852,10 @@ async def create_advance(req: AdvanceCreateRequest):
     return adv
 
 @api_router.put("/advances/{advance_id}")
-async def update_advance(advance_id: str, req: AdvanceCreateRequest):
-    update = {"ref": req.ref, "name": req.name, "amount": req.amount, "date": req.date, "mode": req.mode or "Cash"}
+async def update_advance(advance_id: str, req: AdvanceUpdateRequest):
+    update = {k: v for k, v in req.model_dump().items() if v is not None}  # None = not provided; False/0 are valid values
+    if not update:
+        return {"message": "Nothing to update"}
     result = await db.advances.update_one({"id": advance_id}, {"$set": update})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Advance not found")
