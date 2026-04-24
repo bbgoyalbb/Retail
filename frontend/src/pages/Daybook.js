@@ -30,7 +30,7 @@ function TallyButton({ isTallied, onClick, hasAmount, label, loading }) {
   );
 }
 
-function DaybookTable({ entries, onCategoryTally, loading }) {
+function DaybookTable({ entries, onCategoryTally, loading, dateFilter }) {
   const { toast } = useToast();
   const [sortKey, setSortKey] = useState("date");
   const [sortDir, setSortDir] = useState("desc");
@@ -47,6 +47,19 @@ function DaybookTable({ entries, onCategoryTally, loading }) {
 
   const fmt = (n) => n ? new Intl.NumberFormat('en-IN').format(Math.round(n)) : "-";
 
+  // Compact mode label: Cash→C, PhonePe→P, Bank/Transfer→B, etc.
+  const modeCode = (mode = "") => {
+    const m = mode.toUpperCase();
+    if (m.includes("CASH")) return "C";
+    if (m.includes("PHONEPE") || m.includes("PHONE PE")) return "P";
+    if (m.includes("BANK") || m.includes("TRANSFER") || m.includes("NEFT") || m.includes("IMPS")) return "B";
+    if (m.includes("[E]")) return "E";
+    if (m.includes("[S]")) return "S";
+    return mode ? mode.slice(0, 2).toUpperCase() : "";
+  };
+
+  const CATS = ["fabric", "tailoring", "embroidery", "addon", "advance"];
+
   const isFullyTallied = (entry) => {
     const ts = entry.tally_status || {};
     if ((entry.fabric || 0) > 0 && !ts.fabric) return false;
@@ -55,6 +68,15 @@ function DaybookTable({ entries, onCategoryTally, loading }) {
     if ((entry.addon || 0) > 0 && !ts.addon) return false;
     if ((entry.advance || 0) !== 0 && !ts.advance) return false;
     return true;
+  };
+
+  // Which categories have amounts for an entry
+  const activeCats = (entry) => CATS.filter(c => (entry[c] || 0) !== 0);
+
+  // All active cats are tallied → row is fully tallied
+  const allCatsTallied = (entry) => {
+    const ts = entry.tally_status || {};
+    return activeCats(entry).every(c => ts[c]);
   };
 
   const visibleEntries = localEntries.filter(entry =>
@@ -72,17 +94,6 @@ function DaybookTable({ entries, onCategoryTally, loading }) {
     const cmp = String(va).localeCompare(String(vb));
     return sortDir === "asc" ? cmp : -cmp;
   });
-
-  // Compact mode label: Cash→C, PhonePe→P, Bank/Transfer→B, etc.
-  const modeCode = (mode = "") => {
-    const m = mode.toUpperCase();
-    if (m.includes("CASH")) return "C";
-    if (m.includes("PHONEPE") || m.includes("PHONE PE")) return "P";
-    if (m.includes("BANK") || m.includes("TRANSFER") || m.includes("NEFT") || m.includes("IMPS")) return "B";
-    if (m.includes("[E]")) return "E";
-    if (m.includes("[S]")) return "S";
-    return mode ? mode.slice(0, 2).toUpperCase() : "";
-  };
 
   // Row-level unique key: date + ref
   const rowKey = (entry) => `${entry.date}__${entry.ref}`;
@@ -111,6 +122,50 @@ function DaybookTable({ entries, onCategoryTally, loading }) {
       setUpdatingTally(prev => ({ ...prev, [key]: false }));
     }
   };
+
+  // Tally-all handler: tally or untally all active categories at once
+  const handleTallyAll = async (entry, shouldTally) => {
+    const cats = activeCats(entry);
+    if (cats.length === 0) return;
+    const action = shouldTally ? "tally" : "untally";
+
+    // Optimistic update all cats at once
+    setLocalEntries(prev => prev.map(e => {
+      if (e.date !== entry.date || e.ref !== entry.ref) return e;
+      const newTs = { ...e.tally_status };
+      cats.forEach(c => { newTs[c] = shouldTally; });
+      return { ...e, tally_status: newTs };
+    }));
+
+    // Mark all as updating
+    setUpdatingTally(prev => {
+      const next = { ...prev };
+      cats.forEach(c => { next[`${rowKey(entry)}:${c}`] = true; });
+      return next;
+    });
+
+    try {
+      await onCategoryTally(entry.ref, entry.date, "all", action);
+    } catch (err) {
+      // Revert on failure
+      setLocalEntries(prev => prev.map(e => {
+        if (e.date !== entry.date || e.ref !== entry.ref) return e;
+        const revertTs = { ...e.tally_status };
+        cats.forEach(c => { revertTs[c] = !shouldTally; });
+        return { ...e, tally_status: revertTs };
+      }));
+      toast({ title: "Tally failed", description: err.message || "Could not update tally.", variant: "destructive" });
+    } finally {
+      setUpdatingTally(prev => {
+        const next = { ...prev };
+        cats.forEach(c => { delete next[`${rowKey(entry)}:${c}`]; });
+        return next;
+      });
+    }
+  };
+
+  // Show date dividers only when "All" dates selected and sorted by date
+  const showDateDividers = dateFilter === "All" && sortKey === "date";
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm">
@@ -145,64 +200,111 @@ function DaybookTable({ entries, onCategoryTally, loading }) {
                 <SortableHeader label="Date"      sortKey="date"      currentKey={sortKey} dir={sortDir} onSort={handleSort} />
                 <SortableHeader label="Ref"       sortKey="ref"       currentKey={sortKey} dir={sortDir} onSort={handleSort} />
                 <SortableHeader label="Name"      sortKey="name"      currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-                <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-center">Mode</th>
                 <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Fabric</th>
                 <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Tailoring</th>
                 <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Emb.</th>
                 <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Add-on</th>
                 <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Adv.</th>
-                <SortableHeader label="Total" sortKey="total" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
+                <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Total</th>
               </tr>
             </thead>
             <tbody>
-              {sorted.map((entry) => {
-                const ts = entry.tally_status || {};
-                const modes = entry.modes || {};
-                // Build compact mode string from all non-empty modes
-                const allModeCodes = [...new Set(
-                  ["fabric","tailoring","embroidery","addon","advance"]
-                    .map(c => modeCode(modes[c] || ""))
-                    .filter(Boolean)
-                )].join("+");
+              {(() => {
+                const rows = [];
+                let lastDate = null;
 
-                const tallyCell = (cat, amount) => {
-                  const key = `${rowKey(entry)}:${cat}`;
-                  if (!amount) return <td key={cat} className="px-2 py-2.5 text-right"><span className="font-mono text-xs text-[var(--text-secondary)]">-</span></td>;
-                  return (
-                    <td key={cat} className="px-2 py-2.5">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <span className="font-mono text-xs">{fmt(amount)}</span>
-                        <TallyButton
-                          isTallied={ts[cat]}
-                          onClick={(e) => { e.stopPropagation(); handleCategoryTallyClick(entry, cat, ts[cat]); }}
-                          hasAmount={true}
-                          label={cat}
-                          loading={updatingTally[key]}
-                        />
-                      </div>
-                    </td>
+                sorted.forEach((entry) => {
+                  const ts = entry.tally_status || {};
+                  const modes = entry.modes || {};
+
+                  // Date divider
+                  if (showDateDividers && entry.date !== lastDate) {
+                    if (lastDate !== null) {
+                      rows.push(
+                        <tr key={`divider-${entry.date}`}>
+                          <td colSpan={9} className="px-0 py-0">
+                            <div className="h-px bg-[var(--border-subtle)] opacity-60 mx-3" />
+                          </td>
+                        </tr>
+                      );
+                    }
+                    rows.push(
+                      <tr key={`date-label-${entry.date}`} className="bg-[var(--bg)]">
+                        <td colSpan={9} className="px-3 py-1.5">
+                          <span className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">{entry.date}</span>
+                        </td>
+                      </tr>
+                    );
+                    lastDate = entry.date;
+                  }
+
+                  // Category cell with inline mode badge
+                  const tallyCell = (cat, amount) => {
+                    const key = `${rowKey(entry)}:${cat}`;
+                    const code = modeCode(modes[cat] || "");
+                    if (!amount) return (
+                      <td key={cat} className="px-2 py-2.5 text-right">
+                        <span className="font-mono text-xs text-[var(--text-secondary)]">-</span>
+                      </td>
+                    );
+                    return (
+                      <td key={cat} className="px-2 py-2.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="font-mono text-xs">{fmt(amount)}</span>
+                          {code && (
+                            <span className="font-mono text-[9px] text-[var(--text-secondary)] bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-1 py-px leading-none">{code}</span>
+                          )}
+                          <TallyButton
+                            isTallied={ts[cat]}
+                            onClick={(e) => { e.stopPropagation(); handleCategoryTallyClick(entry, cat, ts[cat]); }}
+                            hasAmount={true}
+                            label={cat}
+                            loading={updatingTally[key]}
+                          />
+                        </div>
+                      </td>
+                    );
+                  };
+
+                  // Build unique mode codes across all active categories for Total cell
+                  const allCodes = [...new Set(
+                    activeCats(entry).map(c => modeCode(modes[c] || "")).filter(Boolean)
+                  )].join("+");
+
+                  const allTallied = allCatsTallied(entry);
+                  const anyUpdating = activeCats(entry).some(c => updatingTally[`${rowKey(entry)}:${c}`]);
+
+                  rows.push(
+                    <tr key={rowKey(entry)} className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D05]">
+                      <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap">{entry.date || "-"}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs text-[var(--brand)] font-medium">{entry.ref}</td>
+                      <td className="px-3 py-2.5 text-sm">{entry.name}</td>
+                      {tallyCell("fabric",     entry.fabric)}
+                      {tallyCell("tailoring",  entry.tailoring)}
+                      {tallyCell("embroidery", entry.embroidery)}
+                      {tallyCell("addon",      entry.addon)}
+                      {tallyCell("advance",    entry.advance)}
+                      <td className="px-2 py-2.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="font-mono text-sm font-semibold">{fmt(entry.total)}</span>
+                          {allCodes && (
+                            <span className="font-mono text-[9px] text-[var(--text-secondary)] bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-1 py-px leading-none">{allCodes}</span>
+                          )}
+                          <TallyButton
+                            isTallied={allTallied}
+                            onClick={(e) => { e.stopPropagation(); handleTallyAll(entry, !allTallied); }}
+                            hasAmount={activeCats(entry).length > 0}
+                            label="all"
+                            loading={anyUpdating}
+                          />
+                        </div>
+                      </td>
+                    </tr>
                   );
-                };
+                });
 
-                return (
-                  <tr key={rowKey(entry)} className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D05]">
-                    <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap">{entry.date || "-"}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs text-[var(--brand)] font-medium">{entry.ref}</td>
-                    <td className="px-3 py-2.5 text-sm">{entry.name}</td>
-                    <td className="px-2 py-2.5 text-center">
-                      {allModeCodes
-                        ? <span className="font-mono text-[10px] text-[var(--text-secondary)] bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-1.5 py-0.5">{allModeCodes}</span>
-                        : <span className="text-[var(--text-secondary)]">-</span>}
-                    </td>
-                    {tallyCell("fabric",     entry.fabric)}
-                    {tallyCell("tailoring",  entry.tailoring)}
-                    {tallyCell("embroidery", entry.embroidery)}
-                    {tallyCell("addon",      entry.addon)}
-                    {tallyCell("advance",    entry.advance)}
-                    <td className="px-3 py-2.5 font-mono text-sm text-right font-semibold">{fmt(entry.total)}</td>
-                  </tr>
-                );
-              })}
+                return rows;
+              })()}
             </tbody>
           </table>
         </div>
@@ -256,7 +358,7 @@ export default function Daybook() {
           {[1,2].map(i => <div key={i} className="h-32 bg-[var(--surface)] border border-[var(--border-subtle)] animate-pulse rounded-sm" />)}
         </div>
       ) : (
-        <DaybookTable entries={entries} onCategoryTally={handleCategoryTally} loading={loading} />
+        <DaybookTable entries={entries} onCategoryTally={handleCategoryTally} loading={loading} dateFilter={dateFilter} />
       )}
     </div>
   );
