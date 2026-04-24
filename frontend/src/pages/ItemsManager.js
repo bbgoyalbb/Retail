@@ -558,7 +558,10 @@ export default function ItemsManager() {
     grouped[ref].totals.addon += item.addon_amount || 0;
     grouped[ref].totals.total += (item.fabric_amount || 0) + (item.tailoring_amount || 0) + (item.embroidery_amount || 0) + (item.addon_amount || 0);
     grouped[ref].totals.received += (item.fabric_received || 0) + (item.tailoring_received || 0) + (item.embroidery_received || 0) + (item.addon_received || 0);
-    grouped[ref].totals.pending += (item.fabric_pending || 0) + (item.tailoring_pending || 0) + (item.embroidery_pending || 0) + (item.addon_pending || 0);
+    if (!String(item.fabric_pay_mode || '').startsWith('Settled'))     grouped[ref].totals.pending += (item.fabric_pending || 0);
+    if (!String(item.tailoring_pay_mode || '').startsWith('Settled'))  grouped[ref].totals.pending += (item.tailoring_pending || 0);
+    if (!String(item.embroidery_pay_mode || '').startsWith('Settled')) grouped[ref].totals.pending += (item.embroidery_pending || 0);
+    if (!String(item.addon_pay_mode || '').startsWith('Settled'))      grouped[ref].totals.pending += (item.addon_pending || 0);
   });
   advances.forEach(adv => {
     if (grouped[adv.ref]) grouped[adv.ref].totals.advance += adv.amount || 0;
