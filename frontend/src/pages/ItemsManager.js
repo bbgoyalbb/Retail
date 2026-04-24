@@ -120,6 +120,7 @@ export default function ItemsManager() {
   const [customers, setCustomers] = useState([]);
   const [nameFilter, setNameFilter] = useState("");
   const [orderFilter, setOrderFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
   const [expanded, setExpanded] = useState({});
   const [message, setMessage] = useState(null);
   const [sortKey, setSortKey] = useState("date");
@@ -546,9 +547,12 @@ export default function ItemsManager() {
     setTimeout(() => setMessage(null), 3000);
   };
 
+  const uniqueDates = [...new Set(allItems.map(i => i.date).filter(Boolean))].sort().reverse();
+  const filteredItems = dateFilter ? allItems.filter(i => i.date === dateFilter) : allItems;
+
   // Group items by reference
   const grouped = {};
-  allItems.forEach(item => {
+  filteredItems.forEach(item => {
     const ref = item.ref;
     if (!grouped[ref]) grouped[ref] = { ref, name: item.name, date: item.date, items: [], totals: { fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0, total: 0, received: 0, pending: 0 } };
     grouped[ref].items.push(item);
@@ -624,6 +628,10 @@ export default function ItemsManager() {
 
       {/* Filters */}
       <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm flex flex-wrap gap-3 items-center">
+        <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
+          <option value="">All Dates</option>
+          {uniqueDates.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
         <select data-testid="orders-customer-filter" value={nameFilter} onChange={e => setNameFilter(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
           <option value="">All Customers</option>
           {customers.map(c => <option key={c} value={c}>{c}</option>)}
