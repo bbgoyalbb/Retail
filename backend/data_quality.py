@@ -139,8 +139,9 @@ def normalize_payment_field(
         if abs(mismatch) <= 1:
             if pending > 0:
                 pending = round_money(max(0, total - received))
-            else:
-                received = round_money(max(0, total - pending))
+            elif pending == 0 and received > 0:
+                # Only fix rounding drift when there is no over-payment
+                received = round_money(total - pending)
 
     status = determine_payment_status(pending, received)
     mode = original_mode

@@ -1138,6 +1138,12 @@ async def assign_tailoring(req: TailoringOrderRequest):
         rates = TAILORING_RATES.get(article_type, (0, 0))
         tail_amt, labour_amt = rates
 
+        existing_item = await db.items.find_one({"id": item_id}, {"_id": 0})
+        existing_tail_received = float((existing_item or {}).get("tailoring_received", 0))
+        existing_tail_mode = (existing_item or {}).get("tailoring_pay_mode", "Pending")
+        tail_pending = round(tail_amt - existing_tail_received, 2)
+        tail_mode = existing_tail_mode if str(existing_tail_mode).startswith("Settled") else ("Pending" if existing_tail_received <= 0 else existing_tail_mode)
+
         update = {
             "$set": {
                 "tailoring_status": "Pending",
@@ -1145,9 +1151,8 @@ async def assign_tailoring(req: TailoringOrderRequest):
                 "order_no": req.order_no,
                 "delivery_date": req.delivery_date,
                 "tailoring_amount": tail_amt,
-                "tailoring_received": 0,
-                "tailoring_pending": tail_amt,
-                "tailoring_pay_mode": "Pending",
+                "tailoring_pending": tail_pending,
+                "tailoring_pay_mode": tail_mode,
                 "labour_amount": labour_amt,
                 "embroidery_status": emb_status,
             }
@@ -1192,6 +1197,10 @@ async def split_and_assign(req: SplitTailoringRequest):
 
         if idx == 0:
             # Update original item with first split
+            existing_tail_received = float(item.get("tailoring_received", 0))
+            existing_tail_mode = item.get("tailoring_pay_mode", "Pending")
+            tail_pending = round(tail_amt - existing_tail_received, 2)
+            tail_mode = existing_tail_mode if str(existing_tail_mode).startswith("Settled") else ("Pending" if existing_tail_received <= 0 else existing_tail_mode)
             update = {
                 "qty": split.qty,
                 "fabric_amount": split_fabric_amt,
@@ -1201,9 +1210,8 @@ async def split_and_assign(req: SplitTailoringRequest):
                 "order_no": req.order_no,
                 "delivery_date": req.delivery_date,
                 "tailoring_amount": tail_amt,
-                "tailoring_received": 0,
-                "tailoring_pending": tail_amt,
-                "tailoring_pay_mode": "Pending",
+                "tailoring_pending": tail_pending,
+                "tailoring_pay_mode": tail_mode,
                 "labour_amount": labour_amt,
                 "embroidery_status": split.embroidery_status,
             }
@@ -1372,9 +1380,14 @@ async def move_embroidery(req: EmbMoveRequest):
         if req.emb_labour_amount is not None and req.emb_labour_amount > 0:
             update_fields["emb_labour_amount"] = req.emb_labour_amount
         if req.emb_customer_amount is not None and req.emb_customer_amount > 0:
+            existing_emb_item = await db.items.find_one({"id": item_id}, {"_id": 0})
+            existing_emb_received = float((existing_emb_item or {}).get("embroidery_received", 0))
+            existing_emb_mode = (existing_emb_item or {}).get("embroidery_pay_mode", "Pending")
+            emb_pending = round(req.emb_customer_amount - existing_emb_received, 2)
+            emb_mode = existing_emb_mode if str(existing_emb_mode).startswith("Settled") else ("Pending" if existing_emb_received <= 0 else existing_emb_mode)
             update_fields["embroidery_amount"] = req.emb_customer_amount
-            update_fields["embroidery_pending"] = req.emb_customer_amount
-            update_fields["embroidery_pay_mode"] = "Pending"
+            update_fields["embroidery_pending"] = emb_pending
+            update_fields["embroidery_pay_mode"] = emb_mode
         result = await db.items.update_one({"id": item_id}, {"$set": update_fields})
         if result.modified_count > 0:
             updated += 1
@@ -1394,9 +1407,14 @@ async def edit_embroidery(req: EmbEditRequest):
     if req.emb_labour_amount is not None:
         update_fields["emb_labour_amount"] = req.emb_labour_amount
     if req.emb_customer_amount is not None:
+        existing_edit_item = await db.items.find_one({"id": req.item_id}, {"_id": 0})
+        existing_edit_received = float((existing_edit_item or {}).get("embroidery_received", 0))
+        existing_edit_mode = (existing_edit_item or {}).get("embroidery_pay_mode", "Pending")
+        edit_pending = round(req.emb_customer_amount - existing_edit_received, 2)
+        edit_mode = existing_edit_mode if str(existing_edit_mode).startswith("Settled") else ("Pending" if existing_edit_received <= 0 else existing_edit_mode)
         update_fields["embroidery_amount"] = req.emb_customer_amount
-        update_fields["embroidery_pending"] = req.emb_customer_amount
-        update_fields["embroidery_pay_mode"] = "Pending"
+        update_fields["embroidery_pending"] = edit_pending
+        update_fields["embroidery_pay_mode"] = edit_mode
     if not update_fields:
         return {"message": "Nothing to update"}
     result = await db.items.update_one({"id": req.item_id}, {"$set": update_fields})
@@ -2443,6 +2461,7 @@ async def get_summary_report(date_from: Optional[str] = None, date_to: Optional[
     total_embroidery_received = sum(i.get("embroidery_received", 0) for i in items)
     total_embroidery_pending = sum(i.get("embroidery_pending", 0) for i in items if not str(i.get("embroidery_pay_mode", "")).startswith("Settled"))
     total_addon = sum(i.get("addon_amount", 0) for i in items)
+    total_addon_received = sum(i.get("addon_received", 0) for i in items)
     total_addon_pending = sum(i.get("addon_pending", 0) for i in items if not str(i.get("addon_pay_mode", "")).startswith("Settled"))
     total_advance = sum(a.get("amount", 0) for a in advances)
 
@@ -2475,6 +2494,7 @@ async def get_summary_report(date_from: Optional[str] = None, date_to: Optional[
         "total_embroidery_received": total_embroidery_received,
         "total_embroidery_pending": total_embroidery_pending,
         "total_addon": total_addon,
+        "total_addon_received": total_addon_received,
         "total_addon_pending": total_addon_pending,
         "total_advance": total_advance,
         "total_items": len(items),
