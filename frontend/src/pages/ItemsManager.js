@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useCallback } from "react";
 import { getItems, getCustomers, updateItem, deleteItem, getAdvances, createAdvance, updateAdvance, deleteAdvance } from "@/api";
-import { PencilSimple, Trash, FloppyDisk, X, Printer, CaretDown, CaretRight, MagnifyingGlass, Check, Plus } from "@phosphor-icons/react";
+import { PencilSimple, Trash, FloppyDisk, X, Printer, CaretDown, CaretRight, MagnifyingGlass, Check, Plus, CheckCircle } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
 
 // ==========================================
@@ -550,12 +550,15 @@ export default function ItemsManager() {
   const grouped = {};
   allItems.forEach(item => {
     const ref = item.ref;
-    if (!grouped[ref]) grouped[ref] = { ref, name: item.name, date: item.date, items: [], totals: { fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0 } };
+    if (!grouped[ref]) grouped[ref] = { ref, name: item.name, date: item.date, items: [], totals: { fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0, total: 0, received: 0, pending: 0 } };
     grouped[ref].items.push(item);
     grouped[ref].totals.fabric += item.fabric_amount || 0;
     grouped[ref].totals.tailoring += item.tailoring_amount || 0;
     grouped[ref].totals.embroidery += item.embroidery_amount || 0;
     grouped[ref].totals.addon += item.addon_amount || 0;
+    grouped[ref].totals.total += (item.fabric_amount || 0) + (item.tailoring_amount || 0) + (item.embroidery_amount || 0) + (item.addon_amount || 0);
+    grouped[ref].totals.received += (item.fabric_received || 0) + (item.tailoring_received || 0) + (item.embroidery_received || 0) + (item.addon_received || 0);
+    grouped[ref].totals.pending += (item.fabric_pending || 0) + (item.tailoring_pending || 0) + (item.embroidery_pending || 0) + (item.addon_pending || 0);
   });
   advances.forEach(adv => {
     if (grouped[adv.ref]) grouped[adv.ref].totals.advance += adv.amount || 0;
@@ -857,7 +860,7 @@ export default function ItemsManager() {
       {/* Grouped References */}
       <div className="space-y-2">
         {/* Header row — desktop only */}
-        <div className="hidden sm:grid bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-4 py-2 items-center text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]" style={{gridTemplateColumns:'24px 96px 96px 1fr repeat(5,88px) 48px 88px'}}>
+        <div className="hidden sm:grid bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-4 py-2 items-center text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]" style={{gridTemplateColumns:'24px 96px 96px 1fr repeat(5,80px) 48px 90px 90px 100px 88px'}}>
           <span></span>
           <button onClick={() => handleSort("date")} className="text-left hover:text-[var(--brand)]">Date {sortKey === 'date' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
           <button onClick={() => handleSort("ref")} className="text-left hover:text-[var(--brand)]">Ref {sortKey === 'ref' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
@@ -868,6 +871,9 @@ export default function ItemsManager() {
           <span className="text-right">Add-on</span>
           <span className="text-right">Advance</span>
           <span className="text-center">Items</span>
+          <span className="text-right">Total</span>
+          <span className="text-right">Received</span>
+          <span className="text-right">Pending</span>
           <span></span>
         </div>
 
@@ -899,6 +905,14 @@ export default function ItemsManager() {
                     {group.totals.addon > 0 && <span className="text-[10px] text-[var(--text-secondary)]">Add-on: <span className="font-mono text-[var(--text-primary)]">{fmt(group.totals.addon)}</span></span>}
                     <span className="text-[10px] text-[var(--text-secondary)]">{group.items.length} items</span>
                   </div>
+                  <div className="flex gap-3 mt-1 pt-1 border-t border-[var(--border-subtle)]">
+                    <span className="text-[10px] text-[var(--text-secondary)]">Total: <span className="font-mono font-medium text-[var(--text-primary)]">₹{fmt(group.totals.total)}</span></span>
+                    <span className="text-[10px] text-[var(--text-secondary)]">Rcvd: <span className="font-mono text-[var(--success)]">₹{fmt(group.totals.received)}</span></span>
+                    {Math.round(group.totals.pending) === 0 && group.totals.total > 0
+                      ? <span className="text-[10px] text-[var(--success)] flex items-center gap-0.5"><CheckCircle size={11} weight="fill" />Settled</span>
+                      : <span className="text-[10px] text-[var(--text-secondary)]">Pend: <span className={`font-mono ${group.totals.pending < 0 ? 'text-[var(--error)]' : 'text-[var(--warning)]'}`}>₹{fmt(group.totals.pending)}</span></span>
+                    }
+                  </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
                   <button onClick={() => { setEditItems(group.items); setEditMode('order'); setShowSectionSelector(true); }} className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm" title="Edit Order"><PencilSimple size={14} /></button>
@@ -907,7 +921,8 @@ export default function ItemsManager() {
                 </div>
               </div>
               {/* Desktop layout */}
-              <div className="hidden sm:grid items-center" style={{gridTemplateColumns:'24px 96px 96px 1fr repeat(5,88px) 48px 88px'}}>
+              {(() => { const isSettled = Math.round(group.totals.pending) === 0 && group.totals.total > 0; return (
+              <div className="hidden sm:grid items-center" style={{gridTemplateColumns:'24px 96px 96px 1fr repeat(5,80px) 48px 90px 90px 100px 88px'}}>
                 <span className="text-[var(--text-secondary)]">{expanded[group.ref] ? <CaretDown size={14} /> : <CaretRight size={14} />}</span>
                 <span className="font-mono text-xs">{group.date}</span>
                 <span className="font-mono text-xs text-[var(--brand)] font-medium">{group.ref}</span>
@@ -918,12 +933,18 @@ export default function ItemsManager() {
                 <span className="font-mono text-xs text-right">{group.totals.addon > 0 ? fmt(group.totals.addon) : '-'}</span>
                 <span className="font-mono text-xs text-right">{group.totals.advance > 0 ? fmt(group.totals.advance) : '-'}</span>
                 <span className="text-center font-mono text-xs">{group.items.length}</span>
+                <span className="font-mono text-xs text-right font-medium">{fmt(group.totals.total)}</span>
+                <span className="font-mono text-xs text-right text-[var(--success)]">{fmt(group.totals.received)}</span>
+                <span className={`font-mono text-xs text-right flex items-center justify-end gap-1 ${isSettled ? 'text-[var(--success)]' : group.totals.pending < 0 ? 'text-[var(--error)]' : 'text-[var(--warning)]'}`}>
+                  {isSettled ? <><CheckCircle size={13} weight="fill" className="text-[var(--success)] flex-shrink-0" /><span>Settled</span></> : fmt(group.totals.pending)}
+                </span>
                 <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
                   <button onClick={() => { setEditItems(group.items); setEditMode('order'); setShowSectionSelector(true); }} className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm" title="Edit Order"><PencilSimple size={14} /></button>
                   <button onClick={() => { setDelConfirm(group); setDelMode('order'); }} className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm" title="Delete Order"><Trash size={14} /></button>
                   <button onClick={e => { e.stopPropagation(); setInvoiceRef(group.ref); }} className="p-1.5"><Printer size={15} className="text-[var(--brand)] hover:text-[var(--brand-hover)]" /></button>
                 </div>
               </div>
+              ); })()}
             </div>
 
             {/* Expanded Detail Rows */}
