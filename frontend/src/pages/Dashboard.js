@@ -138,13 +138,17 @@ export default function Dashboard() {
               <span className="font-mono text-sm font-medium text-[var(--warning)]">₹{fmt(data.embroidery_pending_amount)}</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-[var(--border-subtle)]">
+              <span className="text-sm text-[var(--text-secondary)]">Add-on</span>
+              <span className="font-mono text-sm font-medium text-[var(--warning)]">₹{fmt(data.addon_pending_amount)}</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-[var(--border-subtle)]">
               <span className="text-sm text-[var(--text-secondary)]">Advances Balance</span>
               <span className="font-mono text-sm font-medium text-[var(--success)]">₹{fmt(data.total_advances_amount)}</span>
             </div>
             <div className="flex items-center justify-between py-2 font-medium">
               <span className="text-sm">Total Pending</span>
               <span className="font-mono text-base text-[var(--error)]">
-                ₹{fmt((data.fabric_pending_amount || 0) + (data.tailoring_pending_amount || 0) + (data.embroidery_pending_amount || 0))}
+                ₹{fmt((data.fabric_pending_amount || 0) + (data.tailoring_pending_amount || 0) + (data.embroidery_pending_amount || 0) + (data.addon_pending_amount || 0))}
               </span>
             </div>
           </div>

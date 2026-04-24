@@ -337,7 +337,7 @@ export default function NewBill() {
         <div className="lg:col-span-2 bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
           <h3 className="font-heading text-base font-medium">Customer Info</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
+            <div className="sm:col-span-1">
               <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Customer Name</label>
               <div ref={nameWrapRef} className="relative">
                 <input ref={nameRef} data-testid="customer-name-input" value={customerName}
@@ -409,9 +409,13 @@ export default function NewBill() {
                     return (
                       <tr key={i} className={`border-b border-[var(--border-subtle)] transition-colors ${isEditing ? 'bg-[#C86B4D08] outline outline-1 outline-[var(--brand)]' : 'hover:bg-[var(--bg)]'}`}>
                         <td className="px-3 py-2 text-sm">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             {isEditing && <PencilSimple size={12} className="text-[var(--brand)] flex-shrink-0" weight="fill" />}
                             <span className={isEditing ? 'text-[var(--brand)] font-medium' : ''}>{item.barcode}</span>
+                          </div>
+                          <div className="flex gap-1 mt-0.5 flex-wrap">
+                            {item.tailoring?.enabled && <span className="text-[9px] px-1.5 py-0.5 rounded-sm bg-[#5C8A9E15] text-[var(--info)] font-medium">✂ {item.tailoring.article_type || 'Tailoring'}</span>}
+                            {item.addon?.enabled && (item.addon.items || []).some(a => parseFloat(a.amount) > 0) && <span className="text-[9px] px-1.5 py-0.5 rounded-sm bg-[#C86B4D15] text-[var(--brand)] font-medium">+ Add-on</span>}
                           </div>
                         </td>
                         <td className="px-3 py-2 font-mono text-sm text-right">{item.qty}</td>

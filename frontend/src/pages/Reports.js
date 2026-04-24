@@ -8,16 +8,22 @@ const COLORS = ["#C86B4D", "#455D4A", "#5C8A9E", "#D49842", "#9E473D", "#6C6760"
 function SummaryCards({ summary }) {
   const fmt = (n) => new Intl.NumberFormat('en-IN').format(Math.round(n || 0));
   const cards = [
-    { label: "Total Fabric Sales", value: `₹${fmt(summary.total_fabric)}`, color: "var(--brand)" },
+    { label: "Fabric Total", value: `₹${fmt(summary.total_fabric)}`, color: "var(--brand)" },
     { label: "Fabric Received", value: `₹${fmt(summary.total_fabric_received)}`, color: "var(--success)" },
     { label: "Fabric Pending", value: `₹${fmt(summary.total_fabric_pending)}`, color: "var(--warning)" },
-    { label: "Tailoring Revenue", value: `₹${fmt(summary.total_tailoring)}`, color: "var(--info)" },
+    { label: "Tailoring Total", value: `₹${fmt(summary.total_tailoring)}`, color: "var(--info)" },
     { label: "Tailoring Received", value: `₹${fmt(summary.total_tailoring_received)}`, color: "var(--success)" },
-    { label: "Total Advances", value: `₹${fmt(summary.total_advance)}`, color: "var(--text-secondary)" },
+    { label: "Tailoring Pending", value: `₹${fmt(summary.total_tailoring_pending)}`, color: "var(--warning)" },
+    { label: "Embroidery Total", value: `₹${fmt(summary.total_embroidery)}`, color: "var(--brand)" },
+    { label: "Embroidery Received", value: `₹${fmt(summary.total_embroidery_received)}`, color: "var(--success)" },
+    { label: "Add-on Total", value: `₹${fmt(summary.total_addon)}`, color: "var(--text-secondary)" },
+    { label: "Add-on Received", value: `₹${fmt(summary.total_addon_received)}`, color: "var(--success)" },
+    { label: "Total Advances", value: `₹${fmt(summary.total_advance)}`, color: "var(--info)" },
+    { label: "Total Items", value: String(summary.total_items || 0), color: "var(--text-primary)" },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {cards.map(c => (
         <div key={c.label} className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm">
           <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] mb-1">{c.label}</p>

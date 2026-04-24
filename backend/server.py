@@ -817,6 +817,12 @@ async def get_dashboard():
     ]
     emb_pending = await db.items.aggregate(pipeline_emb_pending).to_list(1)
 
+    pipeline_addon_pending = [
+        {"$match": {"addon_amount": {"$gt": 0}, "addon_pay_mode": _not_settled}},
+        {"$group": {"_id": None, "total": {"$sum": "$addon_pending"}}}
+    ]
+    addon_pending = await db.items.aggregate(pipeline_addon_pending).to_list(1)
+
     tailoring_pending_count = await db.items.count_documents({"tailoring_status": "Pending"})
     tailoring_stitched_count = await db.items.count_documents({"tailoring_status": "Stitched"})
     emb_required = await db.items.count_documents({"embroidery_status": "Required"})
@@ -842,6 +848,7 @@ async def get_dashboard():
         "fabric_pending_amount": fab_pending[0]["total"] if fab_pending else 0,
         "tailoring_pending_amount": tail_pending[0]["total"] if tail_pending else 0,
         "embroidery_pending_amount": emb_pending[0]["total"] if emb_pending else 0,
+        "addon_pending_amount": addon_pending[0]["total"] if addon_pending else 0,
         "tailoring_pending_count": tailoring_pending_count,
         "tailoring_stitched_count": tailoring_stitched_count,
         "embroidery_required_count": emb_required,

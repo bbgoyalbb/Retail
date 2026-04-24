@@ -601,7 +601,7 @@ export default function ItemsManager() {
     return sortDir === "desc" ? -cmp : cmp;
   });
 
-  const orderNos = [...new Set(allItems.map(i => i.order_no).filter(o => o && o !== "N/A"))].sort();
+  const orderNos = [...new Set(filteredItems.map(i => i.order_no).filter(o => o && o !== "N/A"))].sort();
 
   const toggleExpand = (ref) => setExpanded(prev => ({ ...prev, [ref]: !prev[ref] }));
   const handleSort = (key) => {
@@ -628,19 +628,28 @@ export default function ItemsManager() {
 
       {/* Filters */}
       <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm flex flex-wrap gap-3 items-center">
-        <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-          <option value="">All Dates</option>
-          {uniqueDates.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
-        <select data-testid="orders-customer-filter" value={nameFilter} onChange={e => setNameFilter(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-          <option value="">All Customers</option>
-          {customers.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select data-testid="orders-order-filter" value={orderFilter} onChange={e => setOrderFilter(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-          <option value="">All Order Nos</option>
-          {orderNos.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-        <span className="ml-auto text-xs text-[var(--text-secondary)]">{refs.length} references, {allItems.length} items</span>
+        <div className="flex items-center gap-2">
+          <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Date</label>
+          <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
+            <option value="">All Dates</option>
+            {uniqueDates.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Customer</label>
+          <select data-testid="orders-customer-filter" value={nameFilter} onChange={e => setNameFilter(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
+            <option value="">All Customers</option>
+            {customers.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Order No</label>
+          <select data-testid="orders-order-filter" value={orderFilter} onChange={e => setOrderFilter(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
+            <option value="">All Order Nos</option>
+            {orderNos.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
+        <span className="ml-auto text-xs text-[var(--text-secondary)]">{refs.length} references, {filteredItems.length} items</span>
       </div>
 
       {/* Section Selector Modal - inline to preserve input focus */}
