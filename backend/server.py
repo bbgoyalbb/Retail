@@ -211,10 +211,8 @@ def round_money(value: float) -> float:
 def determine_payment_status(pending_amount: float, received_amount: float) -> str:
     pending_amount = round_money(pending_amount)
     received_amount = round_money(received_amount)
-    if pending_amount <= 0 and received_amount > 0:
+    if received_amount > 0:
         return "Settled"
-    if pending_amount > 0 and received_amount > 0:
-        return "Partially Settled"
     if pending_amount > 0:
         return "Pending"
     return "N/A"
@@ -223,8 +221,6 @@ def build_payment_mode_label(payment_modes: List[str], pending_amount: float, re
     status = determine_payment_status(pending_amount, received_amount)
     if status == "Settled":
         return f"Settled - {', '.join(payment_modes) if payment_modes else 'Cash'}"
-    if status == "Partially Settled":
-        return f"Partially Settled - {', '.join(payment_modes) if payment_modes else 'Cash'}"
     if status == "Pending":
         return "Pending"
     return "N/A"
@@ -302,17 +298,6 @@ def analyze_payment_field(
             "mode": mode,
         })
 
-    if expected_status == "Partially Settled" and not str(mode).startswith("Partially Settled"):
-        issues.append({
-            "type": "mode_status_mismatch",
-            "category": label,
-            "message": f"{label} is partially settled but mode is {mode}",
-            "total": total,
-            "received": received,
-            "pending": pending,
-            "mode": mode,
-        })
-
     if expected_status == "Settled" and not str(mode).startswith("Settled"):
         issues.append({
             "type": "mode_status_mismatch",
@@ -362,12 +347,14 @@ def normalize_payment_field(
     mode = original_mode
     if original_mode != "N/A" or total > 0 or received > 0 or pending > 0:
         mode = status if status != "N/A" else "N/A"
-        if status in ("Settled", "Partially Settled"):
+        if status == "Settled":
             mode_suffix = ""
             if " - " in str(original_mode):
                 mode_suffix = original_mode.split(" - ", 1)[1].strip()
+                if mode_suffix.startswith("Partially Settled - "):
+                    mode_suffix = mode_suffix[len("Partially Settled - "):].strip()
             if mode_suffix:
-                mode = f"{status} - {mode_suffix}"
+                mode = f"Settled - {mode_suffix}"
 
     return {
         received_field: received,
@@ -484,11 +471,13 @@ async def repair_high_risk_data(limit: int = 100) -> dict:
             corrected_status = determine_payment_status(corrected_pending, corrected_received)
             if corrected_status == "Pending":
                 corrected_mode = "Pending"
-            elif corrected_status in ("Settled", "Partially Settled"):
+            elif corrected_status == "Settled":
                 suffix = ""
                 if " - " in str(original_mode):
                     suffix = original_mode.split(" - ", 1)[1].strip()
-                corrected_mode = f"{corrected_status} - {suffix}" if suffix else corrected_status
+                    if suffix.startswith("Partially Settled - "):
+                        suffix = suffix[len("Partially Settled - "):].strip()
+                corrected_mode = f"Settled - {suffix}" if suffix else "Settled"
             elif total <= 0:
                 corrected_mode = "N/A"
 
@@ -1951,9 +1940,6 @@ async def search_items(
         if payment_status == "Settled":
             # $lt: 1 covers both pending=0 (exact) and negative (over-paid credit)
             query["fabric_pending"] = {"$lt": 1}
-            query["fabric_received"] = {"$gt": 0}
-        elif payment_status == "Partially Settled":
-            query["fabric_pending"] = {"$gt": 0}
             query["fabric_received"] = {"$gt": 0}
         elif payment_status == "Pending":
             query["fabric_pending"] = {"$gt": 0}

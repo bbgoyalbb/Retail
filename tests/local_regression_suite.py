@@ -139,15 +139,15 @@ class LocalRegressionSuite:
 
     def test_search_status(self) -> None:
         status, body = self.request(
-            f"/search?q={urllib.parse.quote(self.test_customer)}&payment_status=Partially%20Settled&limit=10"
+            f"/search?q={urllib.parse.quote(self.test_customer)}&payment_status=Settled&limit=10"
         )
         passed = (
             status == 200
             and isinstance(body, dict)
             and body.get("total", 0) >= 1
-            and body["items"][0].get("payment_status") == "Partially Settled"
+            and body["items"][0].get("payment_status") == "Settled"
         )
-        self.log("search by partially settled status", passed, str(body) if not passed else f"{body['total']} matching items")
+        self.log("search by settled status (partial payment = settled)", passed, str(body) if not passed else f"{body['total']} matching items")
 
     def test_audit(self) -> None:
         status, body = self.request("/db/audit?limit=10")

@@ -158,7 +158,7 @@ export default function SearchPage() {
             <div>
               <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Payment</label>
               <select data-testid="search-payment-filter" value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm">
-                {["All", "Pending", "Partially Settled", "Settled"].map(s => <option key={s} value={s}>{s}</option>)}
+                {["All", "Pending", "Settled"].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
@@ -210,7 +210,7 @@ export default function SearchPage() {
                       {item.article_type && item.article_type !== 'N/A' && <span>{item.article_type}</span>}
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-sm border ${item.payment_status === 'Settled' ? 'text-[var(--success)] border-[var(--success)]/30 bg-[var(--success)]/5' : item.payment_status === 'Partially Settled' ? 'text-[var(--info)] border-[var(--info)]/30 bg-[var(--info)]/5' : 'text-[var(--warning)] border-[var(--warning)]/30 bg-[var(--warning)]/5'}`}>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-sm border ${item.payment_status === 'Settled' ? 'text-[var(--success)] border-[var(--success)]/30 bg-[var(--success)]/5' : 'text-[var(--warning)] border-[var(--warning)]/30 bg-[var(--warning)]/5'}`}>
                         {item.payment_status || 'Pending'}
                       </span>
                       {item.tailoring_status && item.tailoring_status !== 'N/A' && (
@@ -250,8 +250,8 @@ export default function SearchPage() {
                           <span className={`text-xs ${item.embroidery_status === 'Finished' ? 'text-[var(--success)]' : item.embroidery_status === 'N/A' || item.embroidery_status === 'Not Required' ? 'text-[var(--text-secondary)]' : 'text-[var(--info)]'}`}>{item.embroidery_status}</span>
                         </td>
                         <td className="px-3 py-2">
-                          <span className={`inline-flex items-center gap-1 text-xs ${item.payment_status === 'Settled' ? 'text-[var(--success)]' : item.payment_status === 'Partially Settled' ? 'text-[var(--info)]' : 'text-[var(--warning)]'}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${item.payment_status === 'Settled' ? 'bg-[var(--success)]' : item.payment_status === 'Partially Settled' ? 'bg-[var(--info)]' : 'bg-[var(--warning)]'}`} />
+                          <span className={`inline-flex items-center gap-1 text-xs ${item.payment_status === 'Settled' ? 'text-[var(--success)]' : 'text-[var(--warning)]'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${item.payment_status === 'Settled' ? 'bg-[var(--success)]' : 'bg-[var(--warning)]'}`} />
                             {item.payment_status || 'Pending'}
                           </span>
                         </td>
