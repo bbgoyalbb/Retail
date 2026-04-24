@@ -68,10 +68,10 @@ export default function SettingsPage() {
     });
   };
 
-  const addMode = () => { if (!newMode.trim()) return; setSettings(prev => ({ ...prev, payment_modes: [...(prev.payment_modes || []), newMode.trim()] })); setNewMode(""); };
+  const addMode = () => { if (!newMode.trim()) return; if ((prev => (prev.payment_modes || []).map(m => m.toLowerCase()).includes(newMode.trim().toLowerCase()))(settings)) return; setSettings(prev => ({ ...prev, payment_modes: [...(prev.payment_modes || []), newMode.trim()] })); setNewMode(""); };
   const removeMode = (m) => setSettings(prev => ({ ...prev, payment_modes: prev.payment_modes.filter(x => x !== m) }));
 
-  const addAddonItem = () => { if (!newAddon.trim()) return; setSettings(prev => ({ ...prev, addon_items: [...(prev.addon_items || []), newAddon.trim()] })); setNewAddon(""); };
+  const addAddonItem = () => { if (!newAddon.trim()) return; if ((prev => (prev.addon_items || []).map(a => a.toLowerCase()).includes(newAddon.trim().toLowerCase()))(settings)) return; setSettings(prev => ({ ...prev, addon_items: [...(prev.addon_items || []), newAddon.trim()] })); setNewAddon(""); };
   const removeAddon = (a) => setSettings(prev => ({ ...prev, addon_items: prev.addon_items.filter(x => x !== a) }));
 
   if (!settings) return <div className="p-8 text-center text-[var(--text-secondary)]">Loading...</div>;

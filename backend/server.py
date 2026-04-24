@@ -2809,6 +2809,11 @@ def merge_settings(stored_settings: Optional[dict] = None) -> dict:
     merged = dict(DEFAULT_SETTINGS)
     if stored_settings:
         merged.update({k: v for k, v in stored_settings.items() if k != "key"})
+    # Deduplicate list fields (case-preserving, first occurrence wins)
+    for list_key in ("payment_modes", "addon_items", "article_types"):
+        if isinstance(merged.get(list_key), list):
+            seen = set()
+            merged[list_key] = [x for x in merged[list_key] if not (x.lower() in seen or seen.add(x.lower()))]
     return merged
 
 @api_router.get("/settings/public")
@@ -2826,6 +2831,11 @@ async def get_settings(current_user: dict = Depends(get_current_user_dep)):
 async def update_settings(data: dict, current_user: dict = Depends(get_current_user_dep)):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Only admins can update settings")
+    # Deduplicate list fields before saving
+    for list_key in ("payment_modes", "addon_items", "article_types"):
+        if isinstance(data.get(list_key), list):
+            seen = set()
+            data[list_key] = [x for x in data[list_key] if not (x.lower() in seen or seen.add(x.lower()))]
     data["key"] = "app_settings"
     await db.settings.update_one({"key": "app_settings"}, {"$set": data}, upsert=True)
     settings = await db.settings.find_one({"key": "app_settings"}, {"_id": 0})
