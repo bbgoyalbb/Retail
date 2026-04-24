@@ -171,16 +171,35 @@ class ItemUpdateRequest(BaseModel):
     embroidery_amount: Optional[float] = None
     addon_desc: Optional[str] = None
     addon_amount: Optional[float] = None
+    addon_received: Optional[float] = None
+    addon_pending: Optional[float] = None
+    addon_pay_mode: Optional[str] = None
+    addon_pay_date: Optional[str] = None
     fabric_pay_mode: Optional[str] = None
+    fabric_pay_date: Optional[str] = None
     fabric_pending: Optional[float] = None
     fabric_received: Optional[float] = None
     tailoring_pay_mode: Optional[str] = None
+    tailoring_pay_date: Optional[str] = None
     tailoring_pending: Optional[float] = None
     tailoring_received: Optional[float] = None
     embroidery_pay_mode: Optional[str] = None
+    embroidery_pay_date: Optional[str] = None
     embroidery_pending: Optional[float] = None
     embroidery_received: Optional[float] = None
     karigar: Optional[str] = None
+    labour_amount: Optional[float] = None
+    labour_paid: Optional[str] = None
+    labour_pay_date: Optional[str] = None
+    labour_payment_mode: Optional[str] = None
+    emb_labour_amount: Optional[float] = None
+    emb_labour_paid: Optional[str] = None
+    emb_labour_date: Optional[str] = None
+    emb_labour_payment_mode: Optional[str] = None
+    tally_fabric: Optional[bool] = None
+    tally_tailoring: Optional[bool] = None
+    tally_embroidery: Optional[bool] = None
+    tally_addon: Optional[bool] = None
 
 # ==========================================
 # HELPERS
@@ -1898,10 +1917,7 @@ async def update_item(item_id: str, req: ItemUpdateRequest):
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    update_fields = {}
-    for field, value in req.model_dump(exclude_unset=True).items():
-        if value is not None:
-            update_fields[field] = value
+    update_fields = {f: v for f, v in req.model_dump(exclude_unset=True).items()}
 
     # Recalculate fabric_amount if price/qty/discount changed
     if any(f in update_fields for f in ["price", "qty", "discount"]):
