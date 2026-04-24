@@ -1118,9 +1118,10 @@ async def assign_tailoring(req: TailoringOrderRequest):
                 "order_no": req.order_no,
                 "delivery_date": req.delivery_date,
                 "tailoring_amount": tail_amt,
-                "labour_amount": labour_amt,
+                "tailoring_received": 0,
                 "tailoring_pending": tail_amt,
                 "tailoring_pay_mode": "Pending",
+                "labour_amount": labour_amt,
                 "embroidery_status": emb_status,
             }
         }
@@ -1173,9 +1174,10 @@ async def split_and_assign(req: SplitTailoringRequest):
                 "order_no": req.order_no,
                 "delivery_date": req.delivery_date,
                 "tailoring_amount": tail_amt,
-                "labour_amount": labour_amt,
+                "tailoring_received": 0,
                 "tailoring_pending": tail_amt,
                 "tailoring_pay_mode": "Pending",
+                "labour_amount": labour_amt,
                 "embroidery_status": split.embroidery_status,
             }
             if split.embroidery_status == "Required":
@@ -1189,6 +1191,7 @@ async def split_and_assign(req: SplitTailoringRequest):
             new_item["qty"] = split.qty
             new_item["fabric_amount"] = split_fabric_amt
             new_item["fabric_pending"] = split_fabric_amt if item.get("fabric_pay_mode") == "Pending" else 0
+            new_item["fabric_received"] = 0  # received stays on original item; new splits start at 0
             new_item["article_type"] = split.article_type
             new_item["tailoring_status"] = "Pending"
             new_item["order_no"] = req.order_no
@@ -2349,7 +2352,7 @@ async def get_customer_report():
             "_id": "$name",
             "total_fabric": {"$sum": "$fabric_amount"},
             "total_received": {"$sum": "$fabric_received"},
-            "total_pending": {"$sum": "$fabric_pending"},
+            "total_pending_raw": {"$sum": "$fabric_pending"},
             "total_tailoring": {"$sum": "$tailoring_amount"},
             "items_count": {"$sum": 1},
             "refs": {"$addToSet": "$ref"},
@@ -2362,7 +2365,7 @@ async def get_customer_report():
             "name": r["_id"],
             "total_fabric": r["total_fabric"],
             "total_received": r["total_received"],
-            "total_pending": r["total_pending"],
+            "total_pending": max(0, r["total_pending_raw"]),
             "total_tailoring": r["total_tailoring"],
             "items_count": r["items_count"],
             "refs_count": len(r["refs"]),
