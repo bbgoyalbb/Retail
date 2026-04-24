@@ -480,7 +480,7 @@ async def repair_high_risk_data(limit: int = 100) -> dict:
 
             # Skip over-paid items — negative pending / received>total is intentional.
             # The repair tool must not undo deliberate over-payments.
-            if received > total + 0.01 or corrected_pending < -0.01:
+            if received > total + 0.01 or pending < -0.01:
                 continue
 
             if corrected_pending >= 0 and corrected_received <= total + 0.01:
@@ -969,11 +969,8 @@ async def create_bill(req: CreateBillRequest):
         discounted_price = round(item.price - (item.price * item.discount / 100), 0)
         grand_total += round(discounted_price * item.qty, 0)
 
-    if req.is_settled and req.amount_paid < grand_total:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Settled bills require full payment. Expected {grand_total:.0f}, received {req.amount_paid:.0f}."
-        )
+    # No hard block: amount_paid may be less than, equal to, or greater than grand_total.
+    # Any amount received marks the section as Settled; pending stores the actual difference.
 
     items_to_insert = []
     running_paid = 0
@@ -1220,8 +1217,14 @@ async def split_and_assign(req: SplitTailoringRequest):
             new_item["id"] = str(uuid.uuid4())
             new_item["qty"] = split.qty
             new_item["fabric_amount"] = split_fabric_amt
-            new_item["fabric_pending"] = split_fabric_amt if item.get("fabric_pay_mode") == "Pending" else 0
-            new_item["fabric_received"] = 0  # received stays on original item; new splits start at 0
+            orig_fabric_mode = item.get("fabric_pay_mode", "Pending")
+            if str(orig_fabric_mode).startswith("Settled"):
+                new_item["fabric_pending"] = 0
+                new_item["fabric_received"] = 0
+                new_item["fabric_pay_mode"] = "N/A"
+            else:
+                new_item["fabric_pending"] = split_fabric_amt
+                new_item["fabric_received"] = 0
             new_item["article_type"] = split.article_type
             new_item["tailoring_status"] = "Pending"
             new_item["order_no"] = req.order_no
@@ -1263,11 +1266,18 @@ async def add_addons(req: AddOnRequest):
 
     new_total = float(item.get("addon_amount", 0)) + total_amount
 
+    existing_received = float(item.get("addon_received", 0))
+    new_pending = round(new_total - existing_received, 2)
+    new_mode = item.get("addon_pay_mode", "Pending")
+    if existing_received > 0 and not str(new_mode).startswith("Settled"):
+        new_mode = f"Settled - {new_mode.split(' - ', 1)[1]}" if " - " in str(new_mode) else "Settled"
+    elif existing_received <= 0:
+        new_mode = "Pending"
     await db.items.update_one({"id": req.item_id}, {"$set": {
         "addon_desc": new_desc,
         "addon_amount": new_total,
-        "addon_pay_mode": "Pending",
-        "addon_pending": new_total,
+        "addon_pay_mode": new_mode,
+        "addon_pending": new_pending,
     }})
     return {"message": "Add-ons saved", "addon_desc": new_desc, "addon_amount": new_total}
 
@@ -2169,7 +2179,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref")):
     grand_total = fab_total + tail_total_amt + emb_total_amt + addon_total_amt
     total_received = fab_received + tail_received + emb_received + addon_received
     total_pending = fab_pending + tail_pending_amt + emb_pending_amt + addon_pending_amt
-    net_payable = max(total_pending - max(total_adv, 0), 0)
+    net_payable = total_pending - max(total_adv, 0)
 
     summary_rows = f"""
       <tr><td>Fabric (incl. GST {GST_RATE:.0f}%)</td><td class="r">₹{fmt(fab_total)}</td><td class="r">₹{fmt(fab_received)}</td><td class="r">₹{fmt(fab_pending)}</td></tr>"""

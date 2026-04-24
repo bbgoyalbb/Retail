@@ -329,11 +329,13 @@ export default function ItemsManager() {
   const detectMismatches = (itemId, original, current) => {
     const mismatches = [];
     
-    const checkMismatch = (amountKey, receivedKey, label) => {
+    const checkMismatch = (amountKey, receivedKey, modeKey, label) => {
       const originalAmount = parseFloat(original[amountKey]) || 0;
       const newAmount = parseFloat(current[amountKey]) || 0;
       const received = parseFloat(original[receivedKey]) || 0;
-      
+      const mode = String(current[modeKey] || original[modeKey] || "");
+      // Skip already-settled sections — negative pending is intentional there
+      if (mode.startsWith("Settled")) return;
       // If amount decreased and is now less than what's received
       if (newAmount < originalAmount && newAmount < received) {
         mismatches.push({
@@ -348,10 +350,10 @@ export default function ItemsManager() {
       }
     };
     
-    checkMismatch('fabric_amount', 'fabric_received', 'Fabric');
-    checkMismatch('tailoring_amount', 'tailoring_received', 'Tailoring');
-    checkMismatch('embroidery_amount', 'embroidery_received', 'Embroidery');
-    checkMismatch('addon_amount', 'addon_received', 'Add-on');
+    checkMismatch('fabric_amount', 'fabric_received', 'fabric_pay_mode', 'Fabric');
+    checkMismatch('tailoring_amount', 'tailoring_received', 'tailoring_pay_mode', 'Tailoring');
+    checkMismatch('embroidery_amount', 'embroidery_received', 'embroidery_pay_mode', 'Embroidery');
+    checkMismatch('addon_amount', 'addon_received', 'addon_pay_mode', 'Add-on');
     
     return mismatches;
   };
