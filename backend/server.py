@@ -907,7 +907,28 @@ async def get_dashboard():
     ]
     adv_total = await db.advances.aggregate(pipeline_adv_total).to_list(1)
 
-    recent_items = await db.items.find({}, {"_id": 0}).sort("date", -1).limit(10).to_list(10)
+    # Get recent unique bill refs (grouped by ref) with customer info and totals
+    pipeline_recent = [
+        {"$sort": {"date": -1, "ref": -1}},
+        {"$group": {
+            "_id": "$ref",
+            "date": {"$first": "$date"},
+            "name": {"$first": "$name"},
+            "fabric_total": {"$sum": "$fabric_amount"},
+            "item_count": {"$sum": 1}
+        }},
+        {"$sort": {"date": -1}},
+        {"$limit": 10},
+        {"$project": {
+            "_id": 0,
+            "ref": "$_id",
+            "date": 1,
+            "name": 1,
+            "fabric_total": 1,
+            "item_count": 1
+        }}
+    ]
+    recent_items = await db.items.aggregate(pipeline_recent).to_list(10)
 
     return {
         "total_items": total_items,
@@ -1600,15 +1621,17 @@ async def process_settlement(req: SettlementRequest):
     # Over-payment is allowed: excess is distributed pro-rata and pending goes negative.
     # Pool-match is validated on the frontend as a warning, not a hard block here.
 
-    async def apply_pro_rata(ref, pay_mode_field, pay_date_field, received_field, pending_field, total_to_pay):
+    # Fetch items ONCE for all categories - prevents 4x database round trips
+    all_items = await db.items.find({"ref": req.ref}, {"_id": 0}).to_list(500)
+    
+    async def apply_pro_rata(pay_mode_field, pay_date_field, received_field, pending_field, total_to_pay):
         # Derive the amount field name from the pending field name
         # e.g. "fabric_pending" -> "fabric_amount", "tailoring_pending" -> "tailoring_amount"
         amount_field = pending_field.replace("_pending", "_amount")
 
-        # Fetch ALL items for this ref that have a non-zero category amount.
+        # Use pre-fetched items instead of querying DB again
         # We cannot filter by pending>0 because over-payment must also reach
         # already-settled items (pending=0). Pro-rata weight = category amount.
-        all_items = await db.items.find({"ref": ref}, {"_id": 0}).to_list(500)
         eligible = [i for i in all_items if round_money(i.get(amount_field, 0)) > 0]
         if not eligible:
             return
@@ -1637,13 +1660,13 @@ async def process_settlement(req: SettlementRequest):
             await db.items.update_one({"id": item["id"]}, {"$set": update})
 
     if req.allot_fabric > 0:
-        await apply_pro_rata(req.ref, "fabric_pay_mode", "fabric_pay_date", "fabric_received", "fabric_pending", req.allot_fabric)
+        await apply_pro_rata("fabric_pay_mode", "fabric_pay_date", "fabric_received", "fabric_pending", req.allot_fabric)
     if req.allot_tailoring > 0:
-        await apply_pro_rata(req.ref, "tailoring_pay_mode", "tailoring_pay_date", "tailoring_received", "tailoring_pending", req.allot_tailoring)
+        await apply_pro_rata("tailoring_pay_mode", "tailoring_pay_date", "tailoring_received", "tailoring_pending", req.allot_tailoring)
     if req.allot_embroidery > 0:
-        await apply_pro_rata(req.ref, "embroidery_pay_mode", "embroidery_pay_date", "embroidery_received", "embroidery_pending", req.allot_embroidery)
+        await apply_pro_rata("embroidery_pay_mode", "embroidery_pay_date", "embroidery_received", "embroidery_pending", req.allot_embroidery)
     if req.allot_addon > 0:
-        await apply_pro_rata(req.ref, "addon_pay_mode", "addon_pay_date", "addon_received", "addon_pending", req.allot_addon)
+        await apply_pro_rata("addon_pay_mode", "addon_pay_date", "addon_received", "addon_pending", req.allot_addon)
 
     if req.allot_advance > 0:
         adv = {
@@ -3203,27 +3226,51 @@ async def restore_database(
         contents = await file.read()
         backup_data = json.loads(contents.decode('utf-8'))
 
+        # ===== VALIDATION PHASE =====
+        # Validate backup structure before touching database
         if "items" not in backup_data or "advances" not in backup_data:
-            raise HTTPException(status_code=400, detail="Invalid backup file format")
+            raise HTTPException(status_code=400, detail="Invalid backup file format: missing 'items' or 'advances'")
 
-        items_count = 0
-        advances_count = 0
         items = backup_data["items"]
         advances = backup_data["advances"]
 
         if not isinstance(items, list) or not isinstance(advances, list):
-            raise HTTPException(status_code=400, detail="Invalid backup file format")
+            raise HTTPException(status_code=400, detail="Invalid backup file format: 'items' and 'advances' must be lists")
+        
+        if len(items) == 0 and len(advances) == 0:
+            raise HTTPException(status_code=400, detail="Backup file contains no data")
 
+        # Validate sample of items have required fields
+        required_item_fields = {"id", "ref", "name", "date", "barcode"}
+        for i, item in enumerate(items[:10]):
+            if not isinstance(item, dict):
+                raise HTTPException(status_code=400, detail=f"Invalid item at index {i}: not an object")
+            missing = required_item_fields - set(item.keys())
+            if missing:
+                raise HTTPException(status_code=400, detail=f"Item at index {i} missing required fields: {missing}")
+
+        # Validate advances have required fields
+        required_advance_fields = {"id", "ref", "name", "amount"}
+        for i, adv in enumerate(advances[:10]):
+            if not isinstance(adv, dict):
+                raise HTTPException(status_code=400, detail=f"Invalid advance at index {i}: not an object")
+            missing = required_advance_fields - set(adv.keys())
+            if missing:
+                raise HTTPException(status_code=400, detail=f"Advance at index {i} missing required fields: {missing}")
+
+        # Get counts for response
+        items_count = len(items)
+        advances_count = len(advances)
+
+        # ===== RESTORE PHASE =====
+        # Only delete after full validation passes
         await db.items.delete_many({})
         await db.advances.delete_many({})
 
         if items:
             await db.items.insert_many(items)
-            items_count = len(items)
-
         if advances:
             await db.advances.insert_many(advances)
-            advances_count = len(advances)
 
         return {
             "message": f"Restore successful! {items_count} items and {advances_count} advances restored.",
@@ -3232,6 +3279,8 @@ async def restore_database(
         }
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON file")
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
     except Exception as e:
         logger.error(f"Restore error: {e}")
         raise HTTPException(status_code=500, detail=f"Restore failed: {str(e)}")
