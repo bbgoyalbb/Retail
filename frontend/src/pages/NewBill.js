@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { createBill, getCustomers, getInvoiceUrl, getSettings } from "@/api";
-import { Plus, Trash, FloppyDisk, Barcode, Printer, PencilSimple, X, Scissors, ArrowsSplit } from "@phosphor-icons/react";
+import { Plus, Trash, FloppyDisk, Barcode, Printer, PencilSimple, X, Scissors, ArrowsSplit, CheckCircle } from "@phosphor-icons/react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import InvoiceModal from "@/components/InvoiceModal";
 
@@ -29,6 +29,8 @@ export default function NewBill() {
   const [message, setMessage] = useState(null);
   const [showScanner, setShowScanner] = useState(false);
   const [lastBillRef, setLastBillRef] = useState(null);
+  const [lastBillTotal, setLastBillTotal] = useState(0);
+  const [showPostSave, setShowPostSave] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
   const [showTailoringModal, setShowTailoringModal] = useState(false);
   const [showAddonModal, setShowAddonModal] = useState(false);
@@ -272,19 +274,9 @@ export default function NewBill() {
       });
 
       setLastBillRef(res.data.ref);
-      setMessage({ type: "success", text: `Bill created! Ref: ${res.data.ref} | Total: ₹${res.data.grand_total}` });
-      setItems([]);
-      setCustomerName("");
-      setOrderDate(today);
-      setPayDate(today);
-      setAmountPaid("");
-      setSelectedModes([]);
-      setIsSettled(false);
-      setNeedsTailoring(false);
-      setShowTailoringModal(false);
-      setShowAddonModal(false);
-      resetItemForm();
-      setTimeout(() => nameRef.current?.focus(), 50);
+      setLastBillTotal(res.data.grand_total);
+      setShowPostSave(true);
+      setMessage(null);
     } catch (err) {
       setMessage({ type: "error", text: err.response?.data?.detail || "Failed to save bill" });
     } finally {
@@ -312,6 +304,24 @@ export default function NewBill() {
     setShowAddonModal(true);
   };
 
+  const createAnotherBill = () => {
+    setShowPostSave(false);
+    setLastBillRef(null);
+    setLastBillTotal(0);
+    setItems([]);
+    setCustomerName("");
+    setOrderDate(today);
+    setPayDate(today);
+    setAmountPaid("");
+    setSelectedModes([]);
+    setIsSettled(false);
+    setNeedsTailoring(false);
+    setShowTailoringModal(false);
+    setShowAddonModal(false);
+    resetItemForm();
+    setTimeout(() => nameRef.current?.focus(), 50);
+  };
+
   return (
     <div data-testid="new-bill-page" className="space-y-6">
       <div>
@@ -319,16 +329,35 @@ export default function NewBill() {
         <p className="text-sm text-[var(--text-secondary)] mt-1">Create a new fabric sale entry</p>
       </div>
 
-      {message && (
-        <div data-testid="bill-message" className={`p-4 border rounded-sm text-sm flex items-center justify-between ${message.type === 'success' ? 'bg-[#455D4A10] border-[var(--success)] text-[var(--success)]' : 'bg-[#9E473D10] border-[var(--error)] text-[var(--error)]'}`}>
+      {message && !showPostSave && (
+        <div data-testid="bill-message" className={`p-4 border rounded-sm text-sm ${message.type === 'success' ? 'bg-[#455D4A10] border-[var(--success)] text-[var(--success)]' : 'bg-[#9E473D10] border-[var(--error)] text-[var(--error)]'}`}>
           <span>{message.text}</span>
-          {message.type === 'success' && lastBillRef && (
-            <div className="flex gap-2 ml-4">
-              <button onClick={() => setShowInvoice(true)} data-testid="print-bill-btn" className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[var(--success)] text-white rounded-sm hover:bg-[#3d4d3f]">
-                <Printer size={14} /> View Invoice
-              </button>
+        </div>
+      )}
+
+      {showPostSave && lastBillRef && (
+        <div className="bg-[var(--surface)] border-2 border-[var(--success)] rounded-sm p-6 space-y-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] font-semibold text-[var(--success)]">Bill Saved Successfully</p>
+              <p className="font-heading text-2xl font-semibold tracking-tight mt-1" style={{ color: "var(--brand)" }}>Ref: {lastBillRef}</p>
+              <p className="font-mono text-lg text-[var(--text-primary)] mt-1">₹{lastBillTotal.toLocaleString('en-IN')}</p>
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <CheckCircle size={32} weight="fill" className="text-[var(--success)]" />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3 pt-2">
+            <button onClick={() => setShowInvoice(true)} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--success)] text-white rounded-sm hover:bg-[#3d4d3f]">
+              <Printer size={16} /> View Invoice
+            </button>
+            <button onClick={() => window.open(getInvoiceUrl(lastBillRef), '_blank')} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)]">
+              <Printer size={16} weight="bold" /> Print
+            </button>
+            <button onClick={createAnotherBill} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] ml-auto">
+              <Plus size={16} weight="bold" /> Create Another Bill
+            </button>
+          </div>
         </div>
       )}
 
