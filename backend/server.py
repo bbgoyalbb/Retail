@@ -2119,7 +2119,17 @@ async def create_item(req: ItemCreateRequest, current_user: dict = Depends(get_c
     return doc
 
 @api_router.delete("/items/bulk/delete")
-async def bulk_delete_items(item_ids: List[str]):
+async def bulk_delete_items(
+    item_ids: List[str],
+    current_user: dict = Depends(get_current_user_dep)
+):
+    # Restrict to admin/manager only
+    if current_user.get("role") not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    # Audit log the bulk delete
+    await audit_log(db, "bulk_delete", current_user, "items", f"count:{len(item_ids)}", {"count": len(item_ids)})
+    
     result = await db.items.delete_many({"id": {"$in": item_ids}})
     return {"message": f"{result.deleted_count} items deleted"}
 
@@ -2880,7 +2890,15 @@ async def get_summary_report(date_from: Optional[str] = None, date_to: Optional[
 # ==========================================
 
 @api_router.post("/import/excel")
-async def import_excel(file: UploadFile = File(...), mode: str = "replace"):
+async def import_excel(
+    file: UploadFile = File(...),
+    mode: str = "replace",
+    current_user: dict = Depends(get_current_user_dep)
+):
+    # Restrict to admin only
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
     if not file.filename.endswith(('.xlsm', '.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="Please upload an Excel file (.xlsm or .xlsx)")
 
@@ -3014,7 +3032,11 @@ async def import_excel(file: UploadFile = File(...), mode: str = "replace"):
 # ==========================================
 
 @api_router.get("/export/excel")
-async def export_excel():
+async def export_excel(current_user: dict = Depends(get_current_user_dep)):
+    # Restrict to admin only
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment
 
@@ -3091,7 +3113,11 @@ async def export_excel():
 # ==========================================
 
 @api_router.get("/backup")
-async def backup_database():
+async def backup_database(current_user: dict = Depends(get_current_user_dep)):
+    # Restrict to admin only
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
     items = await db.items.find({}, {"_id": 0}).to_list(50000)
     advances = await db.advances.find({}, {"_id": 0}).to_list(10000)
 
@@ -3115,7 +3141,17 @@ async def backup_database():
     )
 
 @api_router.post("/restore")
-async def restore_database(file: UploadFile = File(...)):
+async def restore_database(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user_dep)
+):
+    # Restrict to admin only
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Audit log the restore attempt
+    await audit_log(db, "restore", current_user, "database", "full", {"filename": file.filename})
+    
     if not file.filename.endswith('.json'):
         raise HTTPException(status_code=400, detail="Please upload a .json backup file")
 
@@ -3418,10 +3454,23 @@ app.include_router(api_router)
 
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
+# CORS configuration - fail loudly if not set in production
+cors_origins = os.environ.get('CORS_ORIGINS')
+if not cors_origins:
+    # In production (when not in DEBUG mode), require explicit CORS origins
+    if os.environ.get('DEBUG', '').lower() != 'true':
+        raise RuntimeError(
+            "CORS_ORIGINS environment variable not set. "
+            "Please set it to your allowed origins (e.g., 'https://yourshop.com,https://192.168.1.100:8001'). "
+            "For development, set DEBUG=true to allow all origins."
+        )
+    # In development, default to allow all
+    cors_origins = '*'
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=cors_origins.split(',') if cors_origins != '*' else ['*'],
     allow_methods=["*"],
     allow_headers=["*"],
 )
