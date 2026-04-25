@@ -1115,14 +1115,16 @@ export default function ItemsManager() {
             {/* Collapsed Reference Row */}
             <div className="px-3 py-3 cursor-pointer hover:bg-[#C86B4D05] transition-colors" onClick={() => toggleExpand(group.ref)}>
               {/* Mobile layout */}
-              <div className="flex sm:hidden items-start gap-2">
+              {(() => { const isCancelled = group.items.some(i => i.cancelled); return (
+              <div className={`flex sm:hidden items-start gap-2 ${isCancelled ? 'opacity-60' : ''}`}>
                 <span className="mt-1 text-[var(--text-secondary)] flex-shrink-0">{expanded[group.ref] ? <CaretDown size={14} /> : <CaretRight size={14} />}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-xs text-[var(--brand)] font-medium">{group.ref}</span>
+                    <span className={`font-mono text-xs text-[var(--brand)] font-medium ${isCancelled ? 'line-through' : ''}`}>{group.ref}</span>
                     <span className="text-xs text-[var(--text-secondary)]">{group.date}</span>
+                    {isCancelled && <span className="text-[10px] px-1.5 py-0.5 bg-[var(--error)]/20 text-[var(--error)] rounded-sm font-medium">CANCELLED</span>}
                   </div>
-                  <div className="text-sm font-medium truncate mt-0.5">{group.name}</div>
+                  <div className={`text-sm font-medium truncate mt-0.5 ${isCancelled ? 'line-through' : ''}`}>{group.name}</div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
                     {group.totals.fabric > 0 && <span className="text-[10px] text-[var(--text-secondary)]">Fab: <span className="font-mono text-[var(--text-primary)]">{fmt(group.totals.fabric)}</span></span>}
                     {group.totals.tailoring > 0 && <span className="text-[10px] text-[var(--text-secondary)]">Tail: <span className="font-mono text-[var(--text-primary)]">{fmt(group.totals.tailoring)}</span></span>}
@@ -1147,13 +1149,14 @@ export default function ItemsManager() {
                 </div>
               </div>
               {/* Desktop layout */}
-              {(() => { const isSettled = Math.round(group.totals.pending) === 0 && group.totals.total > 0; const hasTailoringOrder = group.items.some(i => i.order_no && i.order_no !== 'N/A'); return (
-              <div className="hidden sm:grid items-center" style={{gridTemplateColumns:'24px 96px 96px 120px 1fr repeat(5,80px) 48px 90px 90px 100px 88px'}}>
+              {(() => { const isSettled = Math.round(group.totals.pending) === 0 && group.totals.total > 0; const hasTailoringOrder = group.items.some(i => i.order_no && i.order_no !== 'N/A'); const isCancelled = group.items.some(i => i.cancelled); return (
+              <div className={`hidden sm:grid items-center ${isCancelled ? 'opacity-60' : ''}`} style={{gridTemplateColumns:'24px 96px 96px 120px 1fr repeat(5,80px) 48px 90px 90px 100px 88px'}}>
                 <span className="text-[var(--text-secondary)]">{expanded[group.ref] ? <CaretDown size={14} /> : <CaretRight size={14} />}</span>
                 <span className="font-mono text-xs">{group.date}</span>
-                <span className="font-mono text-xs text-[var(--brand)] font-medium">{group.ref}</span>
-                <span className="font-mono text-xs">{hasTailoringOrder ? group.items.find(i => i.order_no && i.order_no !== 'N/A')?.order_no : '-'}</span>
-                <span className="text-sm font-medium truncate pr-2">{group.name}</span>
+                <span className={`font-mono text-xs text-[var(--brand)] font-medium ${isCancelled ? 'line-through' : ''}`}>{group.ref}</span>
+                <span className={`font-mono text-xs ${isCancelled ? 'line-through' : ''}`}>{hasTailoringOrder ? group.items.find(i => i.order_no && i.order_no !== 'N/A')?.order_no : '-'}</span>
+                <span className={`text-sm font-medium truncate pr-2 ${isCancelled ? 'line-through' : ''}`}>{group.name}</span>
+                {isCancelled && <span className="col-span-12 text-[10px] text-[var(--error)] font-medium -mt-2 mb-1">CANCELLED ORDER</span>}
                 <span className="font-mono text-xs text-right">{group.totals.fabric > 0 ? fmt(group.totals.fabric) : '-'}</span>
                 <span className="font-mono text-xs text-right">{group.totals.tailoring > 0 ? fmt(group.totals.tailoring) : '-'}</span>
                 <span className="font-mono text-xs text-right">{group.totals.embroidery > 0 ? fmt(group.totals.embroidery) : '-'}</span>
