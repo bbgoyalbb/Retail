@@ -202,6 +202,58 @@ class ItemUpdateRequest(BaseModel):
     tally_tailoring: Optional[bool] = None
     tally_embroidery: Optional[bool] = None
     tally_addon: Optional[bool] = None
+    cancelled: Optional[bool] = None
+    cancelled_at: Optional[str] = None
+    cancelled_ref: Optional[str] = None
+
+
+class ItemCreateRequest(BaseModel):
+    ref: str
+    name: str
+    date: str
+    barcode: Optional[str] = None
+    price: Optional[float] = None
+    qty: Optional[float] = None
+    discount: Optional[float] = None
+    fabric_amount: Optional[float] = None
+    fabric_received: Optional[float] = None
+    fabric_pending: Optional[float] = None
+    fabric_pay_date: Optional[str] = None
+    fabric_pay_mode: Optional[str] = None
+    tailoring_status: Optional[str] = None
+    article_type: Optional[str] = None
+    order_no: Optional[str] = None
+    delivery_date: Optional[str] = None
+    tailoring_amount: Optional[float] = None
+    tailoring_received: Optional[float] = None
+    tailoring_pending: Optional[float] = None
+    tailoring_pay_date: Optional[str] = None
+    tailoring_pay_mode: Optional[str] = None
+    embroidery_status: Optional[str] = None
+    karigar: Optional[str] = None
+    embroidery_amount: Optional[float] = None
+    embroidery_received: Optional[float] = None
+    embroidery_pending: Optional[float] = None
+    embroidery_pay_date: Optional[str] = None
+    embroidery_pay_mode: Optional[str] = None
+    addon_desc: Optional[str] = None
+    addon_amount: Optional[float] = None
+    addon_received: Optional[float] = None
+    addon_pending: Optional[float] = None
+    addon_pay_date: Optional[str] = None
+    addon_pay_mode: Optional[str] = None
+    labour_amount: Optional[float] = None
+    labour_paid: Optional[str] = None
+    labour_pay_date: Optional[str] = None
+    labour_payment_mode: Optional[str] = None
+    emb_labour_amount: Optional[float] = None
+    emb_labour_paid: Optional[str] = None
+    emb_labour_date: Optional[str] = None
+    emb_labour_payment_mode: Optional[str] = None
+    tally_fabric: Optional[bool] = None
+    tally_tailoring: Optional[bool] = None
+    tally_embroidery: Optional[bool] = None
+    tally_addon: Optional[bool] = None
 
     # Ensure all frontend editable fields are covered
     # Items section: date, name, ref, barcode, price, qty, discount, fabric_received, fabric_pay_date, fabric_pay_mode, tally_fabric
@@ -2001,6 +2053,70 @@ async def delete_item(item_id: str, current_user: dict = Depends(get_current_use
         raise HTTPException(status_code=404, detail="Item not found")
     await audit_log(db, "delete", current_user, "item", item_id, {"barcode": item.get("barcode") if item else None})
     return {"message": "Item deleted"}
+
+
+@api_router.post("/items")
+async def create_item(req: ItemCreateRequest, current_user: dict = Depends(get_current_user_dep)):
+    """Create a new item for an existing order."""
+    import uuid
+    item_id = str(uuid.uuid4())
+    
+    # Initialize all fields with defaults
+    doc = {
+        "id": item_id,
+        "ref": req.ref,
+        "name": req.name,
+        "date": req.date,
+        "barcode": req.barcode or "",
+        "price": req.price or 0,
+        "qty": req.qty or 0,
+        "discount": req.discount or 0,
+        "fabric_amount": req.fabric_amount or 0,
+        "fabric_received": req.fabric_received or 0,
+        "fabric_pending": req.fabric_pending or 0,
+        "fabric_pay_date": req.fabric_pay_date or "",
+        "fabric_pay_mode": req.fabric_pay_mode or "N/A",
+        "tailoring_status": req.tailoring_status or "N/A",
+        "article_type": req.article_type or "N/A",
+        "order_no": req.order_no or "N/A",
+        "delivery_date": req.delivery_date or "N/A",
+        "tailoring_amount": req.tailoring_amount or 0,
+        "tailoring_received": req.tailoring_received or 0,
+        "tailoring_pending": req.tailoring_pending or 0,
+        "tailoring_pay_date": req.tailoring_pay_date or "",
+        "tailoring_pay_mode": req.tailoring_pay_mode or "N/A",
+        "embroidery_status": req.embroidery_status or "N/A",
+        "karigar": req.karigar or "N/A",
+        "embroidery_amount": req.embroidery_amount or 0,
+        "embroidery_received": req.embroidery_received or 0,
+        "embroidery_pending": req.embroidery_pending or 0,
+        "embroidery_pay_date": req.embroidery_pay_date or "",
+        "embroidery_pay_mode": req.embroidery_pay_mode or "N/A",
+        "addon_desc": req.addon_desc or "N/A",
+        "addon_amount": req.addon_amount or 0,
+        "addon_received": req.addon_received or 0,
+        "addon_pending": req.addon_pending or 0,
+        "addon_pay_date": req.addon_pay_date or "",
+        "addon_pay_mode": req.addon_pay_mode or "N/A",
+        "labour_amount": req.labour_amount or 0,
+        "labour_paid": req.labour_paid or "N/A",
+        "labour_pay_date": req.labour_pay_date or "",
+        "labour_payment_mode": req.labour_payment_mode or "N/A",
+        "emb_labour_amount": req.emb_labour_amount or 0,
+        "emb_labour_paid": req.emb_labour_paid or "N/A",
+        "emb_labour_date": req.emb_labour_date or "",
+        "emb_labour_payment_mode": req.emb_labour_payment_mode or "N/A",
+        "tally_fabric": req.tally_fabric or False,
+        "tally_tailoring": req.tally_tailoring or False,
+        "tally_embroidery": req.tally_embroidery or False,
+        "tally_addon": req.tally_addon or False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    
+    await db.items.insert_one(doc)
+    await audit_log(db, "create", current_user, "item", item_id, {"ref": req.ref, "barcode": req.barcode})
+    doc.pop("_id", None)
+    return doc
 
 @api_router.delete("/items/bulk/delete")
 async def bulk_delete_items(item_ids: List[str]):

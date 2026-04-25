@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useCallback } from "react";
-import { getItems, updateItem, deleteItem, getAdvances, createAdvance, updateAdvance, deleteAdvance } from "@/api";
+import { getItems, updateItem, deleteItem, createItem, getAdvances, createAdvance, updateAdvance, deleteAdvance } from "@/api";
 import { PencilSimple, Trash, FloppyDisk, X, Printer, CaretDown, CaretRight, MagnifyingGlass, Check, Plus, CheckCircle, Funnel, Eye, EyeSlash } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -146,6 +146,8 @@ export default function ItemsManager() {
   const [editItems, setEditItems] = useState([]); // Array of items being edited
   const [editData, setEditData] = useState({}); // { [itemId]: { field: value } }
   const [originalData, setOriginalData] = useState({}); // For cancel
+  const [newItemIds, setNewItemIds] = useState([]); // Track new items to be created
+  const [cancelConfirm, setCancelConfirm] = useState(null); // For cancel order confirmation
   const [saving, setSaving] = useState(false);
   
   // Advances editing state
@@ -446,14 +448,18 @@ export default function ItemsManager() {
       return;
     }
     
-    // Handle regular items
+    // Handle regular items - separate new items from existing items
     const itemIds = Object.keys(editData);
     let success = 0;
     let failed = 0;
     const allMismatches = [];
     const affectedRefs = new Set();
     
+    // Process existing items (update)
     for (const itemId of itemIds) {
+      // Skip new items - they will be created separately
+      if (newItemIds.includes(itemId)) continue;
+      
       try {
         // Only send changed fields
         const original = originalData[itemId];
@@ -483,11 +489,26 @@ export default function ItemsManager() {
       }
     }
     
+    // Create new items
+    for (const itemId of newItemIds) {
+      try {
+        const itemData = editData[itemId];
+        if (itemData) {
+          await createItem(itemData);
+          success++;
+        }
+      } catch (err) {
+        console.error('Failed to create item:', err);
+        failed++;
+      }
+    }
+    
     setSaving(false);
     setSelectedSection(null);
     setEditData({});
     setOriginalData({});
     setEditItems([]);
+    setNewItemIds([]);
     
     if (failed === 0) {
       if (allMismatches.length > 0) {
@@ -497,11 +518,11 @@ export default function ItemsManager() {
           mismatches: allMismatches
         });
       } else {
-        setMessage({ type: "success", text: `${success} item(s) updated successfully` });
+        setMessage({ type: "success", text: `${success} item(s) saved successfully` });
         setTimeout(() => setMessage(null), 3000);
       }
     } else {
-      setMessage({ type: "error", text: `${failed} update(s) failed, ${success} succeeded` });
+      setMessage({ type: "error", text: `${failed} operation(s) failed, ${success} succeeded` });
       setTimeout(() => setMessage(null), 3000);
     }
     
@@ -525,16 +546,78 @@ export default function ItemsManager() {
     setEditData({});
     setOriginalData({});
     setEditItems([]);
+    setNewItemIds([]);
     setShowSectionSelector(false);
     // Reset advance states
     setAdvanceData({});
     setOriginalAdvanceData({});
-    setRefAdvances([]);
     setNewAdvances([]);
     setDeletedAdvances([]);
   };
 
-  // ==========================================
+  // Add new item to existing order (in edit mode)
+  const addNewItem = () => {
+    const tempId = `new_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const ref = editItems[0]?.ref || '';
+    const name = editItems[0]?.name || '';
+    const date = editItems[0]?.date || new Date().toISOString().split('T')[0];
+    
+    const newItem = {
+      id: tempId,
+      ref: ref,
+      name: name,
+      date: date,
+      barcode: '',
+      price: 0,
+      qty: 0,
+      discount: 0,
+      fabric_amount: 0,
+      fabric_received: 0,
+      fabric_pending: 0,
+      fabric_pay_date: '',
+      fabric_pay_mode: 'N/A',
+      tailoring_status: 'N/A',
+      article_type: 'N/A',
+      order_no: 'N/A',
+      delivery_date: 'N/A',
+      tailoring_amount: 0,
+      tailoring_received: 0,
+      tailoring_pending: 0,
+      tailoring_pay_date: '',
+      tailoring_pay_mode: 'N/A',
+      embroidery_status: 'N/A',
+      karigar: 'N/A',
+      embroidery_amount: 0,
+      embroidery_received: 0,
+      embroidery_pending: 0,
+      embroidery_pay_date: '',
+      embroidery_pay_mode: 'N/A',
+      addon_desc: 'N/A',
+      addon_amount: 0,
+      addon_received: 0,
+      addon_pending: 0,
+      addon_pay_date: '',
+      addon_pay_mode: 'N/A',
+      labour_amount: 0,
+      labour_paid: 'N/A',
+      labour_pay_date: '',
+      labour_payment_mode: 'N/A',
+      emb_labour_amount: 0,
+      emb_labour_paid: 'N/A',
+      emb_labour_date: '',
+      emb_labour_payment_mode: 'N/A',
+      tally_fabric: false,
+      tally_tailoring: false,
+      tally_embroidery: false,
+      tally_addon: false,
+    };
+    
+    setEditItems(prev => [...prev, newItem]);
+    setEditData(prev => ({ ...prev, [tempId]: { ...newItem } }));
+    setOriginalData(prev => ({ ...prev, [tempId]: { ...newItem } }));
+    setNewItemIds(prev => [...prev, tempId]);
+  };
+
   // DELETE HANDLERS
   // ==========================================
   const handleDelete = async () => {
@@ -559,6 +642,42 @@ export default function ItemsManager() {
       setMessage({ type: "error", text: "Failed to delete" });
     }
     setTimeout(() => setMessage(null), 3000);
+  };
+
+  // Handle cancel order - mark all items as cancelled
+  const handleCancelOrder = async (group) => {
+    const itemsToCancel = group.items;
+    const cancelledCount = itemsToCancel.length;
+    
+    try {
+      // Mark all items in the order as cancelled by setting a cancelled flag
+      // We'll update each item to add a 'cancelled' field
+      let success = 0;
+      for (const item of itemsToCancel) {
+        try {
+          await updateItem(item.id, { 
+            cancelled: true, 
+            cancelled_at: new Date().toISOString(),
+            cancelled_ref: item.ref 
+          });
+          success++;
+        } catch (err) {
+          // silenced
+        }
+      }
+      
+      if (success === cancelledCount) {
+        setMessage({ type: 'success', text: `Order ${group.ref} cancelled successfully` });
+      } else {
+        setMessage({ type: 'error', text: `${cancelledCount - success} items failed to cancel` });
+      }
+      setTimeout(() => setMessage(null), 3000);
+      loadData();
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to cancel order' });
+      setTimeout(() => setMessage(null), 3000);
+    }
+    setCancelConfirm(null);
   };
 
   const uniqueDates = [...new Set(allItems.map(i => i.date).filter(Boolean))].sort().reverse();
@@ -803,6 +922,12 @@ export default function ItemsManager() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
+                  {_sectionForEdit?.label === 'Items' && editMode === 'order' && (
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="text-xs text-[var(--text-secondary)]">Editing {editItems.length} items for: <span className="font-mono font-medium">{editItems[0]?.ref}</span></span>
+                      <button onClick={addNewItem} className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[var(--success)] text-white rounded-sm hover:bg-[#3d4a3f]"><Plus size={12} /> Add Item</button>
+                    </div>
+                  )}
                   <table className="w-full border border-[var(--border-subtle)]">
                     <thead className="bg-[var(--bg)] sticky top-0"><tr>
                       <th className="px-3 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-20">Item</th>
@@ -873,6 +998,29 @@ export default function ItemsManager() {
           </div>
         </div>
       )}
+
+      {cancelConfirm && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setCancelConfirm(null)}>
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+            <h3 className="font-heading text-lg font-medium mb-2 text-[var(--warning)]">
+              Cancel Order?
+            </h3>
+            <p className="text-sm text-[var(--text-secondary)] mb-4">
+              Order: <span className="font-mono font-medium">{cancelConfirm.ref}</span><br/>
+              <span className="text-xs">{cancelConfirm.items?.length || 0} items will be marked as cancelled. Cancelled orders can still be viewed in reports.</span>
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setCancelConfirm(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm">Back</button>
+              <button
+                onClick={() => handleCancelOrder(cancelConfirm)}
+                className="px-4 py-2 text-sm bg-[var(--warning)] text-white rounded-sm hover:opacity-90"
+              >
+                Cancel Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Amount Mismatch Prompt */}
       {mismatchPrompt && (
@@ -936,10 +1084,11 @@ export default function ItemsManager() {
       {/* Grouped References */}
       <div className="space-y-2">
         {/* Header row — desktop only */}
-        <div className="hidden sm:grid bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-4 py-2 items-center text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]" style={{gridTemplateColumns:'24px 96px 96px 1fr repeat(5,80px) 48px 90px 90px 100px 88px'}}>
+        <div className="hidden sm:grid bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-4 py-2 items-center text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]" style={{gridTemplateColumns:'24px 96px 96px 120px 1fr repeat(5,80px) 48px 90px 90px 100px 88px'}}>
           <span></span>
           <button onClick={() => handleSort("date")} className="text-left hover:text-[var(--brand)]">Date {sortKey === 'date' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
           <button onClick={() => handleSort("ref")} className="text-left hover:text-[var(--brand)]">Ref {sortKey === 'ref' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
+          <button onClick={() => handleSort("order_no")} className="text-left hover:text-[var(--brand)]">Tailoring Order# {sortKey === 'order_no' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
           <button onClick={() => handleSort("name")} className="text-left hover:text-[var(--brand)]">Customer {sortKey === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}</button>
           <span className="text-right">Fabric</span>
           <span className="text-right">Tailoring</span>
@@ -992,16 +1141,18 @@ export default function ItemsManager() {
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
                   <button onClick={() => { setEditItems(group.items); setEditMode('order'); setShowSectionSelector(true); }} className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm" title="Edit Order"><PencilSimple size={14} /></button>
+                  <button onClick={() => { setCancelConfirm(group); }} className="p-1.5 text-[var(--warning)] hover:bg-[#D4984210] rounded-sm" title="Cancel Order"><X size={14} /></button>
                   <button onClick={() => { setDelConfirm(group); setDelMode('order'); }} className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm" title="Delete Order"><Trash size={14} /></button>
                   <button onClick={e => { e.stopPropagation(); setInvoiceRef(group.ref); }} className="p-1.5"><Printer size={15} className="text-[var(--brand)] inline" /></button>
                 </div>
               </div>
               {/* Desktop layout */}
-              {(() => { const isSettled = Math.round(group.totals.pending) === 0 && group.totals.total > 0; return (
-              <div className="hidden sm:grid items-center" style={{gridTemplateColumns:'24px 96px 96px 1fr repeat(5,80px) 48px 90px 90px 100px 88px'}}>
+              {(() => { const isSettled = Math.round(group.totals.pending) === 0 && group.totals.total > 0; const hasTailoringOrder = group.items.some(i => i.order_no && i.order_no !== 'N/A'); return (
+              <div className="hidden sm:grid items-center" style={{gridTemplateColumns:'24px 96px 96px 120px 1fr repeat(5,80px) 48px 90px 90px 100px 88px'}}>
                 <span className="text-[var(--text-secondary)]">{expanded[group.ref] ? <CaretDown size={14} /> : <CaretRight size={14} />}</span>
                 <span className="font-mono text-xs">{group.date}</span>
                 <span className="font-mono text-xs text-[var(--brand)] font-medium">{group.ref}</span>
+                <span className="font-mono text-xs">{hasTailoringOrder ? group.items.find(i => i.order_no && i.order_no !== 'N/A')?.order_no : '-'}</span>
                 <span className="text-sm font-medium truncate pr-2">{group.name}</span>
                 <span className="font-mono text-xs text-right">{group.totals.fabric > 0 ? fmt(group.totals.fabric) : '-'}</span>
                 <span className="font-mono text-xs text-right">{group.totals.tailoring > 0 ? fmt(group.totals.tailoring) : '-'}</span>
@@ -1016,6 +1167,7 @@ export default function ItemsManager() {
                 </span>
                 <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
                   <button onClick={() => { setEditItems(group.items); setEditMode('order'); setShowSectionSelector(true); }} className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm" title="Edit Order"><PencilSimple size={14} /></button>
+                  <button onClick={() => { setCancelConfirm(group); }} className="p-1.5 text-[var(--warning)] hover:bg-[#D4984210] rounded-sm" title="Cancel Order"><X size={14} /></button>
                   <button onClick={() => { setDelConfirm(group); setDelMode('order'); }} className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm" title="Delete Order"><Trash size={14} /></button>
                   <button onClick={e => { e.stopPropagation(); setInvoiceRef(group.ref); }} className="p-1.5"><Printer size={15} className="text-[var(--brand)] hover:text-[var(--brand-hover)]" /></button>
                 </div>

@@ -96,6 +96,7 @@ export const deleteAdvance = (id) => api.delete(`/advances/${id}`);
 export const updateItem = (id, data) => api.put(`/items/${id}`, data);
 export const deleteItem = (id) => api.delete(`/items/${id}`);
 export const bulkDeleteItems = (ids) => api.delete("/items/bulk/delete", { data: ids });
+export const createItem = (data) => api.post("/items", data);
 
 // Search
 export const searchItems = (params) => api.get("/search", { params });
