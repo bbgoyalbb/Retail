@@ -2077,6 +2077,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     firm_address = s.get("firm_address", DEFAULT_SETTINGS["firm_address"])
     firm_phones = s.get("firm_phones", DEFAULT_SETTINGS["firm_phones"])
     firm_gstin = s.get("firm_gstin", DEFAULT_SETTINGS["firm_gstin"])
+    firm_logo = s.get("firm_logo", DEFAULT_SETTINGS.get("firm_logo", None))
 
     customer_name = items[0].get("name", "N/A")
     order_date = items[0].get("date", "N/A")
@@ -2278,17 +2279,21 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     width: 40px; 
     height: 40px; 
     background: var(--brand); 
-    border-radius: 2px; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    color: white; 
-    font-family: 'Manrope', sans-serif; 
-    font-size: 22px; 
+    color: #fff; 
+    border-radius: 8px; 
+    display: grid; 
+    place-items: center; 
     font-weight: 700; 
+    font-size: 18px;
     flex-shrink: 0;
   }}
-  
+  .inv-logo-img {{
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }}
   .inv-firm h2 {{ 
     font-family: 'Manrope', sans-serif; 
     font-size: 16px; 
@@ -2511,7 +2516,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
   <!-- Head -->
   <div class="inv-head">
     <div class="inv-brand">
-      <div class="inv-logo">R</div>
+      {f'<img src="{firm_logo}" class="inv-logo-img" alt="logo" />' if firm_logo else '<div class="inv-logo">R</div>'}
       <div class="inv-firm">
         <h2>{firm_name}</h2>
         <p>Fabric &amp; Tailoring</p>
