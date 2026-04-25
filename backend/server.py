@@ -26,6 +26,7 @@ from data_quality import (
     repair_high_risk_data as dq_repair_high_risk_data,
 )
 import auth as auth_module
+from auth import audit_log
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -947,7 +948,7 @@ async def get_refs(name: Optional[str] = None, pending_only: bool = False):
 # ==========================================
 
 @api_router.post("/bills")
-async def create_bill(req: CreateBillRequest):
+async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_current_user_dep)):
     if not req.items:
         raise HTTPException(status_code=400, detail="At least one item is required")
 
@@ -1108,6 +1109,7 @@ async def create_bill(req: CreateBillRequest):
         }
         await db.advances.insert_one(adv)
 
+    await audit_log(db, "create", current_user, "bill", ref, {"customer": req.customer_name, "items": len(items_to_insert), "total": grand_total})
     return {"message": "Bill created", "ref": ref, "items_count": len(items_to_insert), "grand_total": grand_total}
 
 # ==========================================
@@ -1844,28 +1846,31 @@ class AdvanceUpdateRequest(BaseModel):
     tally: Optional[bool] = None
 
 @api_router.post("/advances")
-async def create_advance(req: AdvanceCreateRequest):
+async def create_advance(req: AdvanceCreateRequest, current_user: dict = Depends(get_current_user_dep)):
     import uuid
     adv = {"id": str(uuid.uuid4()), "ref": req.ref, "name": req.name, "amount": req.amount, "date": req.date, "mode": req.mode or "Cash"}
     await db.advances.insert_one(adv)
+    await audit_log(db, "create", current_user, "advance", adv["id"], {"ref": req.ref, "amount": req.amount})
     adv.pop("_id", None)
     return adv
 
 @api_router.put("/advances/{advance_id}")
-async def update_advance(advance_id: str, req: AdvanceUpdateRequest):
+async def update_advance(advance_id: str, req: AdvanceUpdateRequest, current_user: dict = Depends(get_current_user_dep)):
     update = {k: v for k, v in req.model_dump().items() if v is not None}  # None = not provided; False/0 are valid values
     if not update:
         return {"message": "Nothing to update"}
     result = await db.advances.update_one({"id": advance_id}, {"$set": update})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Advance not found")
+    await audit_log(db, "update", current_user, "advance", advance_id, {"fields": list(update.keys())})
     return {"message": "Advance updated"}
 
 @api_router.delete("/advances/{advance_id}")
-async def delete_advance(advance_id: str):
+async def delete_advance(advance_id: str, current_user: dict = Depends(get_current_user_dep)):
     result = await db.advances.delete_one({"id": advance_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Advance not found")
+    await audit_log(db, "delete", current_user, "advance", advance_id, {})
     return {"message": "Advance deleted"}
 
 # ==========================================
@@ -1957,7 +1962,7 @@ async def get_order_status(
 # ==========================================
 
 @api_router.put("/items/{item_id}")
-async def update_item(item_id: str, req: ItemUpdateRequest):
+async def update_item(item_id: str, req: ItemUpdateRequest, current_user: dict = Depends(get_current_user_dep)):
     item = await db.items.find_one({"id": item_id})
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -1976,15 +1981,18 @@ async def update_item(item_id: str, req: ItemUpdateRequest):
 
     if update_fields:
         await db.items.update_one({"id": item_id}, {"$set": update_fields})
+        await audit_log(db, "update", current_user, "item", item_id, {"fields": list(update_fields.keys())})
 
     updated = await db.items.find_one({"id": item_id}, {"_id": 0})
     return updated
 
 @api_router.delete("/items/{item_id}")
-async def delete_item(item_id: str):
+async def delete_item(item_id: str, current_user: dict = Depends(get_current_user_dep)):
+    item = await db.items.find_one({"id": item_id}, {"_id": 0})
     result = await db.items.delete_one({"id": item_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Item not found")
+    await audit_log(db, "delete", current_user, "item", item_id, {"barcode": item.get("barcode") if item else None})
     return {"message": "Item deleted"}
 
 @api_router.delete("/items/bulk/delete")
@@ -3143,6 +3151,7 @@ async def login(req: LoginRequest, request: Request):
         raise HTTPException(status_code=403, detail="User is disabled")
     _clear_rate_limit(client_ip)
     token = auth_module.create_access_token({"sub": user["username"]})
+    await audit_log(db, "login", user, "user", user["username"], {"ip": client_ip})
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -3187,6 +3196,7 @@ async def register_user(req: UserCreateRequest, current_user: dict = Depends(get
     }
     new_user["username"] = req.username.lower().strip()
     await db.users.insert_one(new_user)
+    await audit_log(db, "create", current_user, "user", new_user["username"], {"full_name": req.full_name, "role": req.role})
     logger.info(f"User '{new_user['username']}' created by '{current_user['username']}'")
     return {"message": "User created successfully", "username": new_user["username"]}
 
@@ -3217,6 +3227,7 @@ async def update_user(username: str, data: dict, current_user: dict = Depends(ge
     result = await db.users.update_one({"username": username}, {"$set": update})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
+    await audit_log(db, "update", current_user, "user", username, {"fields": list(update.keys())})
     logger.info(f"User '{username}' updated by '{current_user['username']}'")
     return {"message": "User updated successfully"}
 
@@ -3231,6 +3242,7 @@ async def delete_user(username: str, current_user: dict = Depends(get_current_us
     result = await db.users.delete_one({"username": username})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
+    await audit_log(db, "delete", current_user, "user", username, {})
     logger.info(f"User '{username}' deleted by '{current_user['username']}'")
     return {"message": "User deleted successfully"}
 
