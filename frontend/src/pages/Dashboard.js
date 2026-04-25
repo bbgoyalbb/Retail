@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { getDashboard } from "@/api";
+import { useToast } from "@/hooks/use-toast";
 import { CurrencyDollar, Scissors, UsersThree, TrendUp, ArrowsClockwise, Receipt } from "@phosphor-icons/react";
+import { EmptyState } from "@/components/EmptyState";
 
 function StatCard({ icon: Icon, label, value, sub, color = "var(--brand)" }) {
   return (
@@ -89,6 +91,15 @@ export default function Dashboard() {
           <ArrowsClockwise size={16} className={refreshing ? "animate-spin" : ""} />
         </button>
       </div>
+
+      {data.total_items === 0 && (
+        <EmptyState
+          title="Welcome to your Dashboard"
+          description="Get started by creating your first bill. Your business overview will appear here."
+          action="Create First Bill"
+          onAction={() => window.location.href = '/new-bill'}
+        />
+      )}
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard icon={TrendUp} label="Revenue Collected" value={`₹${fmt(data.total_revenue)}`} sub={`${data.total_items} transactions`} color="var(--success)" />
