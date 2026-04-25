@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense } from "react"; // useEffect used in OfflineBanner
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
@@ -10,7 +10,6 @@ import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { useLocation } from "react-router-dom";
-import { seedData } from "@/api";
 
 const PAGE_TITLES = {
   "/": "Dashboard",
@@ -111,12 +110,6 @@ function AppShell() {
     setSidebarOpen(v);
     try { localStorage.setItem("sidebar_open", String(v)); } catch {}
   };
-
-  useEffect(() => {
-    if (process.env.REACT_APP_ENABLE_SEED === "true") {
-      seedData().catch(() => {});
-    }
-  }, []);
 
   if (loading) {
     return (

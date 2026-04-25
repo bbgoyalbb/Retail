@@ -39,11 +39,23 @@ app = FastAPI()
 
 api_router = APIRouter(prefix="/api")
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Log to both console and file
+log_file = ROOT_DIR / "server.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(log_file, encoding='utf-8'),
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # Suppress WinError 10054 noise (browser forcibly closes SSL connections on Windows)
 logging.getLogger("asyncio").setLevel(logging.CRITICAL)
+
+# Max upload size: 50MB
+MAX_UPLOAD_SIZE = 50 * 1024 * 1024
 
 # --- Auth dependency ---
 async def get_current_user_dep(credentials: HTTPAuthorizationCredentials = Depends(auth_module.security)):
@@ -3434,6 +3446,12 @@ async def get_me(current_user: dict = Depends(get_current_user_dep)):
 async def register_user(req: UserCreateRequest, current_user: dict = Depends(get_current_user_dep)):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Only admins can create users")
+    if len(req.username.strip()) < 3:
+        raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+    if len(req.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    if req.role not in ["admin", "manager", "cashier"]:
+        raise HTTPException(status_code=400, detail="Role must be admin, manager, or cashier")
     existing = await db.users.find_one({"username": req.username.lower().strip()})
     if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
@@ -3473,6 +3491,8 @@ async def update_user(username: str, data: dict, current_user: dict = Depends(ge
     if "is_active" in data: update["is_active"] = data["is_active"]
     if "allowed_pages" in data: update["allowed_pages"] = data["allowed_pages"]
     if "password" in data and data["password"]:
+        if len(data["password"]) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
         update["password_hash"] = auth_module.get_password_hash(data["password"])
     if not update:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -3549,6 +3569,25 @@ async def list_audit_logs(
 app.include_router(api_router)
 
 app.add_middleware(GZipMiddleware, minimum_size=500)
+
+@app.middleware("http")
+async def limit_upload_size(request: Request, call_next):
+    if request.method in ("POST", "PUT", "PATCH"):
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > MAX_UPLOAD_SIZE:
+            return JSONResponse(
+                {"detail": f"Request body too large. Maximum allowed size is {MAX_UPLOAD_SIZE // (1024*1024)}MB."},
+                status_code=413
+            )
+    return await call_next(request)
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    try:
+        await db.command("ping")
+        return {"status": "ok", "database": "connected"}
+    except Exception as e:
+        return JSONResponse({"status": "error", "database": str(e)}, status_code=503)
 
 # CORS configuration - fail loudly if not set in production
 cors_origins = os.environ.get('CORS_ORIGINS')

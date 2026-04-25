@@ -93,11 +93,13 @@ echo  NOTE: Accept the security warning in browser (self-signed cert)
 echo ==========================================
 echo.
 echo  API endpoints: /api/...
+echo  Logs:          %ROOT%backend\server.log
+echo  Health check:  https://!IP!:%BACKEND_PORT%/health
 echo  Press Ctrl+C to stop.
 echo.
 
 cd /d "%ROOT%backend"
 start "" "https://!IP!:%BACKEND_PORT%/"
-"%PYTHON%" -m uvicorn server:app --host 0.0.0.0 --port %BACKEND_PORT% --ssl-keyfile ssl.key --ssl-certfile ssl.crt
+"%PYTHON%" -m uvicorn server:app --host 0.0.0.0 --port %BACKEND_PORT% --ssl-keyfile ssl.key --ssl-certfile ssl.crt --log-level info
 
 endlocal
