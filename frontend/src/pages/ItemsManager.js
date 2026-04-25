@@ -1148,6 +1148,7 @@ export default function ItemsManager() {
                   <button onClick={e => { e.stopPropagation(); setInvoiceRef(group.ref); }} className="p-1.5"><Printer size={15} className="text-[var(--brand)] inline" /></button>
                 </div>
               </div>
+              ); })()}
               {/* Desktop layout */}
               {(() => { const isSettled = Math.round(group.totals.pending) === 0 && group.totals.total > 0; const hasTailoringOrder = group.items.some(i => i.order_no && i.order_no !== 'N/A'); const isCancelled = group.items.some(i => i.cancelled); return (
               <div className={`hidden sm:grid items-center ${isCancelled ? 'opacity-60' : ''}`} style={{gridTemplateColumns:'24px 96px 96px 120px 1fr repeat(5,80px) 48px 90px 90px 100px 88px'}}>
@@ -1177,7 +1178,6 @@ export default function ItemsManager() {
               </div>
               ); })()}
             </div>
-
             {/* Expanded Detail Rows */}
             {expanded[group.ref] && (
               <div className="border-t border-[var(--border-subtle)]">
