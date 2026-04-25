@@ -203,6 +203,12 @@ class ItemUpdateRequest(BaseModel):
     tally_embroidery: Optional[bool] = None
     tally_addon: Optional[bool] = None
 
+    # Ensure all frontend editable fields are covered
+    # Items section: date, name, ref, barcode, price, qty, discount, fabric_received, fabric_pay_date, fabric_pay_mode, tally_fabric
+    # Tailoring section: order_no, article_type, delivery_date, tailoring_status, tailoring_amount, tailoring_received, tailoring_pay_date, tailoring_pay_mode, labour_amount, labour_paid, labour_pay_date, labour_payment_mode, tally_tailoring
+    # Embroidery section: embroidery_status, karigar, embroidery_amount, embroidery_received, embroidery_pay_date, embroidery_pay_mode, emb_labour_amount, emb_labour_paid, emb_labour_date, emb_labour_payment_mode, tally_embroidery
+    # Addon section: addon_desc, addon_amount, addon_received, addon_pay_date, addon_pay_mode, tally_addon
+
 # ==========================================
 # HELPERS
 # ==========================================
