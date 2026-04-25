@@ -3249,15 +3249,38 @@ async def delete_user(username: str, current_user: dict = Depends(get_current_us
 async def list_audit_logs(
     limit: int = Query(50, ge=1, le=500),
     skip: int = Query(0, ge=0),
+    user: str = Query(None, description="Filter by username"),
+    action: str = Query(None, description="Filter by action type"),
+    date_from: str = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    date_to: str = Query(None, description="Filter to date (YYYY-MM-DD)"),
     current_user: dict = Depends(get_current_user_dep),
 ):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Only admins can view audit logs")
-    cursor = db.audit_logs.find().sort("timestamp", -1).skip(skip).limit(limit)
+    
+    # Build query filter
+    query_filter = {}
+    if user:
+        query_filter["username"] = {"$regex": user, "$options": "i"}
+    if action:
+        query_filter["action"] = {"$regex": action, "$options": "i"}
+    if date_from or date_to:
+        date_filter = {}
+        if date_from:
+            date_filter["$gte"] = f"{date_from}T00:00:00"
+        if date_to:
+            date_filter["$lte"] = f"{date_to}T23:59:59"
+        query_filter["timestamp"] = date_filter
+    
+    cursor = db.audit_logs.find(query_filter).sort("timestamp", -1).skip(skip).limit(limit)
     docs = await cursor.to_list(length=limit)
     for d in docs:
         d["_id"] = str(d["_id"])
-    return {"logs": docs, "count": len(docs)}
+    
+    # Get total count for pagination
+    total_count = await db.audit_logs.count_documents(query_filter)
+    
+    return {"logs": docs, "count": len(docs), "total": total_count}
 
 # ==========================================
 # APP SETUP

@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useCallback } from "react";
-import { listAuditLogs } from "@/api";
+import { listAuditLogs, listUsers } from "@/api";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowClockwise } from "@phosphor-icons/react";
+import { ArrowClockwise, Funnel, X } from "@phosphor-icons/react";
 
 const ACTION_COLORS = {
   create: "text-[var(--success)] bg-[#455D4A10]",
@@ -16,27 +16,61 @@ function badge(action = "") {
   return `inline-block px-2 py-0.5 rounded-sm text-[10px] font-semibold uppercase tracking-wider ${ACTION_COLORS[key]}`;
 }
 
+const ACTION_TYPES = ["create", "update", "delete", "login", "logout"];
+
 export default function AuditLogPage() {
   const { toast } = useToast();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [totalLogs, setTotalLogs] = useState(0);
   const PAGE_SIZE = 50;
+  
+  // Filter states
+  const [users, setUsers] = useState([]);
+  const [filterUser, setFilterUser] = useState("");
+  const [filterAction, setFilterAction] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Load users for filter dropdown
+  useEffect(() => {
+    listUsers().then(res => setUsers(res.data || [])).catch(() => setUsers([]));
+  }, []);
 
   const fetchLogs = useCallback(async (pageNum = 0) => {
     setLoading(true);
     try {
-      const res = await listAuditLogs({ limit: PAGE_SIZE, skip: pageNum * PAGE_SIZE });
+      const params = { 
+        limit: PAGE_SIZE, 
+        skip: pageNum * PAGE_SIZE,
+        ...(filterUser && { user: filterUser }),
+        ...(filterAction && { action: filterAction }),
+        ...(filterDateFrom && { date_from: filterDateFrom }),
+        ...(filterDateTo && { date_to: filterDateTo }),
+      };
+      const res = await listAuditLogs(params);
       const items = res.data.logs ?? [];
       setLogs(items);
+      setTotalLogs(res.data.total || 0);
       setHasMore(items.length === PAGE_SIZE);
     } catch (err) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, filterUser, filterAction, filterDateFrom, filterDateTo]);
+
+  const clearFilters = () => {
+    setFilterUser("");
+    setFilterAction("");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+    setPage(0);
+    fetchLogs(0);
+  };
 
   useEffect(() => { fetchLogs(0); }, [fetchLogs]);
 
@@ -49,14 +83,77 @@ export default function AuditLogPage() {
           <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight text-[var(--text-primary)]">Audit Log</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">All actions performed in the system</p>
         </div>
-        <button
-          onClick={() => { setPage(0); fetchLogs(0); }}
-          className="flex items-center gap-2 px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] text-[var(--text-secondary)] transition-colors"
-        >
-          <ArrowClockwise size={15} className={loading ? "animate-spin" : ""} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-3 py-2 text-sm border rounded-sm transition-colors ${showFilters ? 'bg-[var(--brand)] text-white border-[var(--brand)]' : 'border-[var(--border-subtle)] hover:bg-[var(--bg)] text-[var(--text-secondary)]'}`}
+          >
+            <Funnel size={15} />
+            Filters {(filterUser || filterAction || filterDateFrom || filterDateTo) && <span className="ml-1 w-2 h-2 bg-[var(--warning)] rounded-full" />}
+          </button>
+          <button
+            onClick={() => { setPage(0); fetchLogs(0); }}
+            className="flex items-center gap-2 px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] text-[var(--text-secondary)] transition-colors"
+          >
+            <ArrowClockwise size={15} className={loading ? "animate-spin" : ""} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Filter Panel */}
+      {showFilters && (
+        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-4 space-y-3">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">User</label>
+              <select 
+                value={filterUser} 
+                onChange={e => setFilterUser(e.target.value)}
+                className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)] min-w-[140px]"
+              >
+                <option value="">All Users</option>
+                {users.map(u => <option key={u.username} value={u.username}>{u.full_name} ({u.username})</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Action</label>
+              <select 
+                value={filterAction} 
+                onChange={e => setFilterAction(e.target.value)}
+                className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)] min-w-[140px]"
+              >
+                <option value="">All Actions</option>
+                {ACTION_TYPES.map(a => <option key={a} value={a}>{a.charAt(0).toUpperCase() + a.slice(1)}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">From Date</label>
+              <input 
+                type="date" 
+                value={filterDateFrom} 
+                onChange={e => setFilterDateFrom(e.target.value)}
+                className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">To Date</label>
+              <input 
+                type="date" 
+                value={filterDateTo} 
+                onChange={e => setFilterDateTo(e.target.value)}
+                className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
+              />
+            </div>
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-1 px-3 py-2 text-xs text-[var(--text-secondary)] hover:text-[var(--error)] transition-colors"
+            >
+              <X size={14} /> Clear
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
         {loading ? (
@@ -113,7 +210,9 @@ export default function AuditLogPage() {
           >
             ← Previous
           </button>
-          <span className="text-sm text-[var(--text-secondary)]">Page {page + 1}</span>
+          <span className="text-sm text-[var(--text-secondary)]">
+            Page {page + 1} {totalLogs > 0 && <span className="text-[var(--text-secondary)]/60">({totalLogs} total)</span>}
+          </span>
           <button
             disabled={!hasMore}
             onClick={() => goPage(page + 1)}

@@ -1,7 +1,8 @@
 ﻿import { useState, useEffect, useCallback } from "react";
 import { getItems, updateItem, deleteItem, getAdvances, createAdvance, updateAdvance, deleteAdvance } from "@/api";
-import { PencilSimple, Trash, FloppyDisk, X, Printer, CaretDown, CaretRight, MagnifyingGlass, Check, Plus, CheckCircle } from "@phosphor-icons/react";
+import { PencilSimple, Trash, FloppyDisk, X, Printer, CaretDown, CaretRight, MagnifyingGlass, Check, Plus, CheckCircle, Funnel, Eye, EyeSlash } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 // ==========================================
 // SECTION CONFIGURATION
@@ -126,6 +127,18 @@ export default function ItemsManager() {
   const [sortDir, setSortDir] = useState("desc");
   const [loading, setLoading] = useState(false);
   
+  // Column visibility state (persisted to localStorage)
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('itemsmanager_columns');
+    if (saved) return JSON.parse(saved);
+    // Default: all columns visible
+    return {
+      barcode: true, price: true, qty: true, discount: true, fabric_amount: true,
+      article_type: true, order_no: true, delivery_date: true, tailoring_amount: true,
+      embroidery_amount: true, addon_desc: true, actions: true
+    };
+  });
+  
   // Edit modal states
   const [showSectionSelector, setShowSectionSelector] = useState(false);
   const [selectedSection, setSelectedSection] = useState(null);
@@ -168,6 +181,16 @@ export default function ItemsManager() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+  
+  // Persist column visibility to localStorage
+  useEffect(() => {
+    localStorage.setItem('itemsmanager_columns', JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+  
+  // Toggle column visibility
+  const toggleColumn = (colKey) => {
+    setVisibleColumns(prev => ({ ...prev, [colKey]: !prev[colKey] }));
+  };
 
   // ==========================================
   // EDIT HANDLERS
@@ -646,6 +669,43 @@ export default function ItemsManager() {
           </select>
         </div>
         <span className="ml-auto text-xs text-[var(--text-secondary)]">{refs.length} references, {filteredItems.length} items</span>
+        
+        {/* Column Visibility Toggle */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:text-[var(--brand)] transition-colors">
+              <Funnel size={14} /> Columns
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-3 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm shadow-lg">
+            <h4 className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)] mb-2">Show/Hide Columns</h4>
+            <div className="space-y-1.5">
+              {[
+                { key: 'barcode', label: 'Barcode' },
+                { key: 'price', label: 'Price' },
+                { key: 'qty', label: 'Quantity' },
+                { key: 'discount', label: 'Discount %' },
+                { key: 'fabric_amount', label: 'Fabric Amount' },
+                { key: 'article_type', label: 'Article Type' },
+                { key: 'order_no', label: 'Order #' },
+                { key: 'delivery_date', label: 'Delivery Date' },
+                { key: 'tailoring_amount', label: 'Tailoring Amt' },
+                { key: 'embroidery_amount', label: 'Embroidery Amt' },
+                { key: 'addon_desc', label: 'Add-on' },
+              ].map(col => (
+                <label key={col.key} className="flex items-center gap-2 cursor-pointer hover:bg-[var(--bg)] p-1 rounded-sm">
+                  <input 
+                    type="checkbox" 
+                    checked={visibleColumns[col.key]} 
+                    onChange={() => toggleColumn(col.key)}
+                    className="w-4 h-4 accent-[var(--brand)]"
+                  />
+                  <span className="text-xs text-[var(--text-primary)]">{col.label}</span>
+                </label>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Section Selector Modal - inline to preserve input focus */}
@@ -991,30 +1051,39 @@ export default function ItemsManager() {
                     </div>
                   ))}
                 </div>
-                {/* Desktop: full table */}
+                {/* Desktop: full table with column visibility */}
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="bg-[var(--bg)]">
-                        {["Barcode", "Price", "Qty", "Disc%", "Fabric Amt", "Article", "Order#", "Delivery", "Tail. Amt", "Emb. Amt", "Add-on", "Actions"].map(h => (
-                          <th key={h} className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">{h}</th>
-                        ))}
+                        {visibleColumns.barcode && <th className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Barcode</th>}
+                        {visibleColumns.price && <th className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Price</th>}
+                        {visibleColumns.qty && <th className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Qty</th>}
+                        {visibleColumns.discount && <th className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Disc%</th>}
+                        {visibleColumns.fabric_amount && <th className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Fabric Amt</th>}
+                        {visibleColumns.article_type && <th className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Article</th>}
+                        {visibleColumns.order_no && <th className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Order#</th>}
+                        {visibleColumns.delivery_date && <th className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Delivery</th>}
+                        {visibleColumns.tailoring_amount && <th className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Tail. Amt</th>}
+                        {visibleColumns.embroidery_amount && <th className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Emb. Amt</th>}
+                        {visibleColumns.addon_desc && <th className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Add-on</th>}
+                        <th className="text-left px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {group.items.map(item => (
                         <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D05]">
-                          <td className="px-3 py-2 text-xs max-w-[100px] truncate">{item.barcode}</td>
-                          <td className="px-3 py-2 font-mono text-xs">₹{fmt(item.price)}</td>
-                          <td className="px-3 py-2 font-mono text-xs">{item.qty}</td>
-                          <td className="px-3 py-2 font-mono text-xs">{item.discount ? `${item.discount}%` : "-"}</td>
-                          <td className="px-3 py-2 font-mono text-xs font-medium">₹{fmt(item.fabric_amount)}</td>
-                          <td className="px-3 py-2 text-xs">{item.article_type !== "N/A" ? item.article_type : "-"}</td>
-                          <td className="px-3 py-2 font-mono text-xs">{item.order_no !== "N/A" ? item.order_no : "-"}</td>
-                          <td className="px-3 py-2 font-mono text-xs">{item.delivery_date !== "N/A" ? item.delivery_date : "-"}</td>
-                          <td className="px-3 py-2 font-mono text-xs">{item.tailoring_amount ? `₹${fmt(item.tailoring_amount)}` : "-"}</td>
-                          <td className="px-3 py-2 font-mono text-xs">{item.embroidery_amount ? `₹${fmt(item.embroidery_amount)}` : "-"}</td>
-                          <td className="px-3 py-2 text-xs max-w-[80px] truncate">{item.addon_desc !== "N/A" ? item.addon_desc : "-"}</td>
+                          {visibleColumns.barcode && <td className="px-3 py-2 text-xs max-w-[100px] truncate">{item.barcode}</td>}
+                          {visibleColumns.price && <td className="px-3 py-2 font-mono text-xs">₹{fmt(item.price)}</td>}
+                          {visibleColumns.qty && <td className="px-3 py-2 font-mono text-xs">{item.qty}</td>}
+                          {visibleColumns.discount && <td className="px-3 py-2 font-mono text-xs">{item.discount ? `${item.discount}%` : "-"}</td>}
+                          {visibleColumns.fabric_amount && <td className="px-3 py-2 font-mono text-xs font-medium">₹{fmt(item.fabric_amount)}</td>}
+                          {visibleColumns.article_type && <td className="px-3 py-2 text-xs">{item.article_type !== "N/A" ? item.article_type : "-"}</td>}
+                          {visibleColumns.order_no && <td className="px-3 py-2 font-mono text-xs">{item.order_no !== "N/A" ? item.order_no : "-"}</td>}
+                          {visibleColumns.delivery_date && <td className="px-3 py-2 font-mono text-xs">{item.delivery_date !== "N/A" ? item.delivery_date : "-"}</td>}
+                          {visibleColumns.tailoring_amount && <td className="px-3 py-2 font-mono text-xs">{item.tailoring_amount ? `₹${fmt(item.tailoring_amount)}` : "-"}</td>}
+                          {visibleColumns.embroidery_amount && <td className="px-3 py-2 font-mono text-xs">{item.embroidery_amount ? `₹${fmt(item.embroidery_amount)}` : "-"}</td>}
+                          {visibleColumns.addon_desc && <td className="px-3 py-2 text-xs max-w-[80px] truncate">{item.addon_desc !== "N/A" ? item.addon_desc : "-"}</td>}
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-0.5">
                               <button onClick={() => { setEditItems([item]); setEditMode('item'); setShowSectionSelector(true); }} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm" title="Edit Item"><PencilSimple size={14} /></button>

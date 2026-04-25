@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { listUsers, registerUser, updateUser, deleteUser } from "@/api";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, PencilSimple, Trash, LockKey, CheckCircle, XCircle, UserCircle, ShieldCheck } from "@phosphor-icons/react";
+import { UserPlus, PencilSimple, Trash, LockKey, CheckCircle, XCircle, UserCircle, ShieldCheck, Lock, Info } from "@phosphor-icons/react";
 
 const ALL_PAGES = [
   { group: "General", pages: [
@@ -24,6 +24,13 @@ const ALL_PAGES = [
     { path: "/reports", label: "Reports" },
   ]},
 ];
+
+// Role-based page access mapping - pages each role can potentially access
+const ROLE_PAGE_ACCESS = {
+  cashier: ["/", "/new-bill", "/tailoring", "/addons", "/jobwork", "/order-status", "/search"],
+  manager: ["/", "/new-bill", "/tailoring", "/addons", "/jobwork", "/order-status", "/search", "/settlements", "/daybook", "/labour", "/items", "/reports"],
+  admin: ["/", "/new-bill", "/tailoring", "/addons", "/jobwork", "/order-status", "/search", "/settlements", "/daybook", "/labour", "/items", "/reports", "/data", "/settings", "/users", "/audit"],
+};
 
 const ROLES = ["admin", "manager", "cashier"];
 
@@ -332,23 +339,46 @@ export default function UsersPage() {
               <ShieldCheck size={18} className="text-[var(--brand)]" />
               <h2 className="font-heading text-lg font-semibold">Page Access — @{pagesUser.username}</h2>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] mb-4">Select which pages this user can access. Uncheck to restrict.</p>
+            <p className="text-xs text-[var(--text-secondary)] mb-1">Role: <span className="font-medium text-[var(--text-primary)] capitalize">{pagesUser.role}</span></p>
+            <div className="flex items-center gap-2 mb-4 p-2 bg-[var(--bg)] rounded-sm border border-[var(--border-subtle)]">
+              <Info size={14} className="text-[var(--info)] flex-shrink-0" />
+              <p className="text-[11px] text-[var(--text-secondary)]">Pages marked with <Lock size={10} className="inline" /> are unavailable for this user's role. Other pages can be allowed or blocked by admin.</p>
+            </div>
             <div className="space-y-4 max-h-72 overflow-y-auto pr-1">
               {ALL_PAGES.map(group => (
                 <div key={group.group}>
                   <p className="text-[9px] uppercase tracking-widest font-semibold text-[var(--border-strong)] mb-2">{group.group}</p>
                   <div className="space-y-1">
-                    {group.pages.map(pg => (
-                      <label key={pg.path} className="flex items-center gap-3 px-3 py-2 rounded-sm hover:bg-[var(--bg)] cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={pagesSelection.includes(pg.path)}
-                          onChange={() => togglePage(pg.path)}
-                          className="accent-[var(--brand)] w-4 h-4"
-                        />
-                        <span className="text-sm text-[var(--text-primary)]">{pg.label}</span>
-                      </label>
-                    ))}
+                    {group.pages.map(pg => {
+                      const roleAllowed = ROLE_PAGE_ACCESS[pagesUser.role]?.includes(pg.path);
+                      const isChecked = pagesSelection.includes(pg.path);
+                      return (
+                        <label 
+                          key={pg.path} 
+                          className={`flex items-center gap-3 px-3 py-2 rounded-sm ${roleAllowed ? 'hover:bg-[var(--bg)] cursor-pointer' : 'bg-[var(--bg)]/50 cursor-not-allowed'}`}
+                          title={roleAllowed ? (isChecked ? 'Allowed by admin' : 'Blocked by admin') : `Unavailable for ${pagesUser.role} role`}
+                        >
+                          {roleAllowed ? (
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => togglePage(pg.path)}
+                              className="accent-[var(--brand)] w-4 h-4"
+                            />
+                          ) : (
+                            <Lock size={16} className="text-[var(--text-secondary)]" />
+                          )}
+                          <span className={`text-sm ${roleAllowed ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
+                            {pg.label}
+                          </span>
+                          {!roleAllowed && (
+                            <span className="ml-auto text-[10px] text-[var(--text-secondary)] bg-[var(--border-subtle)] px-1.5 py-0.5 rounded-sm">
+                              {pagesUser.role} only
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
