@@ -3220,7 +3220,7 @@ async def startup_db_client():
     # Labour queries: filter by tailoring_status and labour_paid
     await db.items.create_index([("tailoring_status", ASCENDING), ("labour_paid", ASCENDING)], background=True)
     # Counters collection for bill ref generation
-    await db.counters.create_index("_id", unique=True, background=True)
+    #await db.counters.create_index("_id", unique=True, background=True)
     
     await db.advances.create_index("id", unique=True, background=True)
     await db.advances.create_index("ref", background=True)
