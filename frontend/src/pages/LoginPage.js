@@ -40,29 +40,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--bg)] p-4">
-      {/* Subtle background texture */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full opacity-[0.04]" style={{ background: "var(--brand)" }} />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full opacity-[0.04]" style={{ background: "var(--brand)" }} />
-      </div>
-
-      <div className="relative w-full max-w-sm">
-        {/* Brand mark */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-sm flex items-center justify-center mb-4 shadow-sm" style={{ background: "var(--brand)" }}>
-            <span className="text-white font-serif font-bold text-3xl leading-none">R</span>
-          </div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
-            {firmName}
-          </h1>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-secondary)] mt-1 flex items-center gap-1.5">
-            <Scissors size={10} /> Fabric &amp; Tailoring
-          </p>
+    <div className="min-h-screen flex bg-[var(--bg)]">
+      {/* Left side - Login form */}
+      <div className="flex-1 flex items-center justify-center p-4 lg:p-8">
+        {/* Subtle background texture */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none lg:hidden">
+          <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full opacity-[0.04]" style={{ background: "var(--brand)" }} />
+          <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full opacity-[0.04]" style={{ background: "var(--brand)" }} />
         </div>
 
-        {/* Card */}
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm shadow-sm p-8 space-y-6">
+        <div className="relative w-full max-w-sm">
+          {/* Brand mark */}
+          <div className="flex flex-col items-center mb-8">
+            <div className="w-14 h-14 rounded-sm flex items-center justify-center mb-4 shadow-sm" style={{ background: "var(--brand)" }}>
+              <span className="text-white font-serif font-bold text-3xl leading-none">R</span>
+            </div>
+            <h1 className="font-heading text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+              {firmName}
+            </h1>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-secondary)] mt-1 flex items-center gap-1.5">
+              <Scissors size={10} /> Fabric &amp; Tailoring
+            </p>
+          </div>
+
+          {/* Card */}
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm shadow-sm p-8 space-y-6">
           {sessionExpired && (
             <div className="px-4 py-3 rounded-sm bg-[#D4984210] border border-[var(--warning)] text-[var(--warning)] text-sm text-center">
               ⏱ Your session has expired. Please sign in again.
@@ -117,6 +119,20 @@ export default function LoginPage() {
         <p className="text-center text-[10px] text-[var(--text-secondary)] mt-6 tracking-[0.1em] uppercase">
           Retail Management System
         </p>
+        </div>
+      </div>
+
+      {/* Right side - Fabric texture background (desktop only) */}
+      <div className="hidden lg:block lg:flex-1 relative bg-[#2D2A26]">
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-40"
+          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=1200&q=80')" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#2D2A26] via-transparent to-transparent" />
+        <div className="absolute bottom-12 left-12 right-12 text-white">
+          <p className="font-heading text-2xl font-light tracking-tight mb-2">Crafted for Fabric Professionals</p>
+          <p className="text-sm text-white/70">Manage inventory, tailoring, and settlements in one elegant ledger.</p>
+        </div>
       </div>
     </div>
   );
