@@ -18,9 +18,9 @@ from datetime import datetime, timezone, date
 from bson import ObjectId
 import re
 from data_quality import (
-    round_money as dq_round_money,
-    determine_payment_status as dq_determine_payment_status,
-    build_payment_mode_label as dq_build_payment_mode_label,
+    round_money,
+    determine_payment_status,
+    build_payment_mode_label,
     generate_data_audit as dq_generate_data_audit,
     normalize_low_risk_data as dq_normalize_low_risk_data,
     repair_high_risk_data as dq_repair_high_risk_data,
@@ -275,14 +275,21 @@ def make_ref(seq: int, date_str: str) -> str:
         pass
     return f"{seq:02d}/000000"
 
+def validate_date(date_str: str, field_name: str = "date") -> str:
+    """Validate date format and return the date string. Raises ValueError on invalid input."""
+    if not date_str or not isinstance(date_str, str):
+        raise ValueError(f"{field_name} is required")
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+        return date_str
+    except ValueError:
+        raise ValueError(f"Invalid {field_name} format: {date_str}. Expected YYYY-MM-DD")
+
 def serialize_doc(doc):
     if doc is None:
         return None
     doc["_id"] = str(doc["_id"])
     return doc
-
-def serialize_docs(docs):
-    return [serialize_doc(d) for d in docs]
 
 def round_money(value: float) -> float:
     return round(float(value or 0), 2)
@@ -1011,23 +1018,29 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
     if not req.items:
         raise HTTPException(status_code=400, detail="At least one item is required")
 
-    existing = await db.items.find({"date": req.date}).distinct("ref")
-    max_seq = 0
+    # Validate dates
+    try:
+        validate_date(req.date, "bill date")
+        validate_date(req.payment_date, "payment date")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Use atomic counter to prevent race conditions on bill ref generation
     try:
         parts = req.date.split("-")
         date_suffix = f"{parts[2]}{parts[1]}{parts[0][2:]}"
     except Exception:
         date_suffix = "000000"
 
-    for r in existing:
-        try:
-            seq = int(r.split("/")[0])
-            if seq > max_seq:
-                max_seq = seq
-        except Exception:
-            pass
-
-    ref = f"{max_seq + 1:02d}/{date_suffix}"
+    counter_key = f"bill_seq_{req.date}"
+    counter_doc = await db.counters.find_one_and_update(
+        {"_id": counter_key},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True  # Return document after update
+    )
+    seq = counter_doc.get("seq", 1) if counter_doc else 1
+    ref = f"{seq:02d}/{date_suffix}"
     modes_str = ", ".join(req.payment_modes) if req.payment_modes else "Cash"
     tailoring_status = "Awaiting Order" if req.needs_tailoring else "N/A"
 
@@ -1197,14 +1210,25 @@ async def get_awaiting_orders():
 
 @api_router.post("/tailoring/assign")
 async def assign_tailoring(req: TailoringOrderRequest):
+    # Fetch tailoring rates from settings instead of hardcoded values
+    stored_settings = await db.settings.find_one({"key": "app_settings"}, {"_id": 0})
+    settings = merge_settings(stored_settings)
+    tailoring_rates = settings.get("tailoring_rates", {})
+    
     updated = 0
     for assignment in req.assignments:
         item_id = assignment.get("item_id")
         article_type = assignment.get("article_type", "Shirt")
         emb_status = assignment.get("embroidery_status", "Not Required")
 
-        rates = TAILORING_RATES.get(article_type, (0, 0))
-        tail_amt, labour_amt = rates
+        # Use settings rates with fallback to hardcoded defaults
+        rate_data = tailoring_rates.get(article_type, {})
+        if isinstance(rate_data, dict):
+            tail_amt = rate_data.get("tailoring", 0)
+            labour_amt = rate_data.get("labour", 0)
+        else:
+            # Fallback to hardcoded for backwards compatibility
+            tail_amt, labour_amt = TAILORING_RATES.get(article_type, (0, 0))
 
         existing_item = await db.items.find_one({"id": item_id}, {"_id": 0})
         existing_tail_received = float((existing_item or {}).get("tailoring_received", 0))
@@ -1251,14 +1275,25 @@ async def split_and_assign(req: SplitTailoringRequest):
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
+    # Fetch tailoring rates from settings instead of hardcoded values
+    stored_settings = await db.settings.find_one({"key": "app_settings"}, {"_id": 0})
+    settings = merge_settings(stored_settings)
+    tailoring_rates = settings.get("tailoring_rates", {})
+
     original_qty = item.get("qty", 0)
     original_price = item.get("price", 0)
     original_discount = item.get("discount", 0)
 
     created = 0
     for idx, split in enumerate(req.splits):
-        rates = TAILORING_RATES.get(split.article_type, (0, 0))
-        tail_amt, labour_amt = rates
+        # Use settings rates with fallback to hardcoded defaults
+        rate_data = tailoring_rates.get(split.article_type, {})
+        if isinstance(rate_data, dict):
+            tail_amt = rate_data.get("tailoring", 0)
+            labour_amt = rate_data.get("labour", 0)
+        else:
+            # Fallback to hardcoded for backwards compatibility
+            tail_amt, labour_amt = TAILORING_RATES.get(split.article_type, (0, 0))
 
         discounted_price = round(original_price - (original_price * original_discount / 100), 0)
         split_fabric_amt = round(discounted_price * split.qty, 0)
@@ -1547,20 +1582,20 @@ async def get_settlement_balances(name: Optional[str] = None, ref: Optional[str]
 @api_router.post("/settlements/pay")
 async def process_settlement(req: SettlementRequest):
     modes_str = ", ".join(req.payment_modes) if req.payment_modes else "Cash"
-    total_allocated = dq_round_money(
+    total_allocated = round_money(
         req.allot_fabric + req.allot_tailoring + req.allot_embroidery + req.allot_addon + req.allot_advance
     )
-    fresh_payment = dq_round_money(req.fresh_payment)
+    fresh_payment = round_money(req.fresh_payment)
 
     if total_allocated <= 0:
         raise HTTPException(status_code=400, detail="Please allocate at least some amount")
 
     current_balances = await get_settlement_balances(ref=req.ref)
 
-    available_advance = dq_round_money(current_balances["advance"])
+    available_advance = round_money(current_balances["advance"])
     advance_to_use = 0.0
     if req.use_advance:
-        advance_to_use = min(available_advance, max(0.0, dq_round_money(total_allocated - fresh_payment)))
+        advance_to_use = min(available_advance, max(0.0, round_money(total_allocated - fresh_payment)))
 
     # Over-payment is allowed: excess is distributed pro-rata and pending goes negative.
     # Pool-match is validated on the frontend as a warning, not a hard block here.
@@ -1574,30 +1609,30 @@ async def process_settlement(req: SettlementRequest):
         # We cannot filter by pending>0 because over-payment must also reach
         # already-settled items (pending=0). Pro-rata weight = category amount.
         all_items = await db.items.find({"ref": ref}, {"_id": 0}).to_list(500)
-        eligible = [i for i in all_items if dq_round_money(i.get(amount_field, 0)) > 0]
+        eligible = [i for i in all_items if round_money(i.get(amount_field, 0)) > 0]
         if not eligible:
             return
 
-        total_weight = sum(dq_round_money(i.get(amount_field, 0)) for i in eligible)
+        total_weight = sum(round_money(i.get(amount_field, 0)) for i in eligible)
         running_paid = 0
 
         for idx, item in enumerate(eligible):
-            weight = dq_round_money(item.get(amount_field, 0))
-            bal = dq_round_money(item.get(pending_field, 0))
+            weight = round_money(item.get(amount_field, 0))
+            bal = round_money(item.get(pending_field, 0))
             if idx == len(eligible) - 1:
-                share = dq_round_money(total_to_pay - running_paid)
+                share = round_money(total_to_pay - running_paid)
             else:
-                share = dq_round_money((weight / total_weight) * total_to_pay) if total_weight > 0 else 0
+                share = round_money((weight / total_weight) * total_to_pay) if total_weight > 0 else 0
                 running_paid += share
 
-            existing_received = dq_round_money(item.get(received_field, 0))
-            new_received = dq_round_money(existing_received + share)
-            new_balance = dq_round_money(bal - share)  # negative when over-paid
+            existing_received = round_money(item.get(received_field, 0))
+            new_received = round_money(existing_received + share)
+            new_balance = round_money(bal - share)  # negative when over-paid
             update = {
                 pay_date_field: req.payment_date,
                 received_field: new_received,
                 pending_field: new_balance,
-                pay_mode_field: dq_build_payment_mode_label(req.payment_modes, new_balance, new_received),
+                pay_mode_field: build_payment_mode_label(req.payment_modes, new_balance, new_received),
             }
             await db.items.update_one({"id": item["id"]}, {"$set": update})
 
@@ -1966,7 +2001,9 @@ async def get_order_status(
     if customer:
         query["name"] = customer
     if order_no:
-        query["order_no"] = {"$regex": order_no, "$options": "i"}
+        import re
+        escaped_order_no = re.escape(order_no.strip()) if order_no else ""
+        query["order_no"] = {"$regex": escaped_order_no, "$options": "i"}
     if date_from:
         query.setdefault("date", {})["$gte"] = date_from
     if date_to:
@@ -2150,17 +2187,24 @@ async def search_items(
     limit: int = 100,
     skip: int = 0,
 ):
+    import re
+    
+    def safe_regex(pattern: str) -> str:
+        """Escape special regex characters to prevent ReDoS attacks."""
+        return re.escape(pattern.strip()) if pattern else ""
+    
     query = {}
 
     if q:
+        escaped = safe_regex(q)
         query["$or"] = [
-            {"name": {"$regex": q, "$options": "i"}},
-            {"barcode": {"$regex": q, "$options": "i"}},
-            {"ref": {"$regex": q, "$options": "i"}},
-            {"article_type": {"$regex": q, "$options": "i"}},
-            {"order_no": {"$regex": q, "$options": "i"}},
-            {"karigar": {"$regex": q, "$options": "i"}},
-            {"addon_desc": {"$regex": q, "$options": "i"}},
+            {"name": {"$regex": escaped, "$options": "i"}},
+            {"barcode": {"$regex": escaped, "$options": "i"}},
+            {"ref": {"$regex": escaped, "$options": "i"}},
+            {"article_type": {"$regex": escaped, "$options": "i"}},
+            {"order_no": {"$regex": escaped, "$options": "i"}},
+            {"karigar": {"$regex": escaped, "$options": "i"}},
+            {"addon_desc": {"$regex": escaped, "$options": "i"}},
         ]
 
     if customer and customer != "All":
@@ -2191,7 +2235,7 @@ async def search_items(
 
     items = await db.items.find(query, {"_id": 0}).sort("date", -1).skip(skip).limit(limit).to_list(limit)
     for item in items:
-        item["payment_status"] = dq_determine_payment_status(item.get("fabric_pending", 0), item.get("fabric_received", 0))
+        item["payment_status"] = determine_payment_status(item.get("fabric_pending", 0), item.get("fabric_received", 0))
     total = await db.items.count_documents(query)
     return {"items": items, "total": total}
 
@@ -3422,12 +3466,15 @@ async def list_audit_logs(
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Only admins can view audit logs")
     
-    # Build query filter
+    # Build query filter with ReDoS protection
+    import re
     query_filter = {}
     if user:
-        query_filter["username"] = {"$regex": user, "$options": "i"}
+        escaped_user = re.escape(user.strip()) if user else ""
+        query_filter["username"] = {"$regex": escaped_user, "$options": "i"}
     if action:
-        query_filter["action"] = {"$regex": action, "$options": "i"}
+        escaped_action = re.escape(action.strip()) if action else ""
+        query_filter["action"] = {"$regex": escaped_action, "$options": "i"}
     if date_from or date_to:
         date_filter = {}
         if date_from:
@@ -3490,6 +3537,9 @@ if build_dir.exists():
 
 @app.on_event("startup")
 async def startup_db_client():
+    from pymongo import ASCENDING, DESCENDING
+    
+    # Single field indexes
     await db.items.create_index("id", unique=True, background=True)
     await db.items.create_index("ref", background=True)
     await db.items.create_index("barcode", background=True)
@@ -3497,6 +3547,24 @@ async def startup_db_client():
     await db.items.create_index("date", background=True)
     await db.items.create_index("order_no", background=True)
     await db.items.create_index("karigar", background=True)
+    
+    # Compound indexes for common query patterns (performance optimization)
+    # Job Work queries: filter by tailoring_status and sort by date
+    await db.items.create_index([("tailoring_status", ASCENDING), ("date", DESCENDING)], background=True)
+    # Settlement balance queries: filter by ref and fabric_pay_mode
+    await db.items.create_index([("ref", ASCENDING), ("fabric_pay_mode", ASCENDING)], background=True)
+    # Customer pending refs: filter by name and fabric_pay_mode
+    await db.items.create_index([("name", ASCENDING), ("fabric_pay_mode", ASCENDING)], background=True)
+    # Daybook queries: filter by pay dates
+    await db.items.create_index("fabric_pay_date", background=True)
+    await db.items.create_index("tailoring_pay_date", background=True)
+    await db.items.create_index("embroidery_pay_date", background=True)
+    await db.items.create_index("addon_pay_date", background=True)
+    # Labour queries: filter by tailoring_status and labour_paid
+    await db.items.create_index([("tailoring_status", ASCENDING), ("labour_paid", ASCENDING)], background=True)
+    # Counters collection for bill ref generation
+    await db.counters.create_index("_id", unique=True, background=True)
+    
     await db.advances.create_index("id", unique=True, background=True)
     await db.advances.create_index("ref", background=True)
     await db.advances.create_index("date", background=True)
