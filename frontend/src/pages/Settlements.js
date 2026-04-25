@@ -350,7 +350,7 @@ export default function Settlements() {
         </div>
 
         {/* Payment Panel */}
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4 h-fit">
+        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4 h-fit lg:sticky lg:top-8">
           <h3 className="font-heading text-base font-medium">Payment Details</h3>
 
           <div>

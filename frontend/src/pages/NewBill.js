@@ -461,6 +461,19 @@ export default function NewBill() {
                     );
                   })}
                 </tbody>
+                {items.length > 0 && (
+                  <tfoot className="bg-[var(--bg)] border-t border-[var(--border-subtle)]">
+                    <tr>
+                      <td colSpan="4" className="px-3 py-2 text-xs text-[var(--text-secondary)]">
+                        {items.length} item{items.length !== 1 ? 's' : ''}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-sm font-medium text-right">
+                        ₹{items.reduce((sum, item) => sum + item.total, 0).toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-3 py-2"></td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           )}
