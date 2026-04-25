@@ -1,14 +1,40 @@
+import { useEffect, useState } from "react";
 import { X, CheckCircle, WarningCircle } from "@phosphor-icons/react";
 
-export function StatusBanner({ message, onDismiss, showDismiss = true }) {
+export function StatusBanner({ message, onDismiss, showDismiss = true, autoDismiss = 5000 }) {
+  const [progress, setProgress] = useState(100);
   if (!message) return null;
+
+  // Auto-dismiss success messages after specified time (errors stay until manually dismissed)
+  useEffect(() => {
+    if (autoDismiss && message.type === "success" && onDismiss) {
+      setProgress(100);
+      const startTime = Date.now();
+      
+      const progressInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, 100 - (elapsed / autoDismiss) * 100);
+        setProgress(remaining);
+      }, 50);
+
+      const timer = setTimeout(() => {
+        clearInterval(progressInterval);
+        onDismiss();
+      }, autoDismiss);
+
+      return () => {
+        clearTimeout(timer);
+        clearInterval(progressInterval);
+      };
+    }
+  }, [message, autoDismiss, onDismiss]);
 
   const isSuccess = message.type === "success";
   const isError = message.type === "error";
 
   return (
     <div
-      className={`p-4 border rounded-sm text-sm flex items-start justify-between gap-3 ${
+      className={`relative p-4 border rounded-sm text-sm flex items-start justify-between gap-3 ${
         isSuccess
           ? "bg-[#455D4A10] border-[var(--success)] text-[var(--success)]"
           : isError
@@ -29,6 +55,15 @@ export function StatusBanner({ message, onDismiss, showDismiss = true }) {
         >
           <X size={14} />
         </button>
+      )}
+      {/* Auto-dismiss progress bar */}
+      {autoDismiss && isSuccess && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--success)]/20">
+          <div
+            className="h-full bg-[var(--success)] transition-none"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
       )}
     </div>
   );
