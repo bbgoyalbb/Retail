@@ -452,6 +452,19 @@ export default function NewBill() {
             <input ref={amountRef} data-testid="amount-paid-input" type="number" value={amountPaid} onChange={e => setAmountPaid(e.target.value)} onKeyDown={e => enterNav(e, payDateRef)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" placeholder="Amount received" />
           </div>
 
+          {amountPaid !== "" && (
+            <div className={`p-3 rounded-sm border text-sm font-mono font-medium flex justify-between ${
+              grandTotal - (parseFloat(amountPaid) || 0) > 0
+                ? 'bg-[#D4984210] border-[var(--warning)] text-[var(--warning)]'
+                : grandTotal - (parseFloat(amountPaid) || 0) < 0
+                  ? 'bg-[#5C8A9E10] border-[var(--info)] text-[var(--info)]'
+                  : 'bg-[#455D4A10] border-[var(--success)] text-[var(--success)]'
+            }`}>
+              <span>{grandTotal - (parseFloat(amountPaid) || 0) > 0 ? 'Balance Due' : grandTotal - (parseFloat(amountPaid) || 0) < 0 ? 'Change' : 'Fully Paid'}</span>
+              <span>₹{Math.abs(grandTotal - (parseFloat(amountPaid) || 0)).toLocaleString('en-IN')}</span>
+            </div>
+          )}
+
           <div>
             <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Payment Date</label>
             <input ref={payDateRef} data-testid="pay-date-input" type="date" value={payDate} onChange={e => setPayDate(e.target.value)} onKeyDown={e => enterNav(e, settledRef)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" />
@@ -516,10 +529,11 @@ export default function NewBill() {
               <button onClick={() => setShowAddonModal(false)} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm"><X size={16} /></button>
             </div>
             <div className="p-4 overflow-auto flex-1">
-              <table className="w-full min-w-[800px]">
-                <thead>
-                  <tr className="bg-[var(--bg)]">
-                    <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Article</th>
+              <div className="overflow-x-auto -mx-4 px-4">
+                <table className="w-full min-w-[600px] sm:min-w-[800px]">
+                  <thead>
+                    <tr className="bg-[var(--bg)]">
+                      <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Article</th>
                     <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Qty</th>
                     <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Add-ons</th>
                     <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Total</th>
@@ -577,7 +591,8 @@ export default function NewBill() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
             <div className="px-4 py-3 border-t border-[var(--border-subtle)] flex justify-end">
               <button onClick={() => setShowAddonModal(false)} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">Done</button>
@@ -791,10 +806,11 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
           <button onClick={onClose} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm"><X size={16} /></button>
         </div>
         <div className="p-4 overflow-auto flex-1">
-          <table className="w-full min-w-[900px]">
-            <thead>
-              <tr className="bg-[var(--bg)]">
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Apply</th>
+          <div className="overflow-x-auto -mx-4 px-4">
+            <table className="w-full min-w-[600px] sm:min-w-[900px]">
+              <thead>
+                <tr className="bg-[var(--bg)]">
+                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Apply</th>
                 <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Article</th>
                 <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Qty</th>
                 <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Order No</th>
@@ -836,7 +852,8 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
         <div className="px-4 py-3 border-t border-[var(--border-subtle)] flex justify-end">
           <button onClick={onClose} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">Done</button>
