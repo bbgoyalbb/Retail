@@ -269,34 +269,6 @@ export default function Reports() {
             )}
           </div>
 
-          {/* Revenue Breakdown Table */}
-          <div className="lg:col-span-2 bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
-            <h3 className="font-heading text-base font-medium mb-4">Detailed Revenue Breakdown</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: "Fabric Total", value: summary.total_fabric, color: "var(--brand)" },
-                { label: "Fabric Received", value: summary.total_fabric_received, color: "var(--success)" },
-                { label: "Fabric Pending", value: summary.total_fabric_pending, color: "var(--warning)" },
-                { label: "Tailoring Total", value: summary.total_tailoring, color: "var(--info)" },
-                { label: "Tailoring Received", value: summary.total_tailoring_received, color: "var(--success)" },
-                { label: "Tailoring Pending", value: summary.total_tailoring_pending, color: "var(--warning)" },
-                { label: "Embroidery Total", value: summary.total_embroidery, color: "var(--brand)" },
-                { label: "Embroidery Received", value: summary.total_embroidery_received, color: "var(--success)" },
-                { label: "Add-on Total", value: summary.total_addon, color: "var(--text-secondary)" },
-                { label: "Add-on Received", value: summary.total_addon_received, color: "var(--success)" },
-                { label: "Advances Net", value: summary.total_advance, color: "var(--info)" },
-                { label: "Total Items", value: summary.total_items, color: "var(--text-primary)", isCurrency: false },
-                { label: "Grand Revenue", value: (summary.total_fabric || 0) + (summary.total_tailoring || 0) + (summary.total_embroidery || 0) + (summary.total_addon || 0), color: "var(--brand)" },
-              ].map(item => (
-                <div key={item.label} className="p-3 bg-[var(--bg)] rounded-sm">
-                  <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">{item.label}</p>
-                  <p className="font-mono text-lg font-medium mt-0.5" style={{ color: item.color }}>
-                    {item.isCurrency === false ? item.value : `₹${fmt(item.value)}`}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
     </div>
