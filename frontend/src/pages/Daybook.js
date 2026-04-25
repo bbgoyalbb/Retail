@@ -13,17 +13,18 @@ function SortableHeader({ label, sortKey, currentKey, dir, onSort }) {
 
 // Category tally button component
 function TallyButton({ isTallied, onClick, hasAmount, label, loading }) {
-  if (!hasAmount) return <span className="w-6 h-6 inline-block" />;
+  if (!hasAmount) return <span className="w-6 h-6 sm:w-6 sm:h-6 w-11 h-11 inline-block" />;
   return (
     <button
       onClick={onClick}
       disabled={loading}
-      className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
-        isTallied 
-          ? 'bg-[var(--success)] text-white hover:opacity-80' 
+      className={`min-w-11 min-h-11 sm:min-w-0 sm:min-h-0 sm:w-6 sm:h-6 rounded-full flex items-center justify-center transition-colors ${
+        isTallied
+          ? 'bg-[var(--success)] text-white hover:opacity-80'
           : 'bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--border-strong)]'
       } ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
       title={isTallied ? `Un-tally ${label}` : `Tally ${label}`}
+      aria-label={isTallied ? `Un-tally ${label}` : `Tally ${label}`}
     >
       {loading ? <Spinner size={14} className="animate-spin" /> : (isTallied ? <Check size={14} weight="bold" /> : <Circle size={14} />)}
     </button>

@@ -424,8 +424,8 @@ export default function NewBill() {
                         <td className="px-3 py-2 font-mono text-sm text-right font-medium">₹{item.total}</td>
                         <td className="px-3 py-2">
                           <div className="flex items-center justify-end gap-1">
-                            <button onClick={() => editItem(i)} className={`p-1 rounded-sm transition-colors ${isEditing ? 'text-[var(--brand)] bg-[#C86B4D15]' : 'text-[var(--info)] hover:bg-[#5C8A9E10]'}`} title="Edit row"><PencilSimple size={16} /></button>
-                            <button onClick={() => removeItem(i)} className="text-[var(--error)] hover:bg-[#9E473D10] p-1 rounded-sm" title="Delete row"><Trash size={16} /></button>
+                            <button onClick={() => editItem(i)} className={`min-w-11 min-h-11 sm:min-w-0 sm:min-h-0 sm:p-1 rounded-sm transition-colors flex items-center justify-center ${isEditing ? 'text-[var(--brand)] bg-[#C86B4D15]' : 'text-[var(--info)] hover:bg-[#5C8A9E10]'}`} title="Edit row" aria-label="Edit row"><PencilSimple size={16} /></button>
+                            <button onClick={() => removeItem(i)} className="text-[var(--error)] hover:bg-[#9E473D10] min-w-11 min-h-11 sm:min-w-0 sm:min-h-0 sm:p-1 rounded-sm flex items-center justify-center" title="Delete row" aria-label="Delete row"><Trash size={16} /></button>
                           </div>
                         </td>
                       </tr>
