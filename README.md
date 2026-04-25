@@ -13,21 +13,14 @@ job work tracking, labour payments, reporting, import/export, audit, and repair 
 
 ### 1. Backend
 
-Copy the example env file and fill in your values:
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-Required variables in `backend/.env`:
+Create a `backend/.env` file (auto-created on first run by batch scripts):
 
 | Variable | Description |
 |---|---|
 | `MONGO_URL` | MongoDB connection string (e.g. `mongodb://localhost:27017`) |
 | `DB_NAME` | MongoDB database name (e.g. `retail_db`) |
-| `CORS_ORIGINS` | Comma-separated allowed origins (default: `*` — restrict in production) |
-| `ADMIN_API_KEY` | API key protecting backup/restore endpoints (leave blank to disable auth) |
-| `SEED_FILE_PATH` | Path to Excel seed file (default: `/tmp/retail_book.xlsm`) |
+| `CORS_ORIGINS` | Comma-separated allowed origins (restrict in production) |
+| `JWT_SECRET_KEY` | JWT signing key (auto-generated if missing) |
 
 Install dependencies and start the server:
 
@@ -51,18 +44,7 @@ uvicorn server:app --host 127.0.0.1 --port 8001 --reload
 
 ### 2. Frontend
 
-Copy the example env file and fill in your values:
-
-```bash
-cp frontend/.env.sample frontend/.env
-```
-
-Required variables in `frontend/.env`:
-
-| Variable | Description |
-|---|---|
-| `REACT_APP_BACKEND_URL` | Backend URL without trailing slash (e.g. `http://127.0.0.1:8001`) |
-| `REACT_APP_ENABLE_SEED` | Set to `true` to seed from Excel on first load (dev only, default: `false`) |
+No `.env` file is needed — the frontend auto-detects the backend URL based on the current port.
 
 Install dependencies and start:
 
@@ -103,7 +85,7 @@ python tests\local_regression_suite.py http://127.0.0.1:8001/api
 Open **Data Manager** in the UI for:
 
 - Excel import/export
-- Backup/restore (requires `ADMIN_API_KEY` header if configured)
+- Backup/restore (admin role required)
 - Data audit
 - Low-risk normalization
 - Repair of remaining overpayment anomalies
@@ -113,5 +95,5 @@ Backend endpoints:
 - `GET /api/db/audit`
 - `POST /api/db/normalize`
 - `POST /api/db/repair`
-- `GET /api/backup` — requires `X-Api-Key` header when `ADMIN_API_KEY` is set
-- `POST /api/restore` — requires `X-Api-Key` header when `ADMIN_API_KEY` is set
+- `GET /api/backup` — admin role required (JWT auth)
+- `POST /api/restore` — admin role required (JWT auth)
