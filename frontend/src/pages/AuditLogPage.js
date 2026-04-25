@@ -40,16 +40,17 @@ export default function AuditLogPage() {
     listUsers().then(res => setUsers(res.data || [])).catch(() => setUsers([]));
   }, []);
 
-  const fetchLogs = useCallback(async (pageNum = 0) => {
+  const fetchLogs = useCallback(async (pageNum = 0, currentFilters = null) => {
     setLoading(true);
     try {
+      const filters = currentFilters || { filterUser, filterAction, filterDateFrom, filterDateTo };
       const params = { 
         limit: PAGE_SIZE, 
         skip: pageNum * PAGE_SIZE,
-        ...(filterUser && { user: filterUser }),
-        ...(filterAction && { action: filterAction }),
-        ...(filterDateFrom && { date_from: filterDateFrom }),
-        ...(filterDateTo && { date_to: filterDateTo }),
+        ...(filters.filterUser && { user: filters.filterUser }),
+        ...(filters.filterAction && { action: filters.filterAction }),
+        ...(filters.filterDateFrom && { date_from: filters.filterDateFrom }),
+        ...(filters.filterDateTo && { date_to: filters.filterDateTo }),
       };
       const res = await listAuditLogs(params);
       const items = res.data.logs ?? [];
@@ -69,10 +70,14 @@ export default function AuditLogPage() {
     setFilterDateFrom("");
     setFilterDateTo("");
     setPage(0);
-    fetchLogs(0);
+    fetchLogs(0, { filterUser: "", filterAction: "", filterDateFrom: "", filterDateTo: "" });
   };
 
-  useEffect(() => { fetchLogs(0); }, [fetchLogs]);
+  // Initial fetch only on mount
+  useEffect(() => { 
+    fetchLogs(0); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const goPage = (n) => { setPage(n); fetchLogs(n); };
 
@@ -150,6 +155,12 @@ export default function AuditLogPage() {
               className="flex items-center gap-1 px-3 py-2 text-xs text-[var(--text-secondary)] hover:text-[var(--error)] transition-colors"
             >
               <X size={14} /> Clear
+            </button>
+            <button
+              onClick={() => { setPage(0); fetchLogs(0); }}
+              className="flex items-center gap-1 px-3 py-2 text-xs bg-[var(--brand)] text-white rounded-sm hover:opacity-90 transition-opacity"
+            >
+              Apply Filters
             </button>
           </div>
         </div>
