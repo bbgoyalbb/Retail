@@ -161,6 +161,7 @@ class ItemUpdateRequest(BaseModel):
     qty: Optional[float] = None
     discount: Optional[float] = None
     fabric_amount: Optional[float] = None
+    ref: Optional[str] = None
     name: Optional[str] = None
     date: Optional[str] = None
     tailoring_status: Optional[str] = None
