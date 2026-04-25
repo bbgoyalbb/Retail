@@ -2275,18 +2275,6 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
   }}
   
   .inv-brand {{ display: flex; align-items: flex-start; gap: 12px; }}
-  .inv-logo {{ 
-    width: 40px; 
-    height: 40px; 
-    background: var(--brand); 
-    color: #fff; 
-    border-radius: 8px; 
-    display: grid; 
-    place-items: center; 
-    font-weight: 700; 
-    font-size: 18px;
-    flex-shrink: 0;
-  }}
   .inv-logo-img {{
     width: 40px;
     height: 40px;
@@ -2516,7 +2504,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
   <!-- Head -->
   <div class="inv-head">
     <div class="inv-brand">
-      {f'<img src="{firm_logo}" class="inv-logo-img" alt="logo" />' if firm_logo else '<div class="inv-logo">R</div>'}
+      {f'<img src="{firm_logo}" class="inv-logo-img" alt="logo" />' if firm_logo else ''}
       <div class="inv-firm">
         <h2>{firm_name}</h2>
         <p>Fabric &amp; Tailoring</p>
