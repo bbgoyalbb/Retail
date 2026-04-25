@@ -164,7 +164,7 @@ export default function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold text-[var(--text-primary)]">User Management</h1>
+          <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight text-[var(--text-primary)]">User Management</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-0.5">Manage who can access the app</p>
         </div>
         <button
