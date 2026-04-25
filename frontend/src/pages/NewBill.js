@@ -287,6 +287,7 @@ export default function NewBill() {
       setLastBillTotal(res.data.grand_total);
       setShowPostSave(true);
       setMessage(null);
+      resetFormFields();
     } catch (err) {
       setMessage({ type: "error", text: err.response?.data?.detail || "Failed to save bill" });
     } finally {
@@ -314,10 +315,7 @@ export default function NewBill() {
     setShowAddonModal(true);
   };
 
-  const createAnotherBill = () => {
-    setShowPostSave(false);
-    setLastBillRef(null);
-    setLastBillTotal(0);
+  const resetFormFields = () => {
     setItems([]);
     setCustomerName("");
     setOrderDate(today);
@@ -329,6 +327,13 @@ export default function NewBill() {
     setShowTailoringModal(false);
     setShowAddonModal(false);
     resetItemForm();
+  };
+
+  const createAnotherBill = () => {
+    setShowPostSave(false);
+    setLastBillRef(null);
+    setLastBillTotal(0);
+    resetFormFields();
     setTimeout(() => nameRef.current?.focus(), 50);
   };
 
