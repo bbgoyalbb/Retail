@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { searchItems, getCustomers } from "@/api";
-import { MagnifyingGlass, Funnel, FilePdf, X, CaretLeft, CaretRight } from "@phosphor-icons/react";
+import { MagnifyingGlass, Funnel, FilePdf, X, CaretLeft, CaretRight, ArrowRight } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
 
 const ITEMS_PER_PAGE = 100;
 
 export default function SearchPage() {
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [customers, setCustomers] = useState([]);
   const [customer, setCustomer] = useState("All");
@@ -200,9 +202,14 @@ export default function SearchPage() {
                         <p className="text-sm font-medium leading-tight">{item.name}</p>
                         <p className="font-mono text-[10px] text-[var(--text-secondary)]">{item.ref} · {item.date}</p>
                       </div>
-                      <button onClick={() => setInvoiceRef(item.ref)} className="p-1.5 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm flex-shrink-0">
-                        <FilePdf size={16} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setInvoiceRef(item.ref)} className="p-1.5 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm flex-shrink-0" title="View Invoice">
+                          <FilePdf size={16} />
+                        </button>
+                        <button onClick={() => navigate(`/items?name=${encodeURIComponent(item.name)}&ref=${encodeURIComponent(item.ref)}`)} className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm flex-shrink-0" title="View in Orders">
+                          <ArrowRight size={16} />
+                        </button>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-secondary)]">
                       <span><span className="font-medium text-[var(--text-primary)]">₹{fmt(item.fabric_amount)}</span> fabric</span>
@@ -256,7 +263,10 @@ export default function SearchPage() {
                           </span>
                         </td>
                         <td className="px-3 py-2">
-                          <button onClick={() => setInvoiceRef(item.ref)} className="p-1 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm inline-block"><FilePdf size={16} /></button>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => setInvoiceRef(item.ref)} className="p-1 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm inline-block" title="View Invoice"><FilePdf size={16} /></button>
+                            <button onClick={() => navigate(`/items?name=${encodeURIComponent(item.name)}&ref=${encodeURIComponent(item.ref)}`)} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm inline-block" title="View in Orders"><ArrowRight size={16} /></button>
+                          </div>
                         </td>
                       </tr>
                     ))}

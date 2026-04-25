@@ -1,217 +1,424 @@
 import React, { useState } from "react";
+
 import { useNavigate, useLocation } from "react-router-dom";
+
 import { useTheme } from "@/components/ThemeProvider";
+
 import { useAuth } from "@/context/AuthContext";
+
 import {
+
   House, Receipt, Scissors, PlusCircle, Kanban,
+
   CurrencyDollar, BookOpen, UsersThree,
+
   MagnifyingGlass, Table, ChartBar, Database, Gear, ClipboardText,
+
   CaretDoubleLeft, CaretDoubleRight, Sun, Moon, SignOut, UserCircle, UsersFour, ClockCounterClockwise
+
 } from "@phosphor-icons/react";
 
+
+
 const NAV_ITEMS = [
+
   { key: "dashboard", label: "Dashboard", icon: House, path: "/" },
 
+
+
   { key: "section-tx", type: "section", label: "Transactions" },
+
   { key: "new-bill", label: "New Bill", icon: Receipt, path: "/new-bill" },
+
   { key: "tailoring", label: "Tailoring Orders", icon: Scissors, path: "/tailoring" },
+
   { key: "addons", label: "Add-ons", icon: PlusCircle, path: "/addons" },
+
   { key: "jobwork", label: "Job Work", icon: Kanban, path: "/jobwork" },
 
+
+
   { key: "section-fin", type: "section", label: "Finances", managerOnly: true },
+
   { key: "settlements", label: "Settlements", icon: CurrencyDollar, path: "/settlements", managerOnly: true },
+
   { key: "daybook", label: "Daybook", icon: BookOpen, path: "/daybook", managerOnly: true },
+
   { key: "labour", label: "Labour Payments", icon: UsersThree, path: "/labour", managerOnly: true },
 
+
+
   { key: "section-mgmt", type: "section", label: "Manage" },
+
   { key: "items", label: "Manage Orders", icon: Table, path: "/items", managerOnly: true },
+
   { key: "order-status", label: "Order Status", icon: ClipboardText, path: "/order-status" },
+
   { key: "search", label: "Search", icon: MagnifyingGlass, path: "/search" },
+
   { key: "reports", label: "Reports", icon: ChartBar, path: "/reports", managerOnly: true },
+
   { key: "data", label: "Data Manager", icon: Database, path: "/data", adminOnly: true },
+
   { key: "settings", label: "Settings", icon: Gear, path: "/settings", adminOnly: true },
+
   { key: "users", label: "Users", icon: UsersFour, path: "/users", adminOnly: true },
+
   { key: "audit", label: "Audit Log", icon: ClockCounterClockwise, path: "/audit", adminOnly: true },
+
 ];
 
+
+
 export default function Sidebar({ open, setOpen }) {
+
   const navigate = useNavigate();
+
   const location = useLocation();
+
   const { theme, toggle } = useTheme();
+
   const { user, logout } = useAuth();
+
   const [confirmLogout, setConfirmLogout] = useState(false);
+
+
 
   const handleLogout = () => setConfirmLogout(true);
 
+
+
   // Desktop: collapsed = icon-only rail
+
   const [collapsed, setCollapsed] = useState(() => {
+
     try { return localStorage.getItem("sidebar_collapsed") === "true"; } catch { return false; }
+
   });
 
+
+
   const toggleCollapse = () => {
+
     const next = !collapsed;
+
     setCollapsed(next);
+
     try { localStorage.setItem("sidebar_collapsed", String(next)); } catch {}
+
   };
 
+
+
   return (
+
     <>
+
       {/* Mobile overlay */}
+
       {open && (
+
         <div
+
           className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+
           onClick={() => setOpen(false)}
+
           aria-hidden="true"
+
         />
+
       )}
+
+
 
       {/* Sidebar */}
+
       <aside
+
         data-testid="sidebar"
+
         className={`
+
           fixed lg:static inset-y-0 left-0 z-40 bg-[var(--surface)] border-r border-[var(--border-subtle)]
+
           flex flex-col transition-all duration-200 flex-shrink-0
+
           ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+
           ${collapsed ? 'lg:w-[60px]' : 'w-64'}
+
         `}
+
       >
+
         {/* Logo */}
+
         <div className={`border-b border-[var(--border-subtle)] flex items-center justify-between ${collapsed ? 'p-3' : 'p-5'}`}>
+
           <div className={`flex items-center gap-3 overflow-hidden ${collapsed ? 'justify-center w-full' : ''}`}>
+
             <div className="w-8 h-8 flex-shrink-0 rounded-sm flex items-center justify-center" style={{ background: "var(--brand)" }}>
+
               <span className="text-white font-serif font-bold text-lg leading-none">R</span>
+
             </div>
+
             {!collapsed && (
+
               <div className="min-w-0">
+
                 <h1 className="font-heading text-base font-semibold tracking-tight text-[var(--text-primary)] truncate">
+
                   Retail Book
+
                 </h1>
+
                 <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+
                   Fabric & Tailoring
+
                 </p>
+
               </div>
+
             )}
+
           </div>
+
         </div>
+
+
 
         {/* Nav */}
+
         <nav className={`flex-1 py-3 overflow-y-auto overflow-x-hidden ${collapsed ? 'px-1.5 space-y-1' : 'px-3 space-y-0.5'}`}>
+
           {NAV_ITEMS.filter(item => {
+
             if (item.adminOnly && user?.role !== "admin") return false;
+
             if (item.managerOnly && !["admin","manager"].includes(user?.role)) return false;
+
             const allowed = user?.allowed_pages ?? [];
+
             if (allowed.length > 0 && item.path && !allowed.includes(item.path)) return false;
+
             return true;
+
           }).map(item => {
+
             if (item.type === "section") {
+
               return collapsed ? null : (
+
                 <p key={item.key} className="px-3 pt-4 pb-1 text-[9px] uppercase tracking-[.18em] font-semibold text-[var(--border-strong)]">{item.label}</p>
+
               );
+
             }
+
             const isActive = location.pathname === item.path;
+
             const Icon = item.icon;
+
             return (
+
               <button
+
                 key={item.key}
+
                 data-testid={`nav-${item.key}`}
+
                 title={collapsed ? item.label : undefined}
+
                 onClick={() => { navigate(item.path); setOpen(false); }}
+
                 className={`
+
                   w-full flex items-center text-sm rounded-sm transition-all duration-150 active:scale-[0.97]
+
                   ${collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'}
+
                   ${isActive
+
                     ? 'bg-[var(--brand)] text-white font-medium'
+
                     : 'text-[var(--text-secondary)] hover:bg-[var(--bg)] hover:text-[var(--text-primary)]'
+
                   }`}
+
               >
+
                 <Icon size={20} weight={isActive ? "fill" : "regular"} className="flex-shrink-0" />
+
                 {!collapsed && <span className="truncate">{item.label}</span>}
+
               </button>
+
             );
+
           })}
+
         </nav>
 
+
+
         {/* Footer: desktop collapse toggle + theme */}
+
         <div className={`border-t border-[var(--border-subtle)] ${collapsed ? 'p-2' : 'p-3'}`}>
+
           <div className={`flex ${collapsed ? 'flex-col' : 'flex-row'} gap-2`}>
+
             <button
+
               onClick={toggleCollapse}
+
               className="hidden lg:flex flex-1 items-center justify-center gap-2 py-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg)] rounded-sm transition-colors"
+
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+
             >
+
               {collapsed
+
                 ? <CaretDoubleRight size={16} />
+
                 : <><CaretDoubleLeft size={16} /><span>Collapse</span></>
+
               }
+
             </button>
+
             <button
+
               onClick={toggle}
+
               className="flex items-center justify-center gap-2 py-2 px-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg)] rounded-sm transition-colors"
+
               title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+
             >
+
               {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
+
               {!collapsed && <span>{theme === "light" ? "Dark" : "Light"}</span>}
+
             </button>
+
           </div>
-          {!collapsed && (
+
+          {collapsed ? (
             <button
               onClick={() => { navigate("/new-bill"); setOpen(false); }}
-              className="w-full flex items-center justify-center gap-2 mt-2 py-2.5 px-3 bg-[var(--brand)] text-white text-xs font-semibold rounded-sm hover:bg-[var(--brand-hover)] active:scale-[0.98] transition-all tracking-wide shadow-sm"
+              className="w-full flex items-center justify-center mt-2 py-2 bg-[var(--brand)] text-white rounded-sm hover:opacity-90 active:scale-[0.98] transition-all"
+              title="New Bill"
             >
-              <Receipt size={14} weight="fill" />
-              + New Bill
+              <Receipt size={18} weight="bold" />
+            </button>
+          ) : (
+            <button
+              onClick={() => { navigate("/new-bill"); setOpen(false); }}
+              className="w-full flex items-center justify-center gap-2 mt-2 py-2 px-3 bg-[var(--brand)] text-white text-xs font-medium rounded-sm hover:opacity-90 active:scale-[0.98] transition-all"
+            >
+              <Receipt size={14} weight="bold" />
+              New Bill
             </button>
           )}
+
           {/* User info + logout */}
-          <div className={`mt-2 flex items-center ${collapsed ? 'justify-center' : 'gap-2 px-2.5'} py-2 rounded-sm bg-[var(--bg)] border border-[var(--border-subtle)]`}>
-            <div className="relative flex-shrink-0">
-              <UserCircle size={collapsed ? 20 : 20} className="text-[var(--text-secondary)]" />
-              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[var(--bg)]"
-                style={{ background: user?.role === 'admin' ? 'var(--error)' : user?.role === 'manager' ? 'var(--info)' : 'var(--success)' }}
-              />
-            </div>
+
+          <div className={`mt-2 flex items-center ${collapsed ? 'justify-center' : 'gap-2 px-2'} py-1.5 rounded-sm bg-[var(--bg)]`}>
+
+            <UserCircle size={collapsed ? 20 : 18} className="text-[var(--text-secondary)] flex-shrink-0" />
+
             {!collapsed && (
+
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-[var(--text-primary)] truncate leading-tight">{user?.full_name || user?.username}</p>
-                <p className="text-[10px] text-[var(--text-secondary)] capitalize leading-tight mt-0.5">{user?.role}</p>
+
+                <p className="text-xs font-medium text-[var(--text-primary)] truncate">{user?.full_name || user?.username}</p>
+
+                <p className="text-[10px] text-[var(--text-secondary)] uppercase">{user?.role}</p>
+
               </div>
+
             )}
+
             <button
+
               onClick={handleLogout}
-              className="p-1 rounded-sm hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-red-500 transition-colors flex-shrink-0"
+
+              className="p-1 rounded-sm hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-red-500 transition-colors"
+
               title="Logout"
+
             >
-              <SignOut size={15} />
+
+              <SignOut size={16} />
+
             </button>
+
           </div>
+
         </div>
+
       </aside>
 
+
+
       {/* Logout confirmation dialog */}
+
       {confirmLogout && (
+
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+
           <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm shadow-xl w-full max-w-xs p-5 space-y-4">
+
             <div>
+
               <p className="text-sm font-semibold text-[var(--text-primary)]">Sign out?</p>
+
               <p className="text-xs text-[var(--text-secondary)] mt-1">You will be returned to the login screen.</p>
+
             </div>
+
             <div className="flex gap-2">
+
               <button
+
                 onClick={() => setConfirmLogout(false)}
+
                 className="flex-1 px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] transition-colors"
+
               >
+
                 Cancel
+
               </button>
+
               <button
+
                 onClick={() => { setConfirmLogout(false); logout(); }}
+
                 className="flex-1 px-3 py-2 text-sm bg-red-500 text-white rounded-sm hover:bg-red-600 transition-colors"
+
               >
+
                 Sign Out
+
               </button>
+
             </div>
+
           </div>
+
         </div>
+
       )}
+
     </>
+
   );
+
 }
+
