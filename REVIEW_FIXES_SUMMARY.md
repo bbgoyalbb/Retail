@@ -131,8 +131,9 @@ This document catalogs all fixes implemented across three comprehensive UX revie
 | 🟠 High | Dashboard sparklines | 2 hrs | SVG component + trend prop on StatCard |
 | 🟠 High | iOS CSS fixes | 30 min | Input zoom, tap delay, momentum scroll, hover states |
 | 🟡 Medium | Reports skeleton | 1 hr | Replaced Spinner with pulse skeleton pattern |
+| 🟢 Enhancement | HTML Invoice v3 | 2 hrs | Complete redesign with badges, thermal format (?format=thermal), print-ready CSS |
 
-**All 6 items completed and pushed to main branch.**
+**All 7 items completed and pushed to main branch.**
 
 ---
 
@@ -205,6 +206,24 @@ button, a, [role="button"] { touch-action: manipulation; }
 
 ---
 
+## HTML Invoice v3 Redesign (`@/backend/server.py:2058-2607`)
+
+### New Features
+- **Modern layout**: Left-aligned header with "R" logo badge, cleaner meta section
+- **Item badges**: ✂ for tailoring, + for add-ons (visual indicators)
+- **Conditional tailoring section**: Only shown when bill has tailoring items
+- **Balance due visibility**: Green "Fully Paid ✓" or amber "Balance Due: ₹X"
+- **Thermal printer support**: `?format=thermal` query param for 58mm receipts
+- **Print-ready CSS**: `@media print` with proper A4 margins
+- **WhatsApp-friendly**: Compact 600px max-width, clean typography
+
+### Design System Match
+- Uses CSS variables from app theme (--brand, --success, --warning)
+- IBM Plex Sans + Manrope fonts (same as app)
+- Warm color palette consistent with UI
+
+---
+
 ## Key File Modifications
 
 ### `@/pages/NewBill.js`
@@ -229,6 +248,9 @@ button, a, [role="button"] { touch-action: manipulation; }
 ### `@/index.css`
 - Lines 227-254: iOS-specific fixes
 
+### `@/backend/server.py`
+- Lines 2058-2607: Complete HTML invoice v3 redesign with thermal format support
+
 ---
 
 ## PWA Improvements
@@ -249,6 +271,7 @@ button, a, [role="button"] { touch-action: manipulation; }
 ## Git History (Key Commits)
 
 ```
+82c97bc Redesign HTML invoice to v3 spec - modern layout, badges, thermal format
 a32cb62 Complete all v3 review fixes
 be5ec93 Add PWA manifest.json with brand colors
 5097e95 Add auto-dismiss with visual countdown to StatusBanner
@@ -274,6 +297,9 @@ fd96ec3 Add items subtotal footer to New Bill, make Settlements payment panel st
 - [x] All icon buttons have aria-labels
 - [x] StatusBanner auto-dismisses with progress bar
 - [x] PWA manifest validates in Chrome DevTools
+- [x] HTML invoice v3 renders correctly in InvoiceModal iframe
+- [x] Thermal format (?format=thermal) generates 280px receipt
+- [x] Invoice print CSS produces clean A4 output
 
 ---
 
