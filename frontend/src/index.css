@@ -223,3 +223,32 @@ select, textarea {
     border-top-color: inherit; border-bottom-color: inherit;
   }
 }
+
+/* ── iOS Safari fixes ── */
+
+/* 1. Prevent input zoom on iOS Safari (font-size must be >= 16px) */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* 2. Eliminate 300ms tap delay on touch devices */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* 3. Only apply hover states on devices that support hover */
+@media (hover: none) {
+  button:hover,
+  tr:hover td,
+  .hover\:bg-\[var\(--bg\)\]:hover {
+    background-color: inherit !important;
+  }
+}
+
+/* 4. Momentum scrolling for overflow containers (iOS 13-15) */
+.overflow-x-auto, .overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { createBill, getCustomers, getInvoiceUrl, getSettings } from "@/api";
-import { Plus, Trash, FloppyDisk, Barcode, Printer, PencilSimple, X, Scissors, ArrowsSplit, CheckCircle } from "@phosphor-icons/react";
+import { Plus, Trash, FloppyDisk, Barcode, Printer, PencilSimple, X, Scissors, ArrowsSplit, CheckCircle, Spinner } from "@phosphor-icons/react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import InvoiceModal from "@/components/InvoiceModal";
 
@@ -215,6 +215,16 @@ export default function NewBill() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
+
+  // Escape key handler for AddOnModal
+  useEffect(() => {
+    if (!showAddonModal) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setShowAddonModal(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showAddonModal]);
 
   const handleSave = async () => {
     if (!customerName || items.length === 0) {
@@ -549,6 +559,28 @@ export default function NewBill() {
         </div>
       </div>
 
+      {/* Mobile sticky summary bar - visible only on small screens */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--surface)] border-t border-[var(--border-subtle)] p-3 shadow-lg z-40">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">Grand Total</p>
+            <p className="font-heading text-xl font-semibold" style={{ color: "var(--brand)" }}>
+              ₹{grandTotal.toLocaleString('en-IN')}
+            </p>
+            {items.length > 0 && (
+              <p className="text-xs text-[var(--text-secondary)]">{items.length} item{items.length !== 1 ? 's' : ''}</p>
+            )}
+          </div>
+          <button 
+            onClick={handleSave} 
+            disabled={saving || items.length === 0} 
+            className="flex items-center gap-2 px-4 py-3 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 whitespace-nowrap"
+          >
+            {saving ? <Spinner size={16} className="animate-spin" /> : <><FloppyDisk size={16} weight="bold" /> Save Bill</>}
+          </button>
+        </div>
+      </div>
+
       {showTailoringModal && (
         <TailoringModal
           items={items}
@@ -564,11 +596,17 @@ export default function NewBill() {
       )}
 
       {showAddonModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+        <div 
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="addon-modal-title"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAddonModal(false); }}
+        >
           <div className="w-full max-w-5xl bg-[var(--surface)] rounded-sm border border-[var(--border-subtle)] shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
             <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
-              <h3 className="font-heading text-base">Configure Add-ons for Current Bill ({customerName || 'No Customer'})</h3>
-              <button onClick={() => setShowAddonModal(false)} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm"><X size={16} /></button>
+              <h3 id="addon-modal-title" className="font-heading text-base">Configure Add-ons for Current Bill ({customerName || 'No Customer'})</h3>
+              <button onClick={() => setShowAddonModal(false)} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm" aria-label="Close"><X size={16} /></button>
             </div>
             <div className="p-4 overflow-auto flex-1">
               <div className="overflow-x-auto -mx-4 px-4">
@@ -650,6 +688,21 @@ export default function NewBill() {
 function TailoringModal({ items, setItems, customerName, articleTypes, onClose }) {
   const [splitItem, setSplitItem] = useState(null);
   const [splitError, setSplitError] = useState(null);
+
+  // Escape key handler for accessibility
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        if (splitItem) {
+          setSplitItem(null);
+        } else {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, splitItem]);
 
   const updateItemTailoring = (index, patch) => {
     setItems(prev => prev.map((row, idx) => idx === index ? { ...row, tailoring: { ...(row.tailoring || {}), ...patch } } : row));
@@ -759,14 +812,20 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
     const currentTotal = splitItem.splits.reduce((sum, s) => sum + (parseFloat(s.qty) || 0), 0);
     const isBalanced = Math.abs(currentTotal - splitItem.originalQty) < 0.01;
     return (
-      <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div 
+        className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="split-dialog-title"
+        onClick={(e) => { if (e.target === e.currentTarget) setSplitItem(null); }}
+      >
         <div className="w-full max-w-2xl bg-[var(--surface)] rounded-sm border border-[var(--border-subtle)] shadow-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
             <div>
-              <h3 className="font-heading text-base">Split Article: {items[splitItem.itemIdx]?.barcode}</h3>
+              <h3 id="split-dialog-title" className="font-heading text-base">Split Article: {items[splitItem.itemIdx]?.barcode}</h3>
               <p className="text-xs text-[var(--text-secondary)]">Original Qty: {splitItem.originalQty} | Original Amount: ₹{splitItem.originalTotal?.toLocaleString()}</p>
             </div>
-            <button onClick={() => setSplitItem(null)} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm"><X size={16} /></button>
+            <button onClick={() => setSplitItem(null)} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm" aria-label="Close"><X size={16} /></button>
           </div>
           <div className="p-4 max-h-[60vh] overflow-auto">
             <div className="space-y-3">
@@ -841,15 +900,105 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+    <div 
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tailoring-modal-title"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
       <div className="w-full max-w-5xl bg-[var(--surface)] rounded-sm border border-[var(--border-subtle)] shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
         <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
-          <h3 className="font-heading text-base">Configure Tailoring for Current Bill ({customerName || 'No Customer'})</h3>
-          <button onClick={onClose} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm"><X size={16} /></button>
+          <h3 id="tailoring-modal-title" className="font-heading text-base">Configure Tailoring for Current Bill ({customerName || 'No Customer'})</h3>
+          <button onClick={onClose} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm" aria-label="Close"><X size={16} /></button>
         </div>
         <div className="p-4 overflow-auto flex-1">
-          <div className="overflow-x-auto -mx-4 px-4">
-            <table className="w-full min-w-[600px] sm:min-w-[900px]">
+          {/* Mobile card view - visible only on small screens */}
+          <div className="sm:hidden space-y-3">
+            {items.map((item, idx) => (
+              <div key={`tail-mobile-${idx}`} className="bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm p-3 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="checkbox" 
+                      checked={!!item.tailoring?.enabled} 
+                      onChange={e => updateItemTailoring(idx, { enabled: e.target.checked })} 
+                      className="accent-[var(--brand)]"
+                    />
+                    <span className="text-sm font-medium">{item.barcode}</span>
+                  </div>
+                  <span className="text-xs text-[var(--text-secondary)]">{item.qty}m</span>
+                </div>
+                
+                {item.tailoring?.enabled && (
+                  <div className="space-y-3 pt-2 border-t border-[var(--border-subtle)]">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] block mb-1">Order No</label>
+                        <input 
+                          value={item.tailoring?.order_no || ""} 
+                          onChange={e => updateItemTailoring(idx, { order_no: e.target.value })} 
+                          maxLength={30} 
+                          className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm"
+                          placeholder="TL-2025-XXX"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] block mb-1">Delivery</label>
+                        <input 
+                          type="date" 
+                          value={item.tailoring?.delivery_date || ""} 
+                          onChange={e => updateItemTailoring(idx, { delivery_date: e.target.value })} 
+                          className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] block mb-1">Type</label>
+                        <select 
+                          value={item.tailoring?.article_type || (articleTypes[0] || "Shirt")} 
+                          onChange={e => updateItemTailoring(idx, { article_type: e.target.value })} 
+                          className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)]"
+                        >
+                          {articleTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] block mb-1">Embroidery</label>
+                        <select 
+                          value={item.tailoring?.embroidery_status || "Not Required"} 
+                          onChange={e => updateItemTailoring(idx, { embroidery_status: e.target.value })} 
+                          className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)]"
+                        >
+                          <option value="Not Required">Not Required</option>
+                          <option value="Required">Required</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => handleSplit(idx)}
+                      disabled={item.qty <= 0}
+                      className="w-full px-3 py-2 text-xs border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] disabled:opacity-30 flex items-center justify-center gap-1"
+                      title="Split this article into multiple tailoring orders"
+                    >
+                      <ArrowsSplit size={12} /> Split Article
+                    </button>
+                  </div>
+                )}
+                
+                {!item.tailoring?.enabled && (
+                  <p className="text-xs text-[var(--text-secondary)] italic">Enable tailoring to configure</p>
+                )}
+              </div>
+            ))}
+          </div>
+          
+          {/* Desktop table view - hidden on mobile */}
+          <div className="hidden sm:block overflow-x-auto -mx-4 px-4">
+            <table className="w-full min-w-[900px]">
               <thead>
                 <tr className="bg-[var(--bg)]">
                   <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Apply</th>

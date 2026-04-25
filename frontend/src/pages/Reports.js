@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { getRevenueReport, getCustomerReport, getSummaryReport } from "@/api";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
-import { ChartBar, Users, TrendUp, Spinner, Warning } from "@phosphor-icons/react";
+import { ChartBar, Users, TrendUp, Warning } from "@phosphor-icons/react";
 
 const COLORS = ["#C86B4D", "#455D4A", "#5C8A9E", "#D49842", "#9E473D", "#6C6760", "#B35A3E"];
 
@@ -101,11 +101,19 @@ export default function Reports() {
         </div>
       )}
 
-      {/* Loading State */}
+      {/* Loading State - Skeleton */}
       {loading && (
-        <div className="p-12 text-center">
-          <Spinner size={32} className="animate-spin mx-auto text-[var(--brand)] mb-3" />
-          <p className="text-sm text-[var(--text-secondary)]">Loading reports...</p>
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1,2,3,4].map(i => (
+              <div key={i} className="h-24 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm animate-pulse" />
+            ))}
+          </div>
+          <div className="h-64 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="h-48 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm animate-pulse" />
+            <div className="h-48 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm animate-pulse" />
+          </div>
         </div>
       )}
 
