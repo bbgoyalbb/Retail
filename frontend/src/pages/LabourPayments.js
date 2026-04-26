@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback } from "react";
 import { getLabourItems, getKarigars, payLabour, deleteLabourPayment, getSettings } from "@/api";
+import { fmt } from "@/lib/fmt";
 import { UsersThree, CurrencyDollar, CheckCircle, Circle, CaretDown, CaretRight, Trash, PencilSimple, X } from "@phosphor-icons/react";
 
 export default function LabourPayments() {
@@ -78,7 +79,6 @@ export default function LabourPayments() {
     }
   };
 
-  const fmt = (n) => n ? new Intl.NumberFormat('en-IN').format(Math.round(n)) : "0";
   const totalUnpaid = items.reduce((s, i) => s + (i.labour_type === "Tailoring" ? (i.labour_amount || 0) : (i.emb_labour_amount || 0)), 0);
 
   // Track expanded states for 3-level hierarchy: date -> payment -> articles

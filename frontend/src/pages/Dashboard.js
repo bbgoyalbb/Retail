@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getDashboard } from "@/api";
+import { fmt } from "@/lib/fmt";
 import { useToast } from "@/hooks/use-toast";
 import { CurrencyDollar, Scissors, UsersThree, TrendUp, ArrowsClockwise, Receipt } from "@phosphor-icons/react";
 import { EmptyState } from "@/components/EmptyState";
@@ -103,7 +104,6 @@ export default function Dashboard() {
     </div>
   );
 
-  const fmt = (n) => new Intl.NumberFormat('en-IN').format(Math.round(n || 0));
 
   return (
     <div data-testid="dashboard-page" className="space-y-8">

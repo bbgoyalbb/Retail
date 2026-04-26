@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getDaybook, getDaybookDates, tallyEntries } from "@/api";
+import { fmt } from "@/lib/fmt";
 import { Check, Circle, Spinner } from "@phosphor-icons/react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -46,7 +47,6 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
     else { setSortKey(key); setSortDir("asc"); }
   };
 
-  const fmt = (n) => n ? new Intl.NumberFormat('en-IN').format(Math.round(n)) : "-";
 
   // Compact mode label: Cash→C, PhonePe→P, Bank/Transfer→B, etc.
   const modeCode = (mode = "") => {

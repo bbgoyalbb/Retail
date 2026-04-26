@@ -20,6 +20,38 @@ class SpecificFixesTester:
         self.tests_passed = 0
         self.failed_tests = []
         self.created_refs = []
+        self.session = requests.Session()
+        self.session.headers.update({"Content-Type": "application/json"})
+
+    def login(self, username: str = "admin", password: str = "admin123") -> bool:
+        """Authenticate and inject JWT into session headers."""
+        if hasattr(self, "_pending_credentials"):
+            username, password = self._pending_credentials
+        try:
+            resp = self.session.post(
+                f"{self.api_base}/auth/login",
+                json={"username": username, "password": password},
+            )
+            if resp.status_code == 200:
+                token = resp.json().get("access_token")
+                if token:
+                    self.session.headers.update({"Authorization": f"Bearer {token}"})
+                    print(f"✅ Auth Login — logged in as '{username}'")
+                    return True
+            print(f"❌ Auth Login — HTTP {resp.status_code}: {resp.text[:120]}")
+            return False
+        except Exception as e:
+            print(f"❌ Auth Login — {e}")
+            return False
+
+    def log_test(self, name: str, success: bool, details: str = ""):
+        self.tests_run += 1
+        if success:
+            self.tests_passed += 1
+            print(f"✅ {name}")
+        else:
+            self.failed_tests.append({"name": name, "details": details})
+            print(f"❌ {name} - {details}")
 
     def create_test_bill(self, customer_name: str, needs_tailoring: bool = False, qty: float = 1.0):
         payload = {
@@ -39,7 +71,7 @@ class SpecificFixesTester:
             "is_settled": False,
             "needs_tailoring": needs_tailoring,
         }
-        response = requests.post(f"{self.api_base}/bills", json=payload)
+        response = self.session.post(f"{self.api_base}/bills", json=payload)
         if response.status_code != 200:
             return None
         ref = response.json().get("ref")
@@ -63,7 +95,7 @@ class SpecificFixesTester:
         
         # Test GET /api/settings
         try:
-            response = requests.get(f"{self.api_base}/settings")
+            response = self.session.get(f"{self.api_base}/settings")
             success = response.status_code == 200
             
             if success:
@@ -85,7 +117,7 @@ class SpecificFixesTester:
                         "firm_name": "Test Update - NARWANA AGENCIES"
                     }
                     
-                    put_response = requests.put(f"{self.api_base}/settings", json=test_update)
+                    put_response = self.session.put(f"{self.api_base}/settings", json=test_update)
                     put_success = put_response.status_code == 200
                     self.log_test("PUT /api/settings updates and persists", put_success, 
                                 put_response.text if not put_success else "")
@@ -109,7 +141,7 @@ class SpecificFixesTester:
                 self.log_test("Tailoring split setup", False, "Failed to create fixture bill")
                 return False
 
-            items_response = requests.get(f"{self.api_base}/items", params={"ref": fixture["ref"], "limit": 10})
+            items_response = self.session.get(f"{self.api_base}/items", params={"ref": fixture["ref"], "limit": 10})
             if items_response.status_code != 200:
                 self.log_test("Get items for split test", False, f"Status: {items_response.status_code}")
                 return False
@@ -138,7 +170,7 @@ class SpecificFixesTester:
                 ]
             }
 
-            split_response = requests.post(f"{self.api_base}/tailoring/split", json=split_data)
+            split_response = self.session.post(f"{self.api_base}/tailoring/split", json=split_data)
             success = split_response.status_code == 200
 
             if success:
@@ -168,7 +200,7 @@ class SpecificFixesTester:
                 "emb_customer_amount": 1000.0
             }
             
-            response = requests.post(f"{self.api_base}/jobwork/move-emb", json=test_data)
+            response = self.session.post(f"{self.api_base}/jobwork/move-emb", json=test_data)
             
             # Should return 200 (not 404) even with invalid item ID
             success = response.status_code == 200
@@ -199,7 +231,7 @@ class SpecificFixesTester:
                 self.log_test("PDF fixture setup", False, "Unable to create fixture bills")
                 return False
 
-            response1 = requests.get(f"{self.api_base}/invoice", params={"ref": fabric_only["ref"]})
+            response1 = self.session.get(f"{self.api_base}/invoice", params={"ref": fabric_only["ref"]})
             success1 = response1.status_code == 200 and response1.headers.get('content-type') == 'application/pdf'
             
             if success1:
@@ -210,7 +242,7 @@ class SpecificFixesTester:
                 self.log_test("PDF for fabric-only bill generates", False, 
                             f"Status: {response1.status_code}")
             
-            response2 = requests.get(f"{self.api_base}/invoice", params={"ref": tailoring_bill["ref"]})
+            response2 = self.session.get(f"{self.api_base}/invoice", params={"ref": tailoring_bill["ref"]})
             success2 = response2.status_code == 200 and response2.headers.get('content-type') == 'application/pdf'
             
             if success2:
@@ -237,7 +269,7 @@ class SpecificFixesTester:
                 self.log_test("Settlement balances fixture setup", False, "Unable to create fixture bill")
                 return False
 
-            response = requests.get(f"{self.api_base}/settlements/balances", params={"ref": fixture["ref"]})
+            response = self.session.get(f"{self.api_base}/settlements/balances", params={"ref": fixture["ref"]})
             success = response.status_code == 200
             
             if success:
@@ -268,7 +300,12 @@ class SpecificFixesTester:
         """Run tests for all 7 specific fixes"""
         print("🎯 Testing 7 Specific Fixes from Review Request")
         print("=" * 60)
-        
+
+        # Authenticate first — all routes require a valid JWT
+        if not self.login():
+            print("❌ Cannot proceed without authentication. Check credentials.")
+            return False
+
         # Fix #1: PDF only shows sections with actual data
         pdf_ok = self.test_pdf_conditional_sections()
         
@@ -301,8 +338,11 @@ class SpecificFixesTester:
 def main():
     """Main test runner for specific fixes"""
     base_url = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("RETAIL_API_BASE_URL", "http://127.0.0.1:8001")
+    username = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("RETAIL_TEST_USER", "admin")
+    password = sys.argv[3] if len(sys.argv) > 3 else os.environ.get("RETAIL_TEST_PASS", "admin123")
     tester = SpecificFixesTester(base_url)
-    
+    tester._pending_credentials = (username, password)
+
     try:
         success = tester.run_specific_fixes_tests()
         return 0 if success else 1

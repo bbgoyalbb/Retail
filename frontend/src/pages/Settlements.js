@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { getPendingCustomers, getPendingRefs, getPendingOrders, getBalances, processSettlement, getItems, getSettings } from "@/api";
+import { fmt } from "@/lib/fmt";
 import { CurrencyDollar, CheckCircle } from "@phosphor-icons/react";
 
 export default function Settlements() {
@@ -192,11 +193,6 @@ export default function Settlements() {
     }
   };
 
-  const fmt = (n) => {
-    const v = n || 0;
-    const abs = new Intl.NumberFormat('en-IN').format(Math.round(Math.abs(v)));
-    return v < 0 ? `-${abs}` : abs;
-  };
   const hasRef = selectedRef && selectedRef.length > 0;
 
   // Reset when switching modes

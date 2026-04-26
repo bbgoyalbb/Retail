@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { getCustomers, getOrderStatus } from "@/api";
+import { fmt } from "@/lib/fmt";
 import { ClipboardText, MagnifyingGlass } from "@phosphor-icons/react";
 
-const fmt = (n) => new Intl.NumberFormat("en-IN").format(Math.round(n || 0));
 
 function StatusPill({ label, value, tone }) {
   const tones = {

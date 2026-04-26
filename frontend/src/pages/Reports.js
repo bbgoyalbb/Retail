@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { getRevenueReport, getCustomerReport, getSummaryReport } from "@/api";
+import { fmt } from "@/lib/fmt";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
 import { ChartBar, Users, TrendUp, Warning } from "@phosphor-icons/react";
 
 const COLORS = ["#C86B4D", "#455D4A", "#5C8A9E", "#D49842", "#9E473D", "#6C6760", "#B35A3E"];
 
 function SummaryCards({ summary }) {
-  const fmt = (n) => new Intl.NumberFormat('en-IN').format(Math.round(n || 0));
   const cards = [
     { label: "Fabric Total", value: `₹${fmt(summary.total_fabric)}`, color: "var(--brand)" },
     { label: "Fabric Received", value: `₹${fmt(summary.total_fabric_received)}`, color: "var(--success)" },
@@ -70,7 +70,6 @@ export default function Reports() {
     loadReports();
   }, [period, dateFrom, dateTo]);
 
-  const fmt = (n) => new Intl.NumberFormat('en-IN').format(Math.round(n || 0));
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload) return null;

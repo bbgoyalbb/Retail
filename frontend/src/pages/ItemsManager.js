@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getItems, updateItem, deleteItem, createItem, getAdvances, createAdvance, updateAdvance, deleteAdvance } from "@/api";
+import { fmt } from "@/lib/fmt";
 import { PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle, Funnel } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -109,7 +110,6 @@ const computeFabricAmount = (price, qty, discount) => {
 
 const computePending = (total, received) => Math.round(total - (received || 0));
 
-const fmt = (n) => n != null && n !== 0 ? new Intl.NumberFormat("en-IN").format(Math.round(n)) : "-";
 
 const FIELD_CLASSES = "w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:border-[var(--brand)] focus:outline-none bg-[var(--surface)] text-[var(--text-primary)]";
 

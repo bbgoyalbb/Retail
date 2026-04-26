@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { searchItems, getCustomers } from "@/api";
+import { fmt } from "@/lib/fmt";
 import { MagnifyingGlass, Funnel, FilePdf, X, CaretLeft, CaretRight, ArrowRight } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
 
@@ -88,7 +89,6 @@ export default function SearchPage() {
   const hasMore = (currentPage + 1) * ITEMS_PER_PAGE < total;
   const hasPrev = currentPage > 0;
 
-  const fmt = (n) => new Intl.NumberFormat('en-IN').format(Math.round(n || 0));
 
   return (
     <div data-testid="search-page" className="space-y-6">

@@ -14,6 +14,45 @@ from auth import audit_log
 from .models import LoginRequest, UserCreateRequest
 from fastapi import Header, status
 
+# ==========================================
+# RATE LIMITING
+# TTLCache auto-expires entries — no manual cleanup needed.
+# Falls back to plain dict if cachetools is not installed.
+# ==========================================
+_RATE_LIMIT_MAX = 5
+_RATE_LIMIT_WINDOW = 900  # 15 minutes in seconds
+
+try:
+    from cachetools import TTLCache
+    _login_attempts: dict = TTLCache(maxsize=1000, ttl=_RATE_LIMIT_WINDOW)
+except ImportError:
+    # cachetools not installed — use plain dict with manual expiry
+    _login_attempts: dict = {}  # type: ignore
+
+def _check_rate_limit(ip: str) -> None:
+    """Raise 429 if this IP has exceeded the login attempt limit."""
+    try:
+        # TTLCache: entries auto-expire, just count them
+        count = _login_attempts.get(ip, 0)
+        if count >= _RATE_LIMIT_MAX:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Too many login attempts. Try again in {_RATE_LIMIT_WINDOW // 60} minutes."
+            )
+        _login_attempts[ip] = count + 1
+    except HTTPException:
+        raise
+    except Exception:
+        # If TTLCache is full or any other error, fail open (don't block legitimate users)
+        pass
+
+def _clear_rate_limit(ip: str) -> None:
+    """Clear rate limit counter on successful login."""
+    try:
+        _login_attempts.pop(ip, None)
+    except Exception:
+        pass
+
 router = APIRouter()
 
 @router.get("/settings/public")

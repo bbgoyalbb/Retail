@@ -1,5 +1,10 @@
 // Shared number/date formatting utilities used across all pages
-export const fmt = (n) => new Intl.NumberFormat("en-IN").format(Math.round(n || 0));
+// Handles negatives correctly: fmt(-1234) → "-1,234"
+export const fmt = (n) => {
+  const v = Math.round(n || 0);
+  const abs = new Intl.NumberFormat("en-IN").format(Math.abs(v));
+  return v < 0 ? `-${abs}` : abs;
+};
 
 export const fmtCurrency = (n) => `₹${fmt(n)}`;
 

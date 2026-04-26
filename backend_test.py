@@ -29,6 +29,29 @@ class RetailAPITester:
         self.latest_ref = None
         self.session = requests.Session()
         self.session.headers.update({'Content-Type': 'application/json'})
+        self._token: str | None = None
+
+    def login(self, username: str = "admin", password: str = "admin123") -> bool:
+        """Authenticate and store JWT so all subsequent requests are authorised."""
+        # Allow main() to override default credentials via _pending_credentials
+        if hasattr(self, "_pending_credentials"):
+            username, password = self._pending_credentials
+        try:
+            url = f"{self.api_base}/auth/login"
+            resp = requests.post(url, json={"username": username, "password": password},
+                                 headers={"Content-Type": "application/json"})
+            if resp.status_code == 200:
+                token = resp.json().get("access_token")
+                if token:
+                    self._token = token
+                    self.session.headers.update({"Authorization": f"Bearer {token}"})
+                    self.log_test("Auth Login", True, f"Logged in as '{username}'")
+                    return True
+            self.log_test("Auth Login", False, f"HTTP {resp.status_code}: {resp.text[:120]}")
+            return False
+        except Exception as e:
+            self.log_test("Auth Login", False, str(e))
+            return False
 
     def log_test(self, name: str, success: bool, details: str = ""):
         """Log test result"""
@@ -709,7 +732,12 @@ class RetailAPITester:
         print("🚀 Starting VBA Retail Management API Tests")
         print(f"🌐 Testing against: {self.base_url}")
         print("=" * 60)
-        
+
+        # Authenticate first — all routes require a valid JWT
+        if not self.login():
+            print("❌ Cannot proceed without authentication. Check credentials.")
+            return False
+
         # Core API tests
         self.test_health_check()
         self.test_seed_data()
@@ -764,9 +792,12 @@ class RetailAPITester:
 
 def main():
     """Main test runner"""
-    base_url = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("RETAIL_API_BASE_URL", "http://127.0.0.1:8001")
+    base_url  = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("RETAIL_API_BASE_URL", "http://127.0.0.1:8001")
+    username  = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("RETAIL_TEST_USER", "admin")
+    password  = sys.argv[3] if len(sys.argv) > 3 else os.environ.get("RETAIL_TEST_PASS", "admin123")
     tester = RetailAPITester(base_url)
-    
+    tester._pending_credentials = (username, password)
+
     try:
         success = tester.run_all_tests()
         return 0 if success else 1
