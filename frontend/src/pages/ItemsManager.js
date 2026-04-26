@@ -457,11 +457,19 @@ export default function ItemsManager() {
       cancelled_at: new Date().toISOString(),
       cancelled_ref: group.ref,
       price: 0, qty: 0, discount: 0,
-      fabric_amount: 0, fabric_received: 0, fabric_pending: 0, fabric_pay_mode: "N/A",
+      // Fabric
+      fabric_amount: 0, fabric_received: 0, fabric_pending: 0, fabric_pay_mode: "N/A", tally_fabric: false,
+      // Tailoring
       tailoring_amount: 0, tailoring_received: 0, tailoring_pending: 0, tailoring_pay_mode: "N/A",
+      tailoring_status: "N/A", article_type: "N/A", order_no: "N/A", delivery_date: "N/A",
+      labour_amount: 0, labour_paid: "N/A", tally_tailoring: false,
+      // Embroidery
       embroidery_amount: 0, embroidery_received: 0, embroidery_pending: 0, embroidery_pay_mode: "N/A",
+      embroidery_status: "N/A", karigar: "N/A",
+      emb_labour_amount: 0, emb_labour_paid: "N/A", tally_embroidery: false,
+      // Add-on
       addon_amount: 0, addon_received: 0, addon_pending: 0, addon_pay_mode: "N/A",
-      labour_amount: 0, emb_labour_amount: 0,
+      addon_desc: "N/A", tally_addon: false,
     };
     let success = 0;
     for (const item of group.items) {
