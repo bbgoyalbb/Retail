@@ -457,8 +457,8 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     padding: 10px 18px;
     display: flex;
     gap: 0;
-    border: 2px solid #111;
-    margin: 0;
+    border-top: 1px solid #ddd;
+    border-bottom: 1px solid #ddd;
   }}
   .bt-col {{
     flex: 1;
