@@ -559,18 +559,15 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
 
   /* ── GRAND TOTAL ── */
   .inv-grand {{
-    background: #fff;
-    color: #111;
+    background: #444;
+    color: #fff;
     padding: 8px 18px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-top: 2px solid #111;
-    border-left: 4px solid #111;
-    border-bottom: 1px solid #ccc;
   }}
-  .inv-grand .gt-label {{ font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.25em; color: #111; }}
-  .inv-grand .gt-val {{ font-size: 14px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; color: #111; }}
+  .inv-grand .gt-label {{ font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.25em; color: #fff; }}
+  .inv-grand .gt-val {{ font-size: 14px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; color: #fff; }}
 
   /* ── PAYMENT TABLE ── */
   .inv-pay-section {{
@@ -662,6 +659,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     /* Force background colors/images to print on mobile Chrome & Safari */
     .sec-block th,
     .inv-grand,
+    .inv-pay-section th,
     .inv-pay-section .sec-head {{
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
