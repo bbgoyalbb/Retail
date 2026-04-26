@@ -5,7 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useTheme } from "@/components/ThemeProvider";
 
 import { useAuth } from "@/context/AuthContext";
-import { getDaybookPendingCount, getPublicSettings } from "@/api";
+import { getDaybookPendingCount, getPublicSettings, BACKEND_URL } from "@/api";
 
 import {
 
@@ -176,34 +176,14 @@ export default function Sidebar({ open, setOpen }) {
 
           <div className={`flex items-center gap-3 overflow-hidden ${collapsed ? 'justify-center w-full' : ''}`}>
 
-            <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center" style={{ background: firmLogo ? "transparent" : "var(--brand)", borderRadius: "4px" }}>
+            <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center" style={{ background: firmLogo ? "transparent" : "var(--brand)", borderRadius: "6px" }}>
 
               {firmLogo
-                ? <img src={firmLogo.startsWith("http") ? firmLogo : `${window.location.origin}${firmLogo}`} alt="logo" className="w-full h-full object-contain" />
+                ? <img src={firmLogo.startsWith("http") ? firmLogo : `${BACKEND_URL}${firmLogo}`} alt="logo" className="w-full h-full object-contain" />
                 : <span className="w-full h-full flex items-center justify-center text-white font-serif font-bold text-lg leading-none">{firmName.charAt(0).toUpperCase()}</span>
               }
 
             </div>
-
-            {!collapsed && (
-
-              <div className="min-w-0">
-
-                <h1 className="font-heading text-base font-semibold tracking-tight text-[var(--text-primary)] truncate">
-
-                  {firmName}
-
-                </h1>
-
-                <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-secondary)]">
-
-                  Fabric & Tailoring
-
-                </p>
-
-              </div>
-
-            )}
 
           </div>
 

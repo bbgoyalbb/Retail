@@ -1,11 +1,11 @@
 ﻿import { useState, useEffect, useRef } from "react";
-import { getSettings, updateSettings, uploadLogo } from "@/api";
+import { getSettings, updateSettings, uploadLogo, BACKEND_URL } from "@/api";
 import { FloppyDisk, Plus, Trash, Gear, CheckCircle, Warning } from "@phosphor-icons/react";
 
 const getLogoUrl = (path) => {
   if (!path) return null;
   if (path.startsWith("http")) return path;
-  if (path.startsWith("/")) return `${window.location.origin}${path}`;
+  if (path.startsWith("/")) return `${BACKEND_URL}${path}`;
   return path;
 };
 
