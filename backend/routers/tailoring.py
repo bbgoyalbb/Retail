@@ -12,7 +12,7 @@ from .deps import db, get_current_user_dep
 from data_quality import round_money, determine_payment_status, build_payment_mode_label
 import auth as auth_module
 from auth import audit_log
-from .models import AddOnRequest, SplitTailoringRequest, TAILORING_RATES, TailoringOrderRequest
+from .models import AddOnRequest, SplitTailoringRequest, TAILORING_RATES, TailoringOrderRequest, merge_settings
 
 router = APIRouter()
 

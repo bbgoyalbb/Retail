@@ -28,6 +28,32 @@ ADDON_ITEMS = ["Bow", "Tie", "Cufflinks", "Stall", "Buttons", "Saffa", "Dye", "M
 
 PAYMENT_MODES = ["Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer"]
 
+DEFAULT_SETTINGS = {
+    "article_types": ARTICLE_TYPES,
+    "tailoring_rates": {k: {"tailoring": v[0], "labour": v[1]} for k, v in TAILORING_RATES.items()},
+    "payment_modes": PAYMENT_MODES,
+    "addon_items": ADDON_ITEMS,
+    "gst_rate": 5.0,
+    "firm_name": "Narwana Agencies",
+    "firm_address": "Jasmeet Nagar, Near Kalka Chowk, Ambala City, Pin: 134003, Haryana",
+    "firm_phones": "9467902343, 7056212655",
+    "firm_gstin": "06ADMPG9353K1Z4",
+    "firm_logo": None,
+    "firm_name_color": "#C86B4D",
+    "firm_name_size": "16",
+    "firm_name_case": "uppercase",
+}
+
+def merge_settings(stored_settings=None) -> dict:
+    merged = dict(DEFAULT_SETTINGS)
+    if stored_settings:
+        merged.update({k: v for k, v in stored_settings.items() if k != "key"})
+    for list_key in ("payment_modes", "addon_items", "article_types"):
+        if isinstance(merged.get(list_key), list):
+            seen = set()
+            merged[list_key] = [x for x in merged[list_key] if not (x.lower() in seen or seen.add(x.lower()))]
+    return merged
+
 class BillLineItem(BaseModel):
     barcode: str
     qty: float
