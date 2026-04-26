@@ -201,9 +201,14 @@ export default function SettingsPage() {
                           formData.append("file", file);
                           showMessage({ type: "success", text: "Uploading logo..." });
                           const res = await uploadLogo(formData);
-                          setLogoPreview(res.data.url);
-                          setSettings(p => ({...p, firm_logo: res.data.url}));
-                          showMessage({ type: "success", text: "Logo uploaded. Click Save Settings to apply." });
+                          const logoUrl = res.data.url;
+                          setLogoPreview(logoUrl);
+                          // Auto-save the logo URL immediately so it persists without a manual Save
+                          const updatedSettings = { ...settings, firm_logo: logoUrl };
+                          setSettings(updatedSettings);
+                          await updateSettings(updatedSettings);
+                          setSavedSettings(updatedSettings);
+                          showMessage({ type: "success", text: "Logo uploaded and saved successfully!" });
                         } catch (err) {
                           showMessage({ type: "error", text: err.message || "Failed to upload logo" });
                         }

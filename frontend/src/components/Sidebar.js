@@ -87,10 +87,15 @@ export default function Sidebar({ open, setOpen }) {
   const [firmName, setFirmName] = useState("Retail Book");
 
   useEffect(() => {
-    getPublicSettings().then(s => {
-      if (s?.firm_logo) setFirmLogo(s.firm_logo);
-      if (s?.firm_name) setFirmName(s.firm_name);
-    }).catch(() => {});
+    const fetchSettings = () => {
+      getPublicSettings().then(s => {
+        setFirmLogo(s?.firm_logo || null);
+        if (s?.firm_name) setFirmName(s.firm_name);
+      }).catch(() => {});
+    };
+    fetchSettings();
+    window.addEventListener("focus", fetchSettings);
+    return () => window.removeEventListener("focus", fetchSettings);
   }, []);
 
   useEffect(() => {
