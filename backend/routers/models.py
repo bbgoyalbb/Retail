@@ -33,6 +33,11 @@ class BillLineItem(BaseModel):
     qty: float
     price: float
     discount: float = 0
+    article_type: Optional[str] = None
+    order_no: Optional[str] = None
+    delivery_date: Optional[str] = None
+    embroidery_status: Optional[str] = None
+    addons: Optional[List[dict]] = None
 
 class CreateBillRequest(BaseModel):
     customer_name: str

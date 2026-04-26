@@ -393,7 +393,27 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
         discounted_price = round(item.price - (item.price * item.discount / 100), 0)
         item_total = round(discounted_price * item.qty, 0)
 
-        if req.is_settled:
+        # Resolve per-item tailoring fields sent from NewBill frontend
+        item_article_type  = item.article_type    or "N/A"
+        item_order_no      = item.order_no        or "N/A"
+        item_delivery_date = item.delivery_date   or "N/A"
+        item_emb_status    = item.embroidery_status or "N/A"
+
+        # If an order_no was already set on the line, tailoring starts as Pending
+        item_tailoring_status = "Pending" if item_order_no != "N/A" else tailoring_status
+
+        # Resolve addon fields from line item
+        item_addons = item.addons or []
+        item_addon_amount   = round(sum(float(a.get("price", 0)) for a in item_addons), 0)
+        item_addon_desc     = ", ".join(a.get("name", "") for a in item_addons) if item_addons else "N/A"
+        item_addon_pay_mode = "Pending" if item_addon_amount > 0 else "N/A"
+        item_addon_pending  = item_addon_amount if item_addon_amount > 0 else 0
+
+        # is_settled=True with amount_paid=0 must NOT mark fabric as Settled —
+        # doing so hides the bill from the Settlements page permanently.
+        effective_settled = req.is_settled and req.amount_paid > 0
+
+        if effective_settled:
             total_diff = grand_total - req.amount_paid
             if idx == len(req.items) - 1:
                 item_discount = total_diff - running_discount
@@ -414,15 +434,15 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
                 "qty": item.qty,
                 "discount": item.discount,
                 "fabric_amount": item_total,
-                "tailoring_status": tailoring_status,
-                "article_type": "N/A",
-                "order_no": "N/A",
-                "delivery_date": "N/A",
+                "tailoring_status": item_tailoring_status,
+                "article_type": item_article_type,
+                "order_no": item_order_no,
+                "delivery_date": item_delivery_date,
                 "tailoring_amount": 0,
-                "embroidery_status": "N/A",
+                "embroidery_status": item_emb_status,
                 "embroidery_amount": 0,
-                "addon_desc": "N/A",
-                "addon_amount": 0,
+                "addon_desc": item_addon_desc,
+                "addon_amount": item_addon_amount,
                 "fabric_pay_mode": f"Settled - {modes_str}",
                 "fabric_pay_date": req.payment_date,
                 "fabric_pending": item_discount,
@@ -438,10 +458,10 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
                 "embroidery_pay_date": "N/A",
                 "embroidery_received": 0,
                 "embroidery_pending": 0,
-                "addon_pay_mode": "N/A",
+                "addon_pay_mode": item_addon_pay_mode,
                 "addon_pay_date": "N/A",
                 "addon_received": 0,
-                "addon_pending": 0,
+                "addon_pending": item_addon_pending,
                 "karigar": "N/A",
                 "tally_fabric": False,
                 "tally_tailoring": False,
@@ -460,15 +480,15 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
                 "qty": item.qty,
                 "discount": item.discount,
                 "fabric_amount": item_total,
-                "tailoring_status": tailoring_status,
-                "article_type": "N/A",
-                "order_no": "N/A",
-                "delivery_date": "N/A",
+                "tailoring_status": item_tailoring_status,
+                "article_type": item_article_type,
+                "order_no": item_order_no,
+                "delivery_date": item_delivery_date,
                 "tailoring_amount": 0,
-                "embroidery_status": "N/A",
+                "embroidery_status": item_emb_status,
                 "embroidery_amount": 0,
-                "addon_desc": "N/A",
-                "addon_amount": 0,
+                "addon_desc": item_addon_desc,
+                "addon_amount": item_addon_amount,
                 "fabric_pay_mode": "Pending",
                 "fabric_pay_date": "N/A",
                 "fabric_pending": item_total,
@@ -484,10 +504,10 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
                 "embroidery_pay_date": "N/A",
                 "embroidery_received": 0,
                 "embroidery_pending": 0,
-                "addon_pay_mode": "N/A",
+                "addon_pay_mode": item_addon_pay_mode,
                 "addon_pay_date": "N/A",
                 "addon_received": 0,
-                "addon_pending": 0,
+                "addon_pending": item_addon_pending,
                 "karigar": "N/A",
                 "tally_fabric": False,
                 "tally_tailoring": False,
