@@ -98,7 +98,7 @@ const SECTIONS = {
 // GRID LAYOUT — single source of truth
 // Columns: caret | date | ref | order# | customer | fab | tail | emb | add-on | adv | items | total | rcvd | pending | actions
 // ==========================================
-const GRID_COLS = "24px 90px 100px 110px 1fr 80px 80px 70px 70px 70px 44px 90px 90px 96px 88px";
+const GRID_COLS = "24px 90px 100px 100px minmax(120px,180px) 80px 72px 72px 72px 60px 40px 88px 80px 96px 88px";
 
 // ==========================================
 // UTILITY FUNCTIONS
