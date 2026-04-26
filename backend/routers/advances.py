@@ -43,7 +43,7 @@ class AdvanceUpdateRequest(BaseModel):
 
 @router.post("/advances")
 async def create_advance(req: AdvanceCreateRequest, current_user: dict = Depends(get_current_user_dep)):
-    adv = {"id": str(uuid.uuid4()), "ref": req.ref, "name": req.name, "amount": req.amount, "date": req.date, "mode": req.mode or "Cash"}
+    adv = {"id": str(uuid.uuid4()), "ref": req.ref, "name": req.name, "amount": req.amount, "date": req.date, "mode": req.mode or "Cash", "tally": False, "created_at": datetime.now(timezone.utc).isoformat()}
     await db.advances.insert_one(adv)
     await audit_log(db, "create", current_user, "advance", adv["id"], {"ref": req.ref, "amount": req.amount})
     adv.pop("_id", None)

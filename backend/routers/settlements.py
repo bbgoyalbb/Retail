@@ -49,10 +49,10 @@ async def get_settlement_balances(name: Optional[str] = None, ref: Optional[str]
     adv = await db.advances.aggregate(pipeline_adv).to_list(1)
 
     return {
-        "fabric": max(0, fab[0]["total"]) if fab else 0,
-        "tailoring": max(0, tail[0]["total"]) if tail else 0,
-        "embroidery": max(0, emb[0]["total"]) if emb else 0,
-        "addon": max(0, addon[0]["total"]) if addon else 0,
+        "fabric": fab[0]["total"] if fab else 0,
+        "tailoring": tail[0]["total"] if tail else 0,
+        "embroidery": emb[0]["total"] if emb else 0,
+        "addon": addon[0]["total"] if addon else 0,
         "advance": adv[0]["total"] if adv else 0,
     }
 
