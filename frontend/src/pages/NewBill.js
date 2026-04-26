@@ -432,14 +432,14 @@ export default function NewBill() {
               <CheckCircle size={32} weight="fill" className="text-[var(--success)]" />
             </div>
           </div>
-          <div className="flex flex-wrap gap-3 pt-2">
-            <button onClick={() => setShowInvoice(true)} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--success)] text-white rounded-sm hover:bg-[#3d4d3f]">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 pt-2">
+            <button onClick={() => setShowInvoice(true)} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium bg-[var(--success)] text-white rounded-sm hover:bg-[#3d4d3f]">
               <Printer size={16} /> View Invoice
             </button>
-            <button onClick={() => window.open(getInvoiceUrl(lastBillRef), '_blank')} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)]">
+            <button onClick={() => window.open(getInvoiceUrl(lastBillRef), '_blank')} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)]">
               <Printer size={16} weight="bold" /> Print
             </button>
-            <button onClick={createAnotherBill} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] ml-auto">
+            <button onClick={createAnotherBill} className="w-full sm:w-auto sm:ml-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">
               <Plus size={16} weight="bold" /> Create Another Bill
             </button>
           </div>

@@ -397,6 +397,11 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
   @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
   *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
+  html {{
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }}
+
   body {{
     font-family: 'Manrope', sans-serif;
     font-size: 11px;
@@ -616,6 +621,15 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     body {{ background: #fff; padding: 0; }}
     .inv {{ width: 100%; min-height: 100vh; border: none; box-shadow: none; }}
     @page {{ size: A5; margin: 8mm 10mm; }}
+    /* Force background colors/images to print on mobile Chrome & Safari */
+    .inv-billto,
+    .sec-head,
+    .sec-block th,
+    .inv-grand,
+    .inv-pay-section .sec-head {{
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }}
   }}
 </style>
 </head>
