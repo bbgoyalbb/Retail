@@ -138,7 +138,7 @@ function AppShell() {
       <BackToTop />
       <main className="flex-1 overflow-y-auto min-w-0">
         <MobileTopBar title={PAGE_TITLES[location.pathname] ?? "Retail Book"} onMenuClick={() => handleSetOpen(!sidebarOpen)} />
-        <div className="p-4 pt-16 sm:p-5 sm:pt-16 lg:p-8 lg:pt-8 max-w-[1600px] mx-auto page-in">
+        <div className="p-4 pt-16 md:p-6 md:pt-6 lg:p-8 max-w-[1600px] mx-auto page-in">
           <ErrorBoundary>
             <Suspense fallback={<PageLoader />}>
               <KeyboardShortcuts />

@@ -138,7 +138,7 @@ export default function Sidebar({ open, setOpen }) {
 
         <div
 
-          className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/30 z-40 md:hidden"
 
           onClick={() => setOpen(false)}
 
@@ -158,13 +158,13 @@ export default function Sidebar({ open, setOpen }) {
 
         className={`
 
-          fixed lg:static inset-y-0 left-0 z-40 bg-[var(--surface)] border-r border-[var(--border-subtle)]
+          fixed md:static inset-y-0 left-0 z-40 bg-[var(--surface)] border-r border-[var(--border-subtle)]
 
           flex flex-col transition-all duration-200 flex-shrink-0
 
-          ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
 
-          ${collapsed ? 'lg:w-[60px]' : 'w-64'}
+          ${collapsed ? 'md:w-[60px]' : 'w-64'}
 
         `}
 
@@ -176,7 +176,7 @@ export default function Sidebar({ open, setOpen }) {
 
           <div className={`flex items-center gap-3 overflow-hidden ${collapsed ? 'justify-center w-full' : ''}`}>
 
-            <div className="w-8 h-8 flex-shrink-0 rounded-sm overflow-hidden" style={{ background: "var(--brand)" }}>
+            <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center" style={{ background: firmLogo ? "transparent" : "var(--brand)", borderRadius: "4px" }}>
 
               {firmLogo
                 ? <img src={firmLogo.startsWith("http") ? firmLogo : `${window.location.origin}${firmLogo}`} alt="logo" className="w-full h-full object-contain" />
@@ -303,7 +303,7 @@ export default function Sidebar({ open, setOpen }) {
 
               onClick={toggleCollapse}
 
-              className="hidden lg:flex flex-1 items-center justify-center gap-2 py-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg)] rounded-sm transition-colors"
+              className="hidden md:flex flex-1 items-center justify-center gap-2 py-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg)] rounded-sm transition-colors"
 
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
 
