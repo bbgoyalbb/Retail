@@ -2,6 +2,7 @@
 Jobwork router.
 """
 from fastapi import APIRouter, HTTPException, Query, Depends, Request
+from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, date
 import uuid
@@ -106,6 +107,10 @@ async def move_jobwork(req: StatusUpdateRequest, current_user: dict = Depends(ge
 
     return {"message": f"{updated} items moved to {req.new_status}"}
 
+class MoveBackRequest(BaseModel):
+    item_ids: List[str]
+    current_status: str
+
 @router.post("/jobwork/move-back")
 async def move_jobwork_back(req: MoveBackRequest, current_user: dict = Depends(get_current_user_dep)):
     TAILORING_PREV = {"Stitched": "Pending", "Delivered": "Stitched"}
@@ -122,6 +127,12 @@ async def move_jobwork_back(req: MoveBackRequest, current_user: dict = Depends(g
         if result.modified_count > 0:
             updated += 1
     return {"message": f"{updated} items moved back"}
+
+class EmbMoveRequest(BaseModel):
+    item_ids: List[str]
+    new_status: str
+    emb_labour_amount: Optional[float] = None
+    emb_customer_amount: Optional[float] = None
 
 @router.post("/jobwork/move-emb")
 async def move_embroidery(req: EmbMoveRequest, current_user: dict = Depends(get_current_user_dep)):
@@ -143,6 +154,12 @@ async def move_embroidery(req: EmbMoveRequest, current_user: dict = Depends(get_
         if result.modified_count > 0:
             updated += 1
     return {"message": f"{updated} embroidery items updated"}
+
+class EmbEditRequest(BaseModel):
+    item_id: str
+    karigar: Optional[str] = None
+    emb_labour_amount: Optional[float] = None
+    emb_customer_amount: Optional[float] = None
 
 @router.post("/jobwork/edit-emb")
 async def edit_embroidery(req: EmbEditRequest, current_user: dict = Depends(get_current_user_dep)):

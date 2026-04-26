@@ -40,8 +40,17 @@ if not db_name:
 client = AsyncIOMotorClient(mongo_url)
 db = client[db_name]
 
-# Inject the db instance into the shared deps module before importing routers
-from routers import deps as _deps  # noqa: E402
+# Inject db into the shared deps module BEFORE any router is imported.
+# We use importlib to load routers/deps.py in isolation — this avoids
+# triggering routers/__init__.py (which imports all routers, each of which
+# does `from .deps import db` at module level and would copy the None value).
+import importlib, importlib.util, sys  # noqa: E402
+_spec = importlib.util.spec_from_file_location(
+    "routers.deps", ROOT_DIR / "routers" / "deps.py"
+)
+_deps = importlib.util.module_from_spec(_spec)
+sys.modules["routers.deps"] = _deps  # register before routers load
+_spec.loader.exec_module(_deps)
 _deps.set_db(db)
 
 # ==========================================
@@ -144,7 +153,7 @@ uploads_dir = ROOT_DIR / "static" / "uploads"
 uploads_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
-build_dir = ROOT_DIR.parent / "frontend" / "build"
+build_dir = ROOT_DIR / "frontend" / "build"
 if build_dir.exists():
     app.mount("/static", StaticFiles(directory=build_dir / "static"), name="react-static")
 

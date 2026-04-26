@@ -2,6 +2,7 @@
 Tailoring router.
 """
 from fastapi import APIRouter, HTTPException, Query, Depends, Request
+from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, date
 import uuid
@@ -11,7 +12,7 @@ from .deps import db, get_current_user_dep
 from data_quality import round_money, determine_payment_status, build_payment_mode_label
 import auth as auth_module
 from auth import audit_log
-from .models import AddOnRequest, SplitItem, SplitTailoringRequest, TAILORING_RATES, TailoringOrderRequest, merge_settings
+from .models import AddOnRequest, SplitTailoringRequest, TAILORING_RATES, TailoringOrderRequest
 
 router = APIRouter()
 
@@ -84,6 +85,17 @@ async def assign_tailoring(req: TailoringOrderRequest, current_user: dict = Depe
             updated += 1
 
     return {"message": f"{updated} items assigned to order {req.order_no}"}
+
+class SplitItem(BaseModel):
+    article_type: str
+    qty: float
+    embroidery_status: str = "Not Required"
+
+class SplitTailoringRequest(BaseModel):
+    item_id: str
+    order_no: str
+    delivery_date: str
+    splits: List[SplitItem]
 
 @router.post("/tailoring/split")
 async def split_and_assign(req: SplitTailoringRequest, current_user: dict = Depends(get_current_user_dep)):
@@ -169,4 +181,8 @@ async def split_and_assign(req: SplitTailoringRequest, current_user: dict = Depe
         created += 1
 
     return {"message": f"Item split into {created} pieces for order {req.order_no}"}
+
+# ==========================================
+# ADDONS
+# ==========================================
 

@@ -390,8 +390,8 @@ export default function DataManager() {
               <div>
                 <p className="text-sm font-medium text-[var(--text-primary)]">Repair remaining overpayment issues</p>
                 <p className="text-xs text-[var(--text-secondary)] mt-1">
-                  Repairs genuine accounting errors (pending exceeds total, mode label out of sync).
-                  Intentional over-payments and credit balances are preserved untouched.
+                  Repairs negative pending and received-over-total cases by capping the category at its true total
+                  and carrying excess money into advances for the same reference.
                 </p>
               </div>
               <button

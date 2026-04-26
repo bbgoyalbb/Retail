@@ -2,6 +2,7 @@
 Labour router.
 """
 from fastapi import APIRouter, HTTPException, Query, Depends, Request
+from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, date
 import uuid
@@ -89,6 +90,11 @@ async def pay_labour(req: LabourPaymentRequest, current_user: dict = Depends(get
             updated += 1
 
     return {"message": f"{updated} labour payments processed"}
+
+class LabourDeleteRequest(BaseModel):
+    payment_id: Optional[str] = None
+    item_ids: List[str]
+    labour_type: str
 
 @router.post("/labour/delete-payment")
 async def delete_labour_payment(req: LabourDeleteRequest, current_user: dict = Depends(get_current_user_dep)):

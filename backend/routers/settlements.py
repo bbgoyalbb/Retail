@@ -15,9 +15,11 @@ from .models import SettlementRequest
 
 router = APIRouter()
 
+@router.get("/settlements/balances")
+async def get_settlement_balances(name: Optional[str] = None, ref: Optional[str] = None, current_user: dict = Depends(get_current_user_dep)):
+    if not ref:
+        return {"fabric": 0, "tailoring": 0, "embroidery": 0, "addon": 0, "advance": 0}
 
-async def _fetch_balances(ref: str) -> dict:
-    """Internal helper — queries balance totals for a ref without FastAPI Depends."""
     not_settled = {"$not": {"$regex": "^Settled"}}
     pipeline_fab = [
         {"$match": {"ref": ref, "fabric_amount": {"$gt": 0}, "fabric_pay_mode": not_settled}},
@@ -40,26 +42,19 @@ async def _fetch_balances(ref: str) -> dict:
         {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
     ]
 
-    fab  = await db.items.aggregate(pipeline_fab).to_list(1)
+    fab = await db.items.aggregate(pipeline_fab).to_list(1)
     tail = await db.items.aggregate(pipeline_tail).to_list(1)
-    emb  = await db.items.aggregate(pipeline_emb).to_list(1)
+    emb = await db.items.aggregate(pipeline_emb).to_list(1)
     addon = await db.items.aggregate(pipeline_addon).to_list(1)
-    adv  = await db.advances.aggregate(pipeline_adv).to_list(1)
+    adv = await db.advances.aggregate(pipeline_adv).to_list(1)
 
     return {
-        "fabric":    fab[0]["total"]  if fab  else 0,
-        "tailoring": tail[0]["total"] if tail else 0,
-        "embroidery":emb[0]["total"]  if emb  else 0,
-        "addon":     addon[0]["total"] if addon else 0,
-        "advance":   adv[0]["total"]   if adv  else 0,
+        "fabric": max(0, fab[0]["total"]) if fab else 0,
+        "tailoring": max(0, tail[0]["total"]) if tail else 0,
+        "embroidery": max(0, emb[0]["total"]) if emb else 0,
+        "addon": max(0, addon[0]["total"]) if addon else 0,
+        "advance": adv[0]["total"] if adv else 0,
     }
-
-
-@router.get("/settlements/balances")
-async def get_settlement_balances(name: Optional[str] = None, ref: Optional[str] = None, current_user: dict = Depends(get_current_user_dep)):
-    if not ref:
-        return {"fabric": 0, "tailoring": 0, "embroidery": 0, "addon": 0, "advance": 0}
-    return await _fetch_balances(ref)
 
 @router.post("/settlements/pay")
 async def process_settlement(req: SettlementRequest, current_user: dict = Depends(get_current_user_dep)):
@@ -72,7 +67,7 @@ async def process_settlement(req: SettlementRequest, current_user: dict = Depend
     if total_allocated <= 0:
         raise HTTPException(status_code=400, detail="Please allocate at least some amount")
 
-    current_balances = await _fetch_balances(req.ref)
+    current_balances = await get_settlement_balances(ref=req.ref)
 
     available_advance = round_money(current_balances["advance"])
     advance_to_use = 0.0
@@ -143,16 +138,21 @@ async def process_settlement(req: SettlementRequest, current_user: dict = Depend
         await db.advances.insert_one(adv)
 
     if advance_to_use > 0:
-        adjustment = {
-            "id": str(uuid.uuid4()),
-            "date": req.payment_date,
-            "name": req.customer_name,
-            "ref": req.ref,
-            "amount": -advance_to_use,
-            "mode": "Adjusted",
-            "tally": False,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        await db.advances.insert_one(adjustment)
+            adjustment = {
+                "id": str(uuid.uuid4()),
+                "date": req.payment_date,
+                "name": req.customer_name,
+                "ref": req.ref,
+                "amount": -advance_to_use,
+                "mode": "Adjusted",
+                "tally": False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.advances.insert_one(adjustment)
 
     return {"message": "Settlement processed successfully"}
+
+# ==========================================
+# DAYBOOK
+# ==========================================
+

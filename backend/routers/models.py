@@ -33,11 +33,6 @@ class BillLineItem(BaseModel):
     qty: float
     price: float
     discount: float = 0
-    article_type: Optional[str] = None
-    order_no: Optional[str] = None
-    delivery_date: Optional[str] = None
-    embroidery_status: Optional[str] = None
-    addons: Optional[List[dict]] = None
 
 class CreateBillRequest(BaseModel):
     customer_name: str
@@ -200,6 +195,16 @@ class ItemCreateRequest(BaseModel):
 # HELPERS
 # ==========================================
 
+def make_ref(seq: int, date_str: str) -> str:
+    try:
+        parts = date_str.split("-")
+        if len(parts) == 3:
+            d, m, y = parts
+            return f"{seq:02d}/{d}{m}{y[2:]}"
+    except Exception:
+        pass
+    return f"{seq:02d}/000000"
+
 def validate_date(date_str: str, field_name: str = "date") -> str:
     """Validate date format and return the date string. Raises ValueError on invalid input."""
     if not date_str or not isinstance(date_str, str):
@@ -216,36 +221,6 @@ def serialize_doc(doc):
     doc["_id"] = str(doc["_id"])
     return doc
 
-
-# ==========================================
-# DEFAULT SETTINGS & MERGE HELPER
-# ==========================================
-
-DEFAULT_SETTINGS = {
-    "article_types": ARTICLE_TYPES,
-    "tailoring_rates": {k: {"tailoring": v[0], "labour": v[1]} for k, v in TAILORING_RATES.items()},
-    "payment_modes": PAYMENT_MODES,
-    "addon_items": ADDON_ITEMS,
-    "gst_rate": 5.0,
-    "firm_name": "Narwana Agencies",
-    "firm_address": "Jasmeet Nagar, Near Kalka Chowk, Ambala City, Pin: 134003, Haryana",
-    "firm_phones": "9467902343, 7056212655",
-    "firm_gstin": "06ADMPG9353K1Z4",
-    "firm_logo": None,
-    "firm_name_color": "#C86B4D",
-    "firm_name_size": "16",
-    "firm_name_case": "uppercase",
-}
-
-def merge_settings(stored_settings: Optional[dict] = None) -> dict:
-    merged = dict(DEFAULT_SETTINGS)
-    if stored_settings:
-        merged.update({k: v for k, v in stored_settings.items() if k != "key"})
-    for list_key in ("payment_modes", "addon_items", "article_types"):
-        if isinstance(merged.get(list_key), list):
-            seen: set = set()
-            merged[list_key] = [x for x in merged[list_key] if not (x.lower() in seen or seen.add(x.lower()))]
-    return merged
 
 
 # ==========================================
@@ -267,13 +242,6 @@ class UserCreateRequest(BaseModel):
     allowed_pages: List[str] = []
 
 # --- Rate limiting ---
-
-# --- SplitItem ---
-class SplitItem(BaseModel):
-    article_type: str
-    qty: float
-    embroidery_status: str = "Not Required"
-
 
 # --- SplitTailoringRequest ---
 class SplitTailoringRequest(BaseModel):

@@ -1,10 +1,16 @@
 """
 Orders router.
 """
-from fastapi import APIRouter, Depends, Query
-from typing import Optional, List
-from .deps import db, get_current_user_dep
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from typing import Optional, List, Dict, Any
+from datetime import datetime, timezone, date
+import uuid
 import re
+from bson import ObjectId
+from .deps import db, get_current_user_dep
+from data_quality import round_money, determine_payment_status, build_payment_mode_label
+import auth as auth_module
+from auth import audit_log
 
 router = APIRouter()
 
@@ -52,8 +58,8 @@ async def get_order_status(
         if ono not in grouped:
             grouped[ono] = {
                 "order_no": ono,
-                "customers": [],
-                "refs": [],
+                "customers": set(),
+                "refs": set(),
                 "item_count": 0,
                 "tailoring_pending": 0,
                 "tailoring_stitched": 0,
@@ -66,10 +72,8 @@ async def get_order_status(
                 "latest_delivery_date": "",
             }
         g = grouped[ono]
-        name = item.get("name", "")
-        if name not in g["customers"]: g["customers"].append(name)
-        ref = item.get("ref", "")
-        if ref not in g["refs"]: g["refs"].append(ref)
+        g["customers"].add(item.get("name", ""))
+        g["refs"].add(item.get("ref", ""))
         g["item_count"] += 1
         ts = item.get("tailoring_status", "N/A")
         if ts == "Pending": g["tailoring_pending"] += 1
@@ -86,8 +90,8 @@ async def get_order_status(
         if dd and dd not in ("N/A", "", None) and dd > g["latest_delivery_date"]: g["latest_delivery_date"] = dd
     result = []
     for g in grouped.values():
-        g["customers"] = sorted(set(g["customers"]))
-        g["refs"] = sorted(set(g["refs"]))
+        g["customers"] = sorted(g["customers"])
+        g["refs"] = sorted(g["refs"])
         result.append(g)
     result.sort(key=lambda x: x.get("latest_bill_date", ""), reverse=True)
     return result

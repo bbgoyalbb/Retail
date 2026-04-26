@@ -12,13 +12,15 @@ from .deps import db, get_current_user_dep
 from data_quality import round_money, determine_payment_status, build_payment_mode_label
 import auth as auth_module
 from auth import audit_log
-from .models import ARTICLE_TYPES, TAILORING_RATES, DEFAULT_SETTINGS, merge_settings
+from .models import ARTICLE_TYPES, TAILORING_RATES
 import io
 
 router = APIRouter()
 
 @router.get("/invoice")
 async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = Query(default="standard", alias="format"), current_user: dict = Depends(get_current_user_dep)):
+    from fastapi.responses import HTMLResponse
+
     items = await db.items.find({"ref": ref_id}, {"_id": 0}).to_list(100)
     if not items:
         raise HTTPException(status_code=404, detail="No items found for this reference")
@@ -38,11 +40,6 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
 
     customer_name = items[0].get("name", "N/A")
     order_date = items[0].get("date", "N/A")
-    # Use the fabric pay date as the payment date; fall back to order_date
-    payment_date = next(
-        (i.get("fabric_pay_date") for i in items if i.get("fabric_pay_date") and i.get("fabric_pay_date") not in ("N/A", "")),
-        order_date
-    )
     
     # Collect payment modes
     all_modes = set()
@@ -477,7 +474,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
       <p class="inv-title">Tax Invoice</p>
       <p class="inv-ref">{ref_id}</p>
       <p>Date: {order_date}</p>
-      <p>Payment: {payment_date}</p>
+      <p>Payment: {order_date}</p>
     </div>
   </div>
 
@@ -534,7 +531,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     </div>
     <div>
       <label>Payment Date</label>
-      <p>{payment_date}</p>
+      <p>{order_date}</p>
     </div>
     <div>
       <label>Bill Created</label>
@@ -705,4 +702,8 @@ async def get_summary_report(date_from: Optional[str] = None, date_to: Optional[
         "payment_modes": [{"mode": k, "amount": v} for k, v in sorted(mode_counts.items(), key=lambda x: -x[1])],
         "article_types": [{"type": k, "count": v} for k, v in sorted(article_counts.items(), key=lambda x: -x[1])],
     }
+
+# ==========================================
+# EXCEL IMPORT (Upload .xlsm/.xlsx from browser)
+# ==========================================
 

@@ -43,9 +43,9 @@ def analyze_payment_field(
 
     if pending < 0 or (total >= 0 and received - total > 0.01):
         issues.append({
-            "type": "credit_balance",
+            "type": "overpaid",
             "category": label,
-            "message": f"{label} credit balance: received \u20b9{received} against total \u20b9{total} (credit \u20b9{round_money(received - total)}) — intentional, no action needed",
+            "message": f"{label} over-payment: received \u20b9{received} against total \u20b9{total} (credit \u20b9{round_money(received - total)})",
             "total": total,
             "received": received,
             "pending": pending,
@@ -122,35 +122,39 @@ def normalize_payment_field(
     pending = round_money(item.get(pending_field, 0))
     original_mode = item.get(mode_field, "N/A") or "N/A"
 
-    # Never touch intentional over-payments — received > total or pending < 0
-    # are valid business states (customer paid extra, credit exists).
-    if received > total + 0.02 or pending < -0.02:
-        return {received_field: received, pending_field: pending, mode_field: original_mode}
+    if pending < 0 and abs(pending) <= 1:
+        pending = 0.0
 
-    # Only fix genuine floating-point rounding drift (< ₹0.02), nothing more.
+    if received < 0 and abs(received) <= 1:
+        received = 0.0
+
+    if total >= 0 and received > total and abs(received - total) <= 1:
+        received = total
+
+    if total >= 0 and pending > total and abs(pending - total) <= 1:
+        pending = total
+
     if total > 0:
         mismatch = round_money((received + pending) - total)
-        if 0 < abs(mismatch) <= 0.02:
+        if abs(mismatch) <= 1:
             if pending > 0:
-                pending = round_money(total - received)
+                pending = round_money(max(0, total - received))
             elif pending == 0 and received > 0:
+                # Only fix rounding drift when there is no over-payment
                 received = round_money(total - pending)
 
-    # Fix the mode label if it is out of sync with actual payment status.
-    # Preserve the existing payment method suffix (e.g. "Cash", "PhonePe").
     status = determine_payment_status(pending, received)
     mode = original_mode
-    if status == "Pending" and not str(original_mode).startswith("Pending"):
-        mode = "Pending"
-    elif status == "Settled" and not str(original_mode).startswith("Settled"):
-        mode_suffix = ""
-        if " - " in str(original_mode):
-            mode_suffix = original_mode.split(" - ", 1)[1].strip()
-            if mode_suffix.startswith("Partially Settled - "):
-                mode_suffix = mode_suffix[len("Partially Settled - "):].strip()
-        mode = f"Settled - {mode_suffix}" if mode_suffix else "Settled"
-    elif status == "N/A" and original_mode not in ("N/A", ""):
-        mode = "N/A"
+    if original_mode != "N/A" or total > 0 or received > 0 or pending > 0:
+        mode = status if status != "N/A" else "N/A"
+        if status == "Settled":
+            mode_suffix = ""
+            if " - " in str(original_mode):
+                mode_suffix = original_mode.split(" - ", 1)[1].strip()
+                if mode_suffix.startswith("Partially Settled - "):
+                    mode_suffix = mode_suffix[len("Partially Settled - "):].strip()
+            if mode_suffix:
+                mode = f"Settled - {mode_suffix}"
 
     return {
         received_field: received,
