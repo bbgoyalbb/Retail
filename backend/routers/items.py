@@ -1,21 +1,29 @@
 """
 Items router.
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, StreamingResponse, status
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone, date
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from typing import Optional, List
+from datetime import datetime, timezone
 import uuid
 import re
-from bson import ObjectId
 from .deps import db, get_current_user_dep
-from data_quality import round_money, determine_payment_status, build_payment_mode_label
-import auth as auth_module
+from data_quality import determine_payment_status
 from auth import audit_log
 from .models import ItemCreateRequest, ItemUpdateRequest
-from fastapi import UploadFile, File
-from fastapi.responses import StreamingResponse
 
 router = APIRouter()
+
+@router.delete("/items/bulk/delete")
+async def bulk_delete_items(
+    item_ids: List[str],
+    current_user: dict = Depends(get_current_user_dep)
+):
+    if current_user.get("role") not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    await audit_log(db, "bulk_delete", current_user, "items", f"count:{len(item_ids)}", {"count": len(item_ids)})
+    result = await db.items.delete_many({"id": {"$in": item_ids}})
+    return {"message": f"{result.deleted_count} items deleted"}
+
 
 @router.put("/items/{item_id}")
 async def update_item(item_id: str, req: ItemUpdateRequest, current_user: dict = Depends(get_current_user_dep)):
@@ -32,8 +40,11 @@ async def update_item(item_id: str, req: ItemUpdateRequest, current_user: dict =
         d = update_fields.get("discount", item.get("discount", 0))
         new_fabric_amount = round((p - (p * d / 100)) * q, 0)
         update_fields["fabric_amount"] = new_fabric_amount
-        fabric_received = update_fields.get("fabric_received", item.get("fabric_received", 0))
-        update_fields["fabric_pending"] = round(new_fabric_amount - (fabric_received or 0), 2)
+        # Only recalculate pending if the item is not yet settled — preserve settled accounting
+        existing_mode = update_fields.get("fabric_pay_mode", item.get("fabric_pay_mode", ""))
+        if not str(existing_mode).startswith("Settled"):
+            fabric_received = update_fields.get("fabric_received", item.get("fabric_received", 0))
+            update_fields["fabric_pending"] = round(new_fabric_amount - (fabric_received or 0), 2)
 
     if update_fields:
         await db.items.update_one({"id": item_id}, {"$set": update_fields})
@@ -113,21 +124,6 @@ async def create_item(req: ItemCreateRequest, current_user: dict = Depends(get_c
     await audit_log(db, "create", current_user, "item", item_id, {"ref": req.ref, "barcode": req.barcode})
     doc.pop("_id", None)
     return doc
-
-@router.delete("/items/bulk/delete")
-async def bulk_delete_items(
-    item_ids: List[str],
-    current_user: dict = Depends(get_current_user_dep)
-):
-    # Restrict to admin/manager only
-    if current_user.get("role") not in ["admin", "manager"]:
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
-    # Audit log the bulk delete
-    await audit_log(db, "bulk_delete", current_user, "items", f"count:{len(item_ids)}", {"count": len(item_ids)})
-    
-    result = await db.items.delete_many({"id": {"$in": item_ids}})
-    return {"message": f"{result.deleted_count} items deleted"}
 
 # ==========================================
 # SEARCH

@@ -1,18 +1,24 @@
 """
 Auth Routes router.
 """
-from fastapi import APIRouter, Depends, File, FileResponse, HTTPException, JSONResponse, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, Header, status
+from fastapi.responses import FileResponse, JSONResponse
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, date
 import uuid
 import re
+import os
+import logging
+from pathlib import Path
 from bson import ObjectId
 from .deps import db, get_current_user_dep
 from data_quality import round_money, determine_payment_status, build_payment_mode_label
 import auth as auth_module
 from auth import audit_log
-from .models import LoginRequest, UserCreateRequest
-from fastapi import Header, status
+from .models import LoginRequest, UserCreateRequest, merge_settings
+
+ROOT_DIR = Path(__file__).parent.parent
+logger = logging.getLogger(__name__)
 
 # ==========================================
 # RATE LIMITING
@@ -263,102 +269,3 @@ async def list_audit_logs(
     
     return {"logs": docs, "count": len(docs), "total": total_count}
 
-# ==========================================
-# APP SETUP
-# ==========================================
-
-app.include_router(api_router)
-
-app.add_middleware(GZipMiddleware, minimum_size=500)
-
-@app.middleware("http")
-async def limit_upload_size(request: Request, call_next):
-    if request.method in ("POST", "PUT", "PATCH"):
-        content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > MAX_UPLOAD_SIZE:
-            return JSONResponse(
-                {"detail": f"Request body too large. Maximum allowed size is {MAX_UPLOAD_SIZE // (1024*1024)}MB."},
-                status_code=413
-            )
-    return await call_next(request)
-
-@app.get("/health", tags=["Health"])
-async def health_check():
-    try:
-        await db.command("ping")
-        return {"status": "ok", "database": "connected"}
-    except Exception as e:
-        return JSONResponse({"status": "error", "database": str(e)}, status_code=503)
-
-# CORS configuration - fail loudly if not set in production
-cors_origins = os.environ.get('CORS_ORIGINS')
-if not cors_origins:
-    # In production (when not in DEBUG mode), require explicit CORS origins
-    if os.environ.get('DEBUG', '').lower() != 'true':
-        raise RuntimeError(
-            "CORS_ORIGINS environment variable not set. "
-            "Please set it to your allowed origins (e.g., 'https://yourshop.com,https://192.168.1.100:8001'). "
-            "For development, set DEBUG=true to allow all origins."
-        )
-    # In development, default to allow all
-    cors_origins = '*'
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=cors_origins.split(',') if cors_origins != '*' else ['*'],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-uploads_dir = ROOT_DIR / "static" / "uploads"
-uploads_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
-
-build_dir = ROOT_DIR / "frontend" / "build"
-if build_dir.exists():
-    app.mount("/static", StaticFiles(directory=build_dir / "static"), name="react-static")
-
-    @app.get("/{full_path:path}", include_in_schema=False)
-    async def spa_fallback(full_path: str):
-        index = build_dir / "index.html"
-        return FileResponse(str(index))
-
-@app.on_event("startup")
-async def startup_db_client():
-    from pymongo import ASCENDING, DESCENDING
-    
-    # Single field indexes
-    await db.items.create_index("id", unique=True, background=True)
-    await db.items.create_index("ref", background=True)
-    await db.items.create_index("barcode", background=True)
-    await db.items.create_index("name", background=True)
-    await db.items.create_index("date", background=True)
-    await db.items.create_index("order_no", background=True)
-    await db.items.create_index("karigar", background=True)
-    
-    # Compound indexes for common query patterns (performance optimization)
-    # Job Work queries: filter by tailoring_status and sort by date
-    await db.items.create_index([("tailoring_status", ASCENDING), ("date", DESCENDING)], background=True)
-    # Settlement balance queries: filter by ref and fabric_pay_mode
-    await db.items.create_index([("ref", ASCENDING), ("fabric_pay_mode", ASCENDING)], background=True)
-    # Customer pending refs: filter by name and fabric_pay_mode
-    await db.items.create_index([("name", ASCENDING), ("fabric_pay_mode", ASCENDING)], background=True)
-    # Daybook queries: filter by pay dates
-    await db.items.create_index("fabric_pay_date", background=True)
-    await db.items.create_index("tailoring_pay_date", background=True)
-    await db.items.create_index("embroidery_pay_date", background=True)
-    await db.items.create_index("addon_pay_date", background=True)
-    # Labour queries: filter by tailoring_status and labour_paid
-    await db.items.create_index([("tailoring_status", ASCENDING), ("labour_paid", ASCENDING)], background=True)
-    # Counters collection — _id index is automatic in MongoDB, no explicit creation needed
-    
-    await db.advances.create_index("id", unique=True, background=True)
-    await db.advances.create_index("ref", background=True)
-    await db.advances.create_index("date", background=True)
-    await db.settings.create_index("key", unique=True, background=True)
-    logger.info("MongoDB indexes ensured.")
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()

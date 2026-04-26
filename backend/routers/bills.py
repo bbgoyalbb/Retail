@@ -6,12 +6,16 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, date
 import uuid
 import re
+import os
+import logging
 from bson import ObjectId
 from .deps import db, get_current_user_dep
 from data_quality import round_money, determine_payment_status, build_payment_mode_label
 import auth as auth_module
 from auth import audit_log
 from .models import ADDON_ITEMS, ARTICLE_TYPES, BillLineItem, CreateBillRequest, PAYMENT_MODES, TAILORING_RATES, validate_date
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -28,6 +32,19 @@ async def seed_data(current_user: dict = Depends(get_current_user_dep)):
             return {"message": "Excel file not found at /tmp/retail_book.xlsm"}
 
         wb = openpyxl.load_workbook(wb_path, data_only=True)
+
+        def safe_float(v):
+            if v is None or str(v).strip() in ("N/A", "", "None"):
+                return 0
+            try:
+                return float(v)
+            except (ValueError, TypeError):
+                return 0
+
+        def safe_str(v):
+            if v is None:
+                return "N/A"
+            return str(v).strip()
 
         ws = wb['Item Details']
         items = []
@@ -60,19 +77,6 @@ async def seed_data(current_user: dict = Depends(get_current_user_dep)):
             labour_pay_date = ""
             if row[23] and hasattr(row[23], 'strftime'):
                 labour_pay_date = row[23].strftime("%Y-%m-%d")
-
-            def safe_float(v):
-                if v is None or str(v).strip() in ("N/A", "", "None"):
-                    return 0
-                try:
-                    return float(v)
-                except (ValueError, TypeError):
-                    return 0
-
-            def safe_str(v):
-                if v is None:
-                    return "N/A"
-                return str(v).strip()
 
             item = {
                 "id": str(uuid.uuid4()),
@@ -124,24 +128,25 @@ async def seed_data(current_user: dict = Depends(get_current_user_dep)):
         if items:
             await db.items.insert_many(items)
 
-        ws2 = wb['Advances']
         advances = []
-        for row in ws2.iter_rows(min_row=2, max_row=ws2.max_row, values_only=True):
-            if not row[0]:
-                continue
-            dt = row[0]
-            date_str = dt.strftime("%Y-%m-%d") if hasattr(dt, 'strftime') else str(dt)[:10]
-            adv = {
-                "id": str(uuid.uuid4()),
-                "date": date_str,
-                "name": str(row[1]).strip() if row[1] else "",
-                "ref": str(row[2]).strip() if row[2] else "",
-                "amount": float(row[3]) if row[3] else 0,
-                "mode": str(row[4]).strip() if row[4] else "",
-                "tally": False,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            advances.append(adv)
+        if 'Advances' in wb.sheetnames:
+            ws2 = wb['Advances']
+            for row in ws2.iter_rows(min_row=2, max_row=ws2.max_row, values_only=True):
+                if not row[0]:
+                    continue
+                dt = row[0]
+                date_str = dt.strftime("%Y-%m-%d") if hasattr(dt, 'strftime') else str(dt)[:10]
+                adv = {
+                    "id": str(uuid.uuid4()),
+                    "date": date_str,
+                    "name": str(row[1]).strip() if row[1] else "",
+                    "ref": str(row[2]).strip() if row[2] else "",
+                    "amount": float(row[3]) if row[3] else 0,
+                    "mode": str(row[4]).strip() if row[4] else "",
+                    "tally": False,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+                advances.append(adv)
 
         if advances:
             await db.advances.insert_many(advances)
@@ -154,9 +159,6 @@ async def seed_data(current_user: dict = Depends(get_current_user_dep)):
 # ==========================================
 # DASHBOARD
 # ==========================================
-
-@router.get("/dashboard")
-
 
 @router.get("/dashboard")
 async def get_dashboard(current_user: dict = Depends(get_current_user_dep)):
@@ -393,7 +395,31 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
         discounted_price = round(item.price - (item.price * item.discount / 100), 0)
         item_total = round(discounted_price * item.qty, 0)
 
-        if req.is_settled:
+        # Resolve per-item tailoring fields sent from NewBill frontend
+        item_article_type   = item.article_type    or "N/A"
+        item_order_no       = item.order_no        or "N/A"
+        item_delivery_date  = item.delivery_date   or "N/A"
+        item_emb_status     = item.embroidery_status or "N/A"
+
+        # Resolve per-item tailoring status
+        if item_order_no != "N/A":
+            item_tailoring_status = "Pending"
+        else:
+            item_tailoring_status = tailoring_status
+
+        # Resolve addon amount and description from line item addons
+        item_addons = item.addons or []
+        item_addon_amount = round(sum(float(a.get("price", 0)) for a in item_addons), 0)
+        item_addon_desc = ", ".join(a.get("name", "") for a in item_addons) if item_addons else "N/A"
+        item_addon_pay_mode = "Pending" if item_addon_amount > 0 else "N/A"
+        item_addon_pending  = item_addon_amount if item_addon_amount > 0 else 0
+
+        # is_settled is only meaningful when amount_paid > 0.
+        # If the user ticked "Settled" but entered ₹0, treat as Pending — nothing was received,
+        # so marking as Settled would hide the bill from the Settlements page permanently.
+        effective_settled = req.is_settled and req.amount_paid > 0
+
+        if effective_settled:
             total_diff = grand_total - req.amount_paid
             if idx == len(req.items) - 1:
                 item_discount = total_diff - running_discount
@@ -414,15 +440,15 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
                 "qty": item.qty,
                 "discount": item.discount,
                 "fabric_amount": item_total,
-                "tailoring_status": tailoring_status,
-                "article_type": "N/A",
-                "order_no": "N/A",
-                "delivery_date": "N/A",
+                "tailoring_status": item_tailoring_status,
+                "article_type": item_article_type,
+                "order_no": item_order_no,
+                "delivery_date": item_delivery_date,
                 "tailoring_amount": 0,
-                "embroidery_status": "N/A",
+                "embroidery_status": item_emb_status,
                 "embroidery_amount": 0,
-                "addon_desc": "N/A",
-                "addon_amount": 0,
+                "addon_desc": item_addon_desc,
+                "addon_amount": item_addon_amount,
                 "fabric_pay_mode": f"Settled - {modes_str}",
                 "fabric_pay_date": req.payment_date,
                 "fabric_pending": item_discount,
@@ -438,10 +464,10 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
                 "embroidery_pay_date": "N/A",
                 "embroidery_received": 0,
                 "embroidery_pending": 0,
-                "addon_pay_mode": "N/A",
+                "addon_pay_mode": item_addon_pay_mode,
                 "addon_pay_date": "N/A",
                 "addon_received": 0,
-                "addon_pending": 0,
+                "addon_pending": item_addon_pending,
                 "karigar": "N/A",
                 "tally_fabric": False,
                 "tally_tailoring": False,
@@ -460,15 +486,15 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
                 "qty": item.qty,
                 "discount": item.discount,
                 "fabric_amount": item_total,
-                "tailoring_status": tailoring_status,
-                "article_type": "N/A",
-                "order_no": "N/A",
-                "delivery_date": "N/A",
+                "tailoring_status": item_tailoring_status,
+                "article_type": item_article_type,
+                "order_no": item_order_no,
+                "delivery_date": item_delivery_date,
                 "tailoring_amount": 0,
-                "embroidery_status": "N/A",
+                "embroidery_status": item_emb_status,
                 "embroidery_amount": 0,
-                "addon_desc": "N/A",
-                "addon_amount": 0,
+                "addon_desc": item_addon_desc,
+                "addon_amount": item_addon_amount,
                 "fabric_pay_mode": "Pending",
                 "fabric_pay_date": "N/A",
                 "fabric_pending": item_total,
@@ -484,10 +510,10 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
                 "embroidery_pay_date": "N/A",
                 "embroidery_received": 0,
                 "embroidery_pending": 0,
-                "addon_pay_mode": "N/A",
+                "addon_pay_mode": item_addon_pay_mode,
                 "addon_pay_date": "N/A",
                 "addon_received": 0,
-                "addon_pending": 0,
+                "addon_pending": item_addon_pending,
                 "karigar": "N/A",
                 "tally_fabric": False,
                 "tally_tailoring": False,
@@ -516,8 +542,4 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
 
     await audit_log(db, "create", current_user, "bill", ref, {"customer": req.customer_name, "items": len(items_to_insert), "total": grand_total})
     return {"message": "Bill created", "ref": ref, "items_count": len(items_to_insert), "grand_total": grand_total}
-
-# ==========================================
-# TAILORING ORDERS
-# ==========================================
 

@@ -93,13 +93,6 @@ async def get_current_user(
     return user
 
 
-async def require_user_dependency(request, db):
-    """Factory to build a get_current_user callable bound to a specific db."""
-    # FastAPI 0.110.1 compatible: we return a callable that FastAPI can use with Depends
-    async def _get_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
-        return await get_current_user(credentials, db)
-    return _get_user
-
 
 async def audit_log(db, action: str, user: dict, entity_type: str = "", entity_id: str = "", details: dict = None):
     """Record an audit log entry."""

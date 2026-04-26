@@ -140,6 +140,7 @@ function StatusColumn({ title, items, color, onMove, moveLabel, onMoveBack, move
 }
 
 export default function JobWork() {
+  const { toast } = useToast();
   const [tab, setTab] = useState("tailoring");
   const [data, setData] = useState({});
   const [filters, setFilters] = useState({ order_nos: [], dates: [], delivery_dates: [] });

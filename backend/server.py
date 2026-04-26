@@ -144,7 +144,7 @@ uploads_dir = ROOT_DIR / "static" / "uploads"
 uploads_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
-build_dir = ROOT_DIR / "frontend" / "build"
+build_dir = ROOT_DIR.parent / "frontend" / "build"
 if build_dir.exists():
     app.mount("/static", StaticFiles(directory=build_dir / "static"), name="react-static")
 

@@ -19,6 +19,8 @@ router = APIRouter()
 async def get_daybook(date_filter: Optional[str] = None, current_user: dict = Depends(get_current_user_dep)):
     # Key: (date, ref) — each unique pay-date × ref combination is a separate row
     entries = {}
+    # Tracks (total_items, tallied_items) per (date, ref, category) to compute tally_status correctly
+    tally_counts: dict = {}
 
     def get_or_create(date, ref, name):
         key = (date, ref)
@@ -65,7 +67,9 @@ async def get_daybook(date_filter: Optional[str] = None, current_user: dict = De
             e = get_or_create(pay_date, ref, name)
             e[cat_name]  += received
             e["total"]   += received
-            e["tally_status"][cat_name] = item.get(tally_field, False)
+            tc_key = (pay_date, ref, cat_name)
+            tot, tallied = tally_counts.get(tc_key, (0, 0))
+            tally_counts[tc_key] = (tot + 1, tallied + (1 if item.get(tally_field, False) else 0))
             mode = item.get(mode_field, "")
             if mode:
                 e["modes"][cat_name] = mode
@@ -89,10 +93,18 @@ async def get_daybook(date_filter: Optional[str] = None, current_user: dict = De
         e = get_or_create(adv_date, ref, adv.get("name", ""))
         e["advance"] += amount
         e["total"]   += amount
-        e["tally_status"]["advance"] = adv.get("tally", False)
+        tc_key = (adv_date, ref, "advance")
+        tot, tallied = tally_counts.get(tc_key, (0, 0))
+        tally_counts[tc_key] = (tot + 1, tallied + (1 if adv.get("tally", False) else 0))
         mode = adv.get("mode", "")
         if mode:
             e["modes"]["advance"] = mode
+
+    # Resolve tally_status: True only if ALL items in that (date,ref,category) are tallied
+    for (entry_date, entry_ref, cat_name), (tot, tallied) in tally_counts.items():
+        key = (entry_date, entry_ref)
+        if key in entries:
+            entries[key]["tally_status"][cat_name] = (tot > 0 and tallied == tot)
 
     return {"entries": list(entries.values())}
 
