@@ -452,14 +452,25 @@ export default function ItemsManager() {
   };
 
   const handleCancelOrder = async (group) => {
+    const zeroFields = {
+      cancelled: true,
+      cancelled_at: new Date().toISOString(),
+      cancelled_ref: group.ref,
+      price: 0, qty: 0, discount: 0,
+      fabric_amount: 0, fabric_received: 0, fabric_pending: 0, fabric_pay_mode: "N/A",
+      tailoring_amount: 0, tailoring_received: 0, tailoring_pending: 0, tailoring_pay_mode: "N/A",
+      embroidery_amount: 0, embroidery_received: 0, embroidery_pending: 0, embroidery_pay_mode: "N/A",
+      addon_amount: 0, addon_received: 0, addon_pending: 0, addon_pay_mode: "N/A",
+      labour_amount: 0, emb_labour_amount: 0,
+    };
     let success = 0;
     for (const item of group.items) {
       try {
-        await updateItem(item.id, { cancelled: true, cancelled_at: new Date().toISOString(), cancelled_ref: item.ref });
+        await updateItem(item.id, zeroFields);
         success++;
       } catch {}
     }
-    setMessage({ type: success === group.items.length ? "success" : "error", text: success === group.items.length ? `Order ${group.ref} cancelled successfully` : `${group.items.length - success} items failed to cancel` });
+    setMessage({ type: success === group.items.length ? "success" : "error", text: success === group.items.length ? `Order ${group.ref} cancelled — all amounts zeroed out` : `${group.items.length - success} items failed to cancel` });
     setTimeout(() => setMessage(null), 3000);
     setCancelConfirm(null);
     loadData();
@@ -808,7 +819,7 @@ export default function ItemsManager() {
           <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <h3 className="font-heading text-lg font-medium mb-2 text-[var(--warning)]">Cancel Order?</h3>
             <p className="text-sm text-[var(--text-secondary)] mb-5">
-              <span className="font-mono font-medium text-[var(--text-primary)]">{cancelConfirm.ref}</span> — {cancelConfirm.items?.length || 0} items will be marked cancelled. Cancelled orders remain visible in reports.
+              <span className="font-mono font-medium text-[var(--text-primary)]">{cancelConfirm.ref}</span> — {cancelConfirm.items?.length || 0} items will be marked cancelled and <strong>all amounts zeroed to ₹0</strong>. The record stays visible in ItemsManager with a CANCELLED badge but will not affect any pending balances, reports, or settlements.
             </p>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setCancelConfirm(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">Back</button>
