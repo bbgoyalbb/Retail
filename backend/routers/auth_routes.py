@@ -1,7 +1,7 @@
 """
 Auth Routes router.
 """
-from fastapi import APIRouter, HTTPException, Query, Depends, Request
+from fastapi import APIRouter, Depends, File, FileResponse, HTTPException, JSONResponse, Query, Request, UploadFile
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, date
 import uuid
