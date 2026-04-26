@@ -222,23 +222,22 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
                 cols = [desc, fmt(qty), f"₹{fmt(price)}", f"{disc_pct:.0f}%", disc_str, f"₹{fmt(base)}", f"₹{fmt(gst)}", f"₹{fmt(amt)}"]
             elif section_label == "Tailoring":
                 tail_amt = float(item.get("tailoring_amount", 0))
-                gst = round(tail_amt * GST_RATE / 100, 2)
+                gst = 0.0
                 base = tail_amt
                 desc = f'<div class="sec-barcode">{item.get("barcode","N/A")}</div><div class="sec-sub">{item.get("article_type","—")}</div>'
-                order_col = f'<td class="r">{item.get("order_no","—")}</td>' if show_order else ""
-                cols = [desc, "—", "—", "—", "—", f"₹{fmt(base)}", f"₹{fmt(gst)}", f"₹{fmt(tail_amt)}"]
+                cols = [desc, f"₹{fmt(tail_amt)}"]
             elif section_label == "Embroidery":
                 emb_amt = float(item.get("embroidery_amount", 0))
-                gst = round(emb_amt * GST_RATE / 100, 2)
+                gst = 0.0
                 base = emb_amt
                 desc = f'<div class="sec-barcode">{item.get("barcode","N/A")}</div>'
-                cols = [desc, "—", "—", "—", "—", f"₹{fmt(base)}", f"₹{fmt(gst)}", f"₹{fmt(emb_amt)}"]
+                cols = [desc, f"₹{fmt(emb_amt)}"]
             elif section_label == "Add-on":
                 ao_amt = float(item.get("addon_amount", 0))
-                gst = round(ao_amt * GST_RATE / 100, 2)
+                gst = 0.0
                 base = ao_amt
                 desc = f'<div class="sec-barcode">{item.get("addon_desc","Add-on")}</div>'
-                cols = [desc, "—", "—", "—", "—", f"₹{fmt(base)}", f"₹{fmt(gst)}", f"₹{fmt(ao_amt)}"]
+                cols = [desc, f"₹{fmt(ao_amt)}"]
             else:
                 cols = ["—","—","—","—","—","—","—","—"]
                 base = gst = disc_amt = amt
@@ -274,16 +273,15 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
         sub_disc = subs["disc"]
 
         if label == "Fabric":
-            headers = ["Article / Barcode", "Qty (m)", "Rate", "Disc %", "Disc Amt", "Base Amt", f"GST {int(GST_RATE)}%", "Total"]
-        else:
-            headers = [label + " Item", "—", "—", "—", "—", "Base Amt", f"GST {int(GST_RATE)}%", "Total"]
-
-        th_row = "".join(f'<th{"" if i==0 else " class=\"r\""} >{h}</th>' for i, h in enumerate(headers))
-        # Subtotal row
-        if label == "Fabric":
+            # Fabric: base = price*qty - disc (GST-exclusive), GST col, Total col
+            headers = ["Article / Barcode", "Qty (m)", "Rate", "Disc %", "Disc Amt", f"Base (excl GST {int(GST_RATE)}%)", f"GST {int(GST_RATE)}%", "Total"]
+            th_row = "".join(f'<th{"" if i==0 else " class=\"r\""} >{h}</th>' for i, h in enumerate(headers))
             sub_tds = f'<td class="subtd" colspan="4">Subtotal ({len(items_list)} articles)</td><td class="subtd r">₹{fmt(sub_disc)}</td><td class="subtd r">₹{fmt(sub_base)}</td><td class="subtd r">₹{fmt(sub_gst)}</td><td class="subtd r">₹{fmt(sub_amt)}</td>'
         else:
-            sub_tds = f'<td class="subtd" colspan="5">Subtotal</td><td class="subtd r">₹{fmt(sub_base)}</td><td class="subtd r">₹{fmt(sub_gst)}</td><td class="subtd r">₹{fmt(sub_amt)}</td>'
+            # Non-fabric: just 2 cols — item desc + amount
+            headers = [label + " Item", "Amount"]
+            th_row = f'<th>{headers[0]}</th><th class="r">{headers[1]}</th>'
+            sub_tds = f'<td class="subtd">Subtotal</td><td class="subtd r">₹{fmt(sub_amt)}</td>'
 
         block = f"""
         <div class="sec-block">
@@ -335,52 +333,71 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
 
     # Grand total
     grand_total_calc = fab_amt + tail_amt_total + emb_amt_total + ao_amt_total
-    total_gst_calc   = fab_gst + tail_gst + emb_gst + ao_gst
+    total_gst_calc   = fab_gst  # only fabric has GST
 
     # ---- Payment details table (section-wise) ----
-    def pay_row(label, amt, rcvd, rcvd_date, mode, pending_val, pay_mode_raw):
+    def pay_row(label, amt, rcvd, rcvd_date, mode, pay_mode_raw):
         if amt <= 0:
             return ""
         is_settled_sec = str(pay_mode_raw).startswith("Settled")
-        clean_mode = mode.replace("Settled - ", "").replace("Settled", "").strip() if mode else "—"
+        clean_mode = mode.replace("Settled - ", "").replace("Settled", "").strip() if mode else ""
         rcvd_str   = f"₹{fmt(rcvd)}" if rcvd > 0 else ""
         date_str   = rcvd_date if (rcvd_date and rcvd_date != "N/A" and rcvd > 0) else ""
         bal        = amt - rcvd
-        bal_str    = f"₹{fmt(bal)}" if not is_settled_sec and bal > 0 else ("✓ Settled" if is_settled_sec else "")
+        bal_str    = "✓ Settled" if is_settled_sec else (f"₹{fmt(bal)}" if bal > 0 else "")
         mode_str   = clean_mode if rcvd > 0 else ""
-        bal_cls    = "bal-due" if not is_settled_sec and bal > 0 else "bal-ok"
+        bal_cls    = "bal-ok" if is_settled_sec else ("bal-due" if bal > 0 else "")
         return f'<tr><td>{label}</td><td class="r">₹{fmt(amt)}</td><td class="r">{rcvd_str}</td><td class="r">{date_str}</td><td>{mode_str}</td><td class="r {bal_cls}">{bal_str}</td></tr>'
 
     fabric_rcvd = sum(float(i.get("fabric_received", 0)) for i in items)
     tail_rcvd   = sum(float(i.get("tailoring_received", 0)) for i in items)
     emb_rcvd    = sum(float(i.get("embroidery_received", 0)) for i in items)
-    ao_rcvd     = sum(float(i.get("addon_received", 0)) for i in items)
+    ao_rcvd     = sum(float(i.get("addon_received", 0)) for i in ao_items)
 
-    fabric_pay_mode  = items[0].get("fabric_pay_mode", "N/A") if items else "N/A"
-    tail_pay_mode    = items[0].get("tailoring_pay_mode", "N/A") if tail_items else "N/A"
-    emb_pay_mode     = items[0].get("embroidery_pay_mode", "N/A") if emb_items else "N/A"
-    ao_pay_mode      = items[0].get("addon_pay_mode", "N/A") if ao_items else "N/A"
+    # Use first settled item's pay mode/date for section-level display
+    def _first_settled(item_list, mode_field, date_field):
+        for it in item_list:
+            m = it.get(mode_field, "N/A") or "N/A"
+            if m.startswith("Settled"):
+                return m, it.get(date_field, "") or ""
+        # fallback: first item
+        if item_list:
+            return item_list[0].get(mode_field, "N/A") or "N/A", item_list[0].get(date_field, "") or ""
+        return "N/A", ""
 
-    fabric_pay_date  = items[0].get("fabric_pay_date", "") if items else ""
-    tail_pay_date    = items[0].get("tailoring_pay_date", "") if tail_items else ""
-    emb_pay_date     = items[0].get("embroidery_pay_date", "") if emb_items else ""
-    ao_pay_date      = items[0].get("addon_pay_date", "") if ao_items else ""
+    fabric_pay_mode, fabric_pay_date = _first_settled(items, "fabric_pay_mode", "fabric_pay_date")
+    tail_pay_mode,   tail_pay_date   = _first_settled(tail_items, "tailoring_pay_mode", "tailoring_pay_date")
+    emb_pay_mode,    emb_pay_date    = _first_settled(emb_items, "embroidery_pay_mode", "embroidery_pay_date")
+    ao_pay_mode,     ao_pay_date     = _first_settled(ao_items, "addon_pay_mode", "addon_pay_date")
 
     fabric_pend  = sum(float(i.get("fabric_pending", 0)) for i in items)
-    tail_pend    = sum(float(i.get("tailoring_pending", 0)) for i in items)
-    emb_pend     = sum(float(i.get("embroidery_pending", 0)) for i in items)
-    ao_pend      = sum(float(i.get("addon_pending", 0)) for i in items)
+    tail_pend    = sum(float(i.get("tailoring_pending", 0)) for i in tail_items)
+    emb_pend     = sum(float(i.get("embroidery_pending", 0)) for i in emb_items)
+    ao_pend      = sum(float(i.get("addon_pending", 0)) for i in ao_items)
 
     pay_rows_html = ""
-    pay_rows_html += pay_row("Fabric",     fab_amt,       fabric_rcvd, fabric_pay_date, fabric_pay_mode, fabric_pend, fabric_pay_mode)
-    pay_rows_html += pay_row("Tailoring",  tail_amt_total, tail_rcvd,  tail_pay_date,   tail_pay_mode,   tail_pend,   tail_pay_mode)
-    pay_rows_html += pay_row("Embroidery", emb_amt_total,  emb_rcvd,   emb_pay_date,    emb_pay_mode,    emb_pend,    emb_pay_mode)
-    pay_rows_html += pay_row("Add-on",     ao_amt_total,   ao_rcvd,    ao_pay_date,     ao_pay_mode,     ao_pend,     ao_pay_mode)
+    pay_rows_html += pay_row("Fabric",     fab_amt,        fabric_rcvd, fabric_pay_date, fabric_pay_mode, fabric_pay_mode)
+    pay_rows_html += pay_row("Tailoring",  tail_amt_total, tail_rcvd,   tail_pay_date,   tail_pay_mode,   tail_pay_mode)
+    pay_rows_html += pay_row("Embroidery", emb_amt_total,  emb_rcvd,    emb_pay_date,    emb_pay_mode,    emb_pay_mode)
+    pay_rows_html += pay_row("Add-on",     ao_amt_total,   ao_rcvd,     ao_pay_date,     ao_pay_mode,     ao_pay_mode)
 
     total_rcvd_all = fabric_rcvd + tail_rcvd + emb_rcvd + ao_rcvd
-    total_bal_all  = grand_total_calc - total_rcvd_all
-    grand_bal_cls  = "bal-due" if total_bal_all > 0 else "bal-ok"
-    grand_bal_str  = f"₹{fmt(total_bal_all)}" if total_bal_all > 0 else "✓ Settled"
+    # Subtotal balance: sum only unsettled sections
+    unsettled_pending = 0.0
+    all_settled = True
+    for _amt, _rcvd, _mode in [
+        (fab_amt, fabric_rcvd, fabric_pay_mode),
+        (tail_amt_total, tail_rcvd, tail_pay_mode),
+        (emb_amt_total, emb_rcvd, emb_pay_mode),
+        (ao_amt_total, ao_rcvd, ao_pay_mode),
+    ]:
+        if _amt <= 0:
+            continue
+        if not str(_mode).startswith("Settled"):
+            all_settled = False
+            unsettled_pending += _amt - _rcvd
+    grand_bal_cls = "bal-ok" if all_settled else "bal-due"
+    grand_bal_str = "✓ Settled" if all_settled else f"₹{fmt(unsettled_pending)}"
 
     logo_tag = ""
     if firm_logo:
@@ -542,23 +559,35 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
 
   /* ── GRAND TOTAL ── */
   .inv-grand {{
-    background: #111;
-    color: #fff;
-    padding: 10px 18px;
+    background: #fff;
+    color: #111;
+    padding: 8px 18px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     border-top: 2px solid #111;
+    border-left: 4px solid #111;
+    border-bottom: 1px solid #ccc;
   }}
-  .inv-grand .gt-label {{ font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }}
-  .inv-grand .gt-val {{ font-size: 16px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; }}
-  .inv-grand .gt-gst {{ font-size: 8.5px; color: #bbb; margin-top: 2px; }}
+  .inv-grand .gt-label {{ font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.25em; color: #111; }}
+  .inv-grand .gt-val {{ font-size: 14px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; color: #111; }}
 
   /* ── PAYMENT TABLE ── */
   .inv-pay-section {{
-    border-top: 1px solid #ddd;
+    border-top: 2px solid #111;
+    margin-top: 6px;
   }}
-  .inv-pay-section .sec-head {{ background: #1a1a1a; }}
+  .inv-pay-section .sec-head {{
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: #111;
+    background: #fff;
+    padding: 6px 18px 4px;
+    border-left: 4px solid #111;
+    border-bottom: 1px solid #ccc;
+  }}
   .inv-pay-section table {{
     width: 100%;
     border-collapse: collapse;
@@ -568,10 +597,11 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     text-transform: uppercase;
     letter-spacing: 0.1em;
     font-weight: 700;
-    color: #555;
+    color: #fff;
+    background: #444;
     padding: 5px 8px;
-    border-bottom: 1px solid #ddd;
     text-align: left;
+    white-space: nowrap;
   }}
   .inv-pay-section th.r {{ text-align: right; }}
   .inv-pay-section td {{
@@ -584,7 +614,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     text-align: right;
     font-family: 'IBM Plex Mono', monospace;
   }}
-  .inv-pay-section tr:last-child td {{ border-bottom: none; font-weight: 700; background: #f5f5f5; }}
+  .inv-pay-section tr:last-child td {{ border-bottom: none; font-weight: 600; background: #f0f0f0; }}
   .bal-due {{ color: #8b0000; }}
   .bal-ok  {{ color: #1a5c2a; }}
 
@@ -684,10 +714,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
 
   <!-- Grand Total -->
   <div class="inv-grand">
-    <div>
-      <div class="gt-label">Grand Total</div>
-      {f'<div class="gt-gst">Incl. GST {int(GST_RATE)}% = ₹{fmt(total_gst_calc)}</div>' if GST_RATE > 0 else ''}
-    </div>
+    <div class="gt-label">Grand Total</div>
     <div class="gt-val">₹{fmt(grand_total_calc)}</div>
   </div>
 
@@ -722,14 +749,15 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
   <!-- Footer -->
   <div class="inv-footer">
     <div class="footer-top">
-      <div class="footer-thanks">Thank you for your business!</div>
+      <div></div>
       <div class="footer-sig">Authorised Signatory</div>
     </div>
     <div class="footer-tnc">
-      <strong>Terms &amp; Conditions:</strong> All disputes are subject to local jurisdiction only. &nbsp;|
-      Goods once sold will not be taken back or exchanged. &nbsp;|
-      Payment is due within 30 days of the bill date. &nbsp;|
-      We are not responsible for any damage after delivery.
+      <strong>Terms &amp; Conditions</strong><br/>
+      1. All disputes are subject to local jurisdiction only.<br/>
+      2. Goods once sold will not be taken back or exchanged.<br/>
+      3. Payment is due within 30 days of the bill date.<br/>
+      4. We are not responsible for any damage after delivery.
     </div>
   </div>
 
