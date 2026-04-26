@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
-import { getItems, getAdvances, updateItem, deleteItem, createItem, updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache } from "@/api";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { getItems, getAdvances, updateItem, deleteItem, createItem, updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache, exportExcelUrl } from "@/api";
 import { fmt } from "@/lib/fmt";
-import { PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle, Funnel } from "@phosphor-icons/react";
+import { PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle, Funnel, DownloadSimple } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
@@ -142,6 +142,7 @@ const renderFieldInput = (field, itemId, value, onChange) => {
 };
 
 export default function ItemsManager() {
+  const customerFilterRef = useRef(null);
   const [allItems, setAllItems] = useState([]);
   const [advances, setAdvances] = useState([]);
   const [nameFilter, setNameFilter] = useState("");
@@ -208,6 +209,17 @@ export default function ItemsManager() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Ctrl+F focuses customer filter
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        if (customerFilterRef.current) { e.preventDefault(); customerFilterRef.current.focus(); }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   useEffect(() => {
     try { localStorage.setItem("itemsmanager_columns", JSON.stringify(visibleColumns)); } catch {}
@@ -576,7 +588,7 @@ export default function ItemsManager() {
         </div>
         <div className="flex items-center gap-2">
           <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Customer</label>
-          <select data-testid="orders-customer-filter" value={nameFilter} onChange={e => setNameFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]">
+          <select ref={customerFilterRef} data-testid="orders-customer-filter" value={nameFilter} onChange={e => setNameFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]">
             <option value="">All Customers</option>
             {filteredCustomers.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
@@ -590,6 +602,11 @@ export default function ItemsManager() {
         </div>
 
         <span className="ml-auto text-xs text-[var(--text-secondary)]">{refs.length} refs · {filteredItems.length} items</span>
+
+        <a href={exportExcelUrl()} target="_blank" rel="noreferrer"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:text-[var(--brand)] transition-colors">
+          <DownloadSimple size={13} /> Export
+        </a>
 
         {/* Column Visibility Toggle */}
         <Popover>

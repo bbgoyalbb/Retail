@@ -1,14 +1,25 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { searchItems, getCustomers } from "@/api";
 import { fmt } from "@/lib/fmt";
 import { MagnifyingGlass, Funnel, FilePdf, X, CaretLeft, CaretRight, ArrowRight } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
 
+const _today = new Date();
+const _iso = (d) => d.toISOString().split("T")[0];
+const SEARCH_DATE_PRESETS = [
+  { label: "Today",       from: _iso(_today), to: _iso(_today) },
+  { label: "This Week",   from: _iso(new Date(_today - (_today.getDay()||7)*86400000+86400000)), to: _iso(_today) },
+  { label: "This Month",  from: _iso(new Date(_today.getFullYear(), _today.getMonth(), 1)), to: _iso(_today) },
+  { label: "Last Month",  from: _iso(new Date(_today.getFullYear(), _today.getMonth()-1, 1)), to: _iso(new Date(_today.getFullYear(), _today.getMonth(), 0)) },
+  { label: "Last 90 Days",from: _iso(new Date(_today - 89*86400000)), to: _iso(_today) },
+];
+
 const ITEMS_PER_PAGE = 100;
 
 export default function SearchPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [query, setQuery] = useState("");
   const [customers, setCustomers] = useState([]);
   const [customer, setCustomer] = useState("All");
@@ -29,6 +40,14 @@ export default function SearchPage() {
 
   useEffect(() => { getCustomers().then(res => setCustomers(res.data)).catch(() => {}); }, []);
 
+  // Pre-fill customer filter when navigated from Reports drill-down
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const c = params.get("customer");
+    if (c) { setCustomer(c); setShowFilters(true); setTimeout(() => handleSearch(0, { customer: c }), 100); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Debounced search for query changes
   useEffect(() => {
     if (!searched && !query) return;
@@ -41,17 +60,18 @@ export default function SearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
-  const handleSearch = async (page = 0) => {
+  const handleSearch = async (page = 0, overrides = {}) => {
     setLoading(true);
     setError(null);
     setCurrentPage(page);
     
+    const _customer = overrides.customer !== undefined ? overrides.customer : customer;
     const params = { 
       q: query, 
       limit: ITEMS_PER_PAGE,
       skip: page * ITEMS_PER_PAGE
     };
-    if (customer !== "All") params.customer = customer;
+    if (_customer !== "All") params.customer = _customer;
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
     if (status !== "All") params.status = status;
@@ -135,7 +155,22 @@ export default function SearchPage() {
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-[var(--border-subtle)]">
+          <div className="space-y-3 pt-3 border-t border-[var(--border-subtle)]">
+          <div className="flex flex-wrap gap-1.5">
+            {SEARCH_DATE_PRESETS.map(p => (
+              <button key={p.label} onClick={() => { setDateFrom(p.from); setDateTo(p.to); }}
+                className={`px-3 py-1 text-xs font-medium rounded-sm border transition-colors ${
+                  dateFrom === p.from && dateTo === p.to
+                    ? 'bg-[var(--brand)] text-white border-[var(--brand)]'
+                    : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]'
+                }`}>{p.label}</button>
+            ))}
+            {(dateFrom || dateTo) && (
+              <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+                className="px-3 py-1 text-xs rounded-sm border border-[var(--border-subtle)] text-[var(--error)] hover:bg-[#9E473D08]">Clear dates</button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Customer</label>
               <select data-testid="search-customer-filter" value={customer} onChange={e => setCustomer(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm">
@@ -171,6 +206,7 @@ export default function SearchPage() {
               <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Max Amount</label>
               <input data-testid="search-max-amount" type="number" value={maxAmount} onChange={e => setMaxAmount(e.target.value)} placeholder="₹99999" className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm" />
             </div>
+          </div>
           </div>
         )}
       </div>

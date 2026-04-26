@@ -185,6 +185,7 @@ async def get_dashboard(current_user: dict = Depends(get_current_user_dep)):
         "today_collected": [{"$match": {"date": today}}, {"$group": {"_id": None,
             "t": {"$sum": {"$add": ["$fabric_received", "$tailoring_received", "$embroidery_received", "$addon_received"]}}
         }}],
+        "overdue_orders": [{"$match": {"delivery_date": {"$lt": today, "$gt": ""}, "tailoring_status": {"$in": ["Pending", "Stitched"]}}}, {"$count": "n"}],
     }}]
 
     pipeline_recent = [
@@ -231,6 +232,7 @@ async def get_dashboard(current_user: dict = Depends(get_current_user_dep)):
         "total_advances_amount":     a["total_amt"][0]["t"]    if a.get("total_amt")    else 0,
         "today_bills_count":         len(f.get("today_refs", [])),
         "today_collected":           f["today_collected"][0]["t"] if f.get("today_collected") else 0,
+        "overdue_orders_count":      f["overdue_orders"][0]["n"]  if f.get("overdue_orders")  else 0,
         "recent_items":              recent_items,
     }
 

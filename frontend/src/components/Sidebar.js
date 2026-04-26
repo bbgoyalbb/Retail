@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 import { useNavigate, useLocation } from "react-router-dom";
 
 import { useTheme } from "@/components/ThemeProvider";
 
 import { useAuth } from "@/context/AuthContext";
+import { getDaybookPendingCount } from "@/api";
 
 import {
 
@@ -81,6 +82,14 @@ export default function Sidebar({ open, setOpen }) {
   const { user, logout } = useAuth();
 
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [daybookPending, setDaybookPending] = useState(0);
+
+  useEffect(() => {
+    const fetch = () => getDaybookPendingCount().then(r => setDaybookPending(r.data?.count || 0)).catch(() => {});
+    fetch();
+    const timer = setInterval(fetch, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
 
 
@@ -236,7 +245,7 @@ export default function Sidebar({ open, setOpen }) {
 
                 className={`
 
-                  w-full flex items-center text-sm rounded-sm transition-all duration-150 active:scale-[0.97]
+                  relative w-full flex items-center text-sm rounded-sm transition-all duration-150 active:scale-[0.97]
 
                   ${collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'}
 
@@ -252,7 +261,15 @@ export default function Sidebar({ open, setOpen }) {
 
                 <Icon size={20} weight={isActive ? "fill" : "regular"} className="flex-shrink-0" />
 
-                {!collapsed && <span className="truncate">{item.label}</span>}
+                {!collapsed && <span className="truncate flex-1">{item.label}</span>}
+                {!collapsed && item.key === 'daybook' && daybookPending > 0 && (
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none flex-shrink-0 ${
+                    isActive ? 'bg-white text-[var(--brand)]' : 'bg-[var(--brand)] text-white'
+                  }`}>{daybookPending > 99 ? '99+' : daybookPending}</span>
+                )}
+                {collapsed && item.key === 'daybook' && daybookPending > 0 && (
+                  <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-[var(--brand)] block" />
+                )}
 
               </button>
 

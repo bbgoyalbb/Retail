@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { getCustomers, getOrderStatus } from "@/api";
+import { getCustomers, getOrderStatus, markOrderDelivered } from "@/api";
 import { fmt } from "@/lib/fmt";
-import { ClipboardText, MagnifyingGlass } from "@phosphor-icons/react";
+import { ClipboardText, MagnifyingGlass, CheckCircle } from "@phosphor-icons/react";
 
 
 function StatusPill({ label, value, tone }) {
@@ -28,6 +28,8 @@ export default function OrderStatus() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [loading, setLoading] = useState(false);
+  const [delivering, setDelivering] = useState(null);
+  const [message, setMessage] = useState(null);
 
   // Keep a ref to the latest filter values so loadData is stable
   const filtersRef = useRef({ customer, orderNo, fromDate, toDate });
@@ -80,6 +82,12 @@ export default function OrderStatus() {
         <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Order Status</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">Master status board grouped by order number</p>
       </div>
+
+      {message && (
+        <div className={`p-3 border rounded-sm text-sm ${
+          message.type === 'success' ? 'bg-[#455D4A10] border-[var(--success)] text-[var(--success)]' : 'bg-[#9E473D10] border-[var(--error)] text-[var(--error)]'
+        }`}>{message.text}</div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-3">
@@ -146,7 +154,7 @@ export default function OrderStatus() {
           <span className="ml-auto text-xs text-[var(--text-secondary)]">{loading ? "Loading..." : `${rows.length} orders`}</span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-[var(--border-strong)]">
           <table className="w-full min-w-[980px]">
             <thead>
               <tr className="bg-[var(--bg)]">
@@ -160,21 +168,24 @@ export default function OrderStatus() {
                   "Value",
                   "Latest Bill",
                   "Latest Delivery",
-                ].map((h) => (
-                  <th key={h} className="text-left px-3 py-2 text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-secondary)]">{h}</th>
+                  "Action",
+                ].map((h, hi) => (
+                  <th key={h} className={`text-left px-3 py-2 text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-secondary)] ${hi === 0 ? 'sticky left-0 z-10 bg-[var(--bg)]' : ''}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {!loading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">No orders found for selected filters.</td>
+                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">No orders found for selected filters.</td>
                 </tr>
               )}
 
-              {rows.map((row) => (
+              {rows.map((row) => {
+                const hasUndelivered = (row.tailoring_pending || 0) + (row.tailoring_stitched || 0) > 0;
+                return (
                 <tr key={row._id || row.order_no} className="border-t border-[var(--border-subtle)] align-top hover:bg-[#C86B4D06]">
-                  <td className="px-3 py-2 font-mono text-xs font-semibold">{row.order_no || "-"}</td>
+                  <td className="px-3 py-2 font-mono text-xs font-semibold sticky left-0 z-10 bg-[var(--surface)] border-r border-[var(--border-subtle)]">{row.order_no || "-"}</td>
                   <td className="px-3 py-2 text-xs">{(row.customers || []).join(", ") || "-"}</td>
                   <td className="px-3 py-2 text-xs">{(row.refs || []).join(", ") || "-"}</td>
                   <td className="px-3 py-2 font-mono text-xs">{row.item_count || 0}</td>
@@ -195,8 +206,29 @@ export default function OrderStatus() {
                   <td className="px-3 py-2 font-mono text-xs">₹{fmt(row.order_total || 0)}</td>
                   <td className="px-3 py-2 font-mono text-xs">{row.latest_bill_date || "-"}</td>
                   <td className="px-3 py-2 font-mono text-xs">{row.latest_delivery_date && row.latest_delivery_date !== "N/A" ? row.latest_delivery_date : "-"}</td>
-                </tr>
-              ))}
+                  <td className="px-3 py-2">
+                    {hasUndelivered && (
+                      <button
+                        disabled={delivering === row.order_no}
+                        onClick={async () => {
+                          setDelivering(row.order_no);
+                          try {
+                            await markOrderDelivered(row.order_no);
+                            setMessage({ type: "success", text: `Order ${row.order_no} marked as Delivered` });
+                            setTimeout(() => setMessage(null), 3000);
+                            loadData();
+                          } catch (err) {
+                            setMessage({ type: "error", text: err.message || "Failed" });
+                            setTimeout(() => setMessage(null), 3000);
+                          } finally { setDelivering(null); }
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-[var(--success)] text-white rounded-sm hover:opacity-90 disabled:opacity-50 whitespace-nowrap">
+                        <CheckCircle size={11} /> {delivering === row.order_no ? "…" : "Deliver"}
+                      </button>
+                    )}
+                  </td>
+                </tr>);
+              })}
             </tbody>
           </table>
         </div>

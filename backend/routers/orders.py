@@ -96,6 +96,26 @@ async def get_order_status(
     result.sort(key=lambda x: x.get("latest_bill_date", ""), reverse=True)
     return result
 
+@router.post("/orders/deliver")
+async def mark_order_delivered(
+    payload: dict,
+    request: Request,
+    current_user: dict = Depends(get_current_user_dep),
+):
+    """Mark all Pending/Stitched items in an order as Delivered."""
+    order_no = payload.get("order_no", "").strip()
+    if not order_no:
+        raise HTTPException(status_code=400, detail="order_no is required")
+    result = await db.items.update_many(
+        {"order_no": order_no, "tailoring_status": {"$in": ["Pending", "Stitched"]}},
+        {"$set": {"tailoring_status": "Delivered"}},
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="No items updated — order may not exist or is already delivered")
+    await audit_log(db, current_user["username"], "update", "items",
+        f"Mark order {order_no} as Delivered ({result.modified_count} items)", request)
+    return {"modified": result.modified_count}
+
 # ==========================================
 # ITEM EDIT & DELETE
 # ==========================================

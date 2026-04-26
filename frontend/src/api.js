@@ -79,6 +79,7 @@ export const getPendingRefs = (name) => api.get("/refs", { params: { name, pendi
 export const getOrders = () => api.get("/orders");
 export const getPendingOrders = () => api.get("/orders", { params: { pending_only: true } });
 export const getOrderStatus = (params) => api.get("/orders/status", { params });
+export const markOrderDelivered = (order_no) => api.post("/orders/deliver", { order_no });
 
 export const createBill = (data) => api.post("/bills", data);
 
@@ -100,6 +101,7 @@ export const processSettlement = (data) => api.post("/settlements/pay", data);
 
 export const getDaybook = (params) => api.get("/daybook", { params });
 export const getDaybookDates = () => api.get("/daybook/dates");
+export const getDaybookPendingCount = () => api.get("/daybook/pending-count");
 export const tallyEntries = (data) => api.post("/daybook/tally", data);
 
 export const getLabourItems = (params) => api.get("/labour", { params });
@@ -131,8 +133,9 @@ export const getSummaryReport = (params) => api.get("/reports/summary", { params
 
 // Import / Export / Backup
 export const importExcel = (formData, mode) => api.post(`/import/excel?mode=${mode}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-export const exportExcelUrl = () => `${BACKEND_URL}/api/export/excel`;
-export const backupUrl = () => `${BACKEND_URL}/api/backup`;
+const _authToken = () => { try { return localStorage.getItem("token") || ""; } catch { return ""; } };
+export const exportExcelUrl = () => { const t = _authToken(); return `${BACKEND_URL}/api/export/excel${t ? `?token=${encodeURIComponent(t)}` : ''}`; };
+export const backupUrl = () => { const t = _authToken(); return `${BACKEND_URL}/api/backup${t ? `?token=${encodeURIComponent(t)}` : ''}`; };
 export const restoreBackup = (formData) => api.post("/restore", formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const getDbStats = () => api.get("/db/stats");
 export const getDbAudit = (params) => api.get("/db/audit", { params });

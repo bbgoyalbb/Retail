@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { getPublicSettings } from "@/api";
 import { useToast } from "@/hooks/use-toast";
-import { Scissors } from "@phosphor-icons/react";
+import { Scissors, Eye, EyeSlash } from "@phosphor-icons/react";
 
 export default function LoginPage() {
   const { login, sessionExpired } = useAuth();
@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [firmName, setFirmName] = useState("Retail Book");
+  const [showPwd, setShowPwd] = useState(false);
 
   useEffect(() => {
     getPublicSettings().then(s => { if (s?.firm_name) setFirmName(s.firm_name); }).catch(() => {});
@@ -96,15 +97,21 @@ export default function LoginPage() {
               <label htmlFor="password" className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                placeholder="Enter password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                className="w-full px-3 py-2.5 text-sm border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)] focus:border-[var(--brand)] transition-colors"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPwd ? "text" : "password"}
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  className="w-full px-3 py-2.5 pr-10 text-sm border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)] focus:border-[var(--brand)] transition-colors"
+                />
+                <button type="button" onClick={() => setShowPwd(p => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                  {showPwd ? <EyeSlash size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
             <button
               type="submit"

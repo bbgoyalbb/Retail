@@ -1,16 +1,32 @@
-# Retail Management
+# Retail Book — Fabric & Tailoring Management System
 
+A full-featured retail management system for fabric shops and tailoring businesses.
+Handles billing, settlements, tailoring order tracking, embroidery job work, labour payments,
+daily reconciliation, reporting, and more.
 
+## Features
 
-FastAPI + React retail and tailoring management app with billing, settlements,
+- **Billing** — Create multi-item bills with fabric, tailoring, embroidery, and add-on charges
+- **Settlements** — Allocate payments across categories; auto-distribute with advance support
+- **Daybook** — Daily reconciliation with tally tracking and summary bar; defaults to today
+- **Reports** — Revenue and customer analytics with date presets and Excel export
+- **Order Status** — Status board grouped by order number; one-click Mark as Delivered
+- **Tailoring Orders** — Assign order numbers, delivery dates, and split articles
+- **Job Work** — Track embroidery through in-progress and finished stages
+- **Labour Payments** — Pay karigars by type with date tracking
+- **Search** — Full-text search across all bills with date presets and customer drill-down
+- **Settings** — Configure article types, tailoring rates, payment modes, add-on items, firm details
+- **Audit Log** — Complete action history for all users
+- **Data Manager** — Excel import/export, backup/restore, audit and repair tools
 
-job work tracking, labour payments, reporting, import/export, audit, and repair tools.
+## Keyboard Shortcuts
 
-
+| Page | Shortcut | Action |
+|---|---|---|
+| New Bill | `Ctrl+S` | Save bill |
+| Manage Orders | `Ctrl+F` | Focus customer filter |
 
 ## Stack
-
-
 
 - **Backend:** Python 3, FastAPI, Motor (async MongoDB driver)
 
@@ -35,6 +51,8 @@ Copy the example env file and fill in your values:
 ```bash
 
 cp backend/.env.example backend/.env
+# Windows (PowerShell)
+copy backend\.env.example backend\.env
 
 ```
 

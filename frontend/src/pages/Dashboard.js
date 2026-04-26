@@ -150,6 +150,20 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Overdue Alert */}
+      {(data.overdue_orders_count ?? 0) > 0 && (
+        <div className="flex items-center gap-3 px-5 py-3 bg-[#9E473D10] border border-[var(--error)] rounded-sm">
+          <Warning size={18} className="text-[var(--error)] flex-shrink-0" weight="fill" />
+          <span className="text-sm text-[var(--error)] font-medium">
+            {data.overdue_orders_count} order{data.overdue_orders_count !== 1 ? 's' : ''} overdue for delivery — delivery date has passed but tailoring is not complete.
+          </span>
+          <button onClick={() => navigate('/order-status')}
+            className="ml-auto text-xs font-medium text-[var(--error)] underline underline-offset-2 hover:opacity-80 whitespace-nowrap">
+            View →
+          </button>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard icon={TrendUp} label="Revenue Collected" value={`₹${fmt(data.total_revenue)}`}

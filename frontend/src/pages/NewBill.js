@@ -284,6 +284,18 @@ export default function NewBill() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showAddonModal]);
 
+  // Ctrl+S saves the bill
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (!showPostSave && !saving) saveBtnRef.current?.click();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [showPostSave, saving]);
+
   const handleSave = async () => {
     if (!customerName || items.length === 0) {
       setMessage({ type: "error", text: "Please enter customer name and at least one item" });
@@ -493,7 +505,43 @@ export default function NewBill() {
           {showScanner && <BarcodeScanner onScan={(code) => { setBarcode(code); setShowScanner(false); setTimeout(() => qtyRef.current?.focus(), 100); }} onClose={() => setShowScanner(false)} />}
 
           {items.length > 0 && (
-            <div className="overflow-x-auto">
+            <div>
+              {/* Mobile card list */}
+              <div className="sm:hidden space-y-2" data-testid="bill-items-table">
+                {items.map((item, i) => {
+                  const isEditing = editingIndex === i;
+                  return (
+                    <div key={i} className={`border rounded-sm p-3 ${isEditing ? 'border-[var(--brand)] bg-[#C86B4D06]' : 'border-[var(--border-subtle)] bg-[var(--surface)]'}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className={`text-sm font-medium truncate ${isEditing ? 'text-[var(--brand)]' : ''}`}>{item.barcode}</p>
+                          <div className="flex gap-1 mt-1 flex-wrap">
+                            {item.tailoring?.enabled && <span className="text-[9px] px-1.5 py-0.5 rounded-sm bg-[#5C8A9E15] text-[var(--info)] font-medium">✂ {item.tailoring.article_type || 'Tailoring'}</span>}
+                            {item.addon?.enabled && (item.addon.items || []).some(a => parseFloat(a.amount) > 0) && <span className="text-[9px] px-1.5 py-0.5 rounded-sm bg-[#C86B4D15] text-[var(--brand)] font-medium">+ Add-on</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button onClick={() => editItem(i)} className={`p-2 rounded-sm ${isEditing ? 'text-[var(--brand)] bg-[#C86B4D15]' : 'text-[var(--info)] hover:bg-[#5C8A9E10]'}`}><PencilSimple size={15} /></button>
+                          <button onClick={() => removeItem(i)} className="p-2 rounded-sm text-[var(--error)] hover:bg-[#9E473D10]"><Trash size={15} /></button>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex gap-4 text-xs font-mono text-[var(--text-secondary)]">
+                        <span>{item.qty}m</span>
+                        <span>₹{item.price}/m</span>
+                        {parseFloat(item.discount) > 0 && <span>{item.discount}% off</span>}
+                        <span className="ml-auto font-semibold text-[var(--text-primary)]">₹{item.total.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="flex justify-between items-center px-1 pt-1 text-xs text-[var(--text-secondary)] border-t border-[var(--border-subtle)]">
+                  <span>{items.length} item{items.length !== 1 ? 's' : ''}</span>
+                  <span className="font-mono font-semibold text-[var(--text-primary)]">₹{items.reduce((s, it) => s + it.total, 0).toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden sm:block overflow-x-auto">
               <table className="w-full" data-testid="bill-items-table">
                 <thead>
                   <tr className="bg-[var(--bg)]">
@@ -548,6 +596,7 @@ export default function NewBill() {
                   </tfoot>
                 )}
               </table>
+              </div>
             </div>
           )}
         </div>

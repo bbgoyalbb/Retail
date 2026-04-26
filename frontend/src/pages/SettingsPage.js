@@ -11,6 +11,7 @@ const getLogoUrl = (path) => {
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState(null);
+  const [savedSettings, setSavedSettings] = useState(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [newArticle, setNewArticle] = useState("");
@@ -18,6 +19,15 @@ export default function SettingsPage() {
   const [newAddon, setNewAddon] = useState("");
   const [logoPreview, setLogoPreview] = useState(null);
   const msgTimerRef = useRef(null);
+
+  const isDirty = settings && savedSettings && JSON.stringify(settings) !== JSON.stringify(savedSettings);
+
+  // Warn on page/tab close with unsaved changes
+  useEffect(() => {
+    const handler = (e) => { if (isDirty) { e.preventDefault(); e.returnValue = ""; } };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
 
   // Clear timeout on unmount to prevent memory leak
   useEffect(() => () => { if (msgTimerRef.current) clearTimeout(msgTimerRef.current); }, []);
@@ -28,13 +38,14 @@ export default function SettingsPage() {
     msgTimerRef.current = setTimeout(() => setMessage(null), 3000);
   };
 
-  useEffect(() => { getSettings().then(res => setSettings(res.data)).catch(() => {}); }, []);
+  useEffect(() => { getSettings().then(res => { setSettings(res.data); setSavedSettings(res.data); }).catch(() => {}); }, []);
 
   const save = async () => {
     setSaving(true);
     try {
       const res = await updateSettings(settings);
       setSettings(res.data);
+      setSavedSettings(res.data);
       showMessage({ type: "success", text: "Settings saved successfully!" });
     } catch (err) {
       showMessage({ type: "error", text: err.message || "Failed to save settings" });
@@ -83,8 +94,11 @@ export default function SettingsPage() {
           <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Settings</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">Configure article types, rates, payment modes, and more</p>
         </div>
-        <button data-testid="save-settings-btn" onClick={save} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 transition-all">
-          {saving ? "Saving..." : <><FloppyDisk size={16} weight="bold" /> Save Settings</>}
+        <button data-testid="save-settings-btn" onClick={save} disabled={saving}
+          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-sm transition-all disabled:opacity-50 ${
+            isDirty ? 'bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)] ring-2 ring-[var(--brand)] ring-offset-2' : 'bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)]'
+          }`}>
+          {saving ? "Saving..." : <><FloppyDisk size={16} weight="bold" /> {isDirty ? "Save Changes ●" : "Save Settings"}</>}
         </button>
       </div>
 

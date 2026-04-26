@@ -316,6 +316,8 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
   );
 }
 
+const todayStr = new Date().toISOString().split("T")[0];
+
 export default function Daybook() {
   const [dateFilter, setDateFilter] = useState("All");
   const [refFilter,  setRefFilter]  = useState("All");
@@ -335,12 +337,34 @@ export default function Daybook() {
       .finally(() => setLoading(false));
   }, [dateFilter]);
 
-  useEffect(() => { getDaybookDates().then(res => setDates(res.data)).catch(() => {}); }, []);
+  useEffect(() => {
+    getDaybookDates().then(res => {
+      setDates(res.data);
+      if (res.data && res.data.includes(todayStr)) setDateFilter(todayStr);
+    }).catch(() => {});
+  }, []);
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleCategoryTally = async (ref, date, category, action) => {
     await tallyEntries({ entry_ids: [ref], date, category, action });
   };
+
+  const summaryStats = (() => {
+    const visible = entries.filter(e => dateFilter === "All" || e.date === dateFilter);
+    const total = visible.reduce((s, e) => s + (e.total || 0), 0);
+    const byMode = {};
+    visible.forEach(e => {
+      ["fabric","tailoring","embroidery","addon","advance"].forEach(cat => {
+        const amt = e[cat] || 0;
+        if (amt > 0) {
+          const raw = e.modes?.[cat] || "Unknown";
+          const m = raw.replace(/^Settled\s*-?\s*/i, "").trim() || raw;
+          byMode[m] = (byMode[m] || 0) + amt;
+        }
+      });
+    });
+    return { total, byMode, count: visible.length };
+  })();
 
   return (
     <div data-testid="daybook-page" className="space-y-6">
@@ -374,6 +398,28 @@ export default function Daybook() {
           {entries.length} entries
         </span>
       </div>
+
+      {!loading && summaryStats.count > 0 && (
+        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-4 flex flex-wrap items-center gap-6">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Total Collected</p>
+            <p className="font-mono text-2xl font-semibold mt-0.5">₹{summaryStats.total.toLocaleString("en-IN")}</p>
+          </div>
+          <div className="h-8 w-px bg-[var(--border-subtle)] hidden sm:block" />
+          <div className="flex flex-wrap gap-4">
+            {Object.entries(summaryStats.byMode).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]).map(([mode, amt]) => (
+              <div key={mode}>
+                <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">{mode}</p>
+                <p className="font-mono text-sm font-medium mt-0.5">₹{amt.toLocaleString("en-IN")}</p>
+              </div>
+            ))}
+          </div>
+          <div className="ml-auto">
+            <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">Entries</p>
+            <p className="font-mono text-lg font-medium mt-0.5">{summaryStats.count}</p>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-4">

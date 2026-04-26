@@ -1,7 +1,8 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { getPendingCustomers, getPendingRefs, getPendingOrders, getBalances, processSettlement, getItems, getSettings } from "@/api";
 import { fmt } from "@/lib/fmt";
-import { CurrencyDollar, CheckCircle } from "@phosphor-icons/react";
+import { CurrencyDollar, CheckCircle, FilePdf } from "@phosphor-icons/react";
+import InvoiceModal from "@/components/InvoiceModal";
 
 export default function Settlements() {
   const [mode, setMode] = useState("customer");
@@ -24,6 +25,8 @@ export default function Settlements() {
   const [message, setMessage] = useState(null);
   const [saving, setSaving] = useState(false);
   const [orderInfo, setOrderInfo] = useState(null);
+  const [lastSettledRef, setLastSettledRef] = useState(null);
+  const [showInvoice, setShowInvoice] = useState(false);
   const [paymentModes, setPaymentModes] = useState(["Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer"]);
 
   // Flag to prevent customer useEffect from clearing ref when set by order lookup
@@ -180,6 +183,7 @@ export default function Settlements() {
         allot_addon: parseFloat(allotAddon) || 0,
         allot_advance: parseFloat(allotAdv) || 0,
       });
+      setLastSettledRef(selectedRef);
       setMessage({ type: "success", text: "Settlement processed!" });
       setFreshPay(""); clearAllotments();
       setSelectedModes([]);
@@ -215,9 +219,18 @@ export default function Settlements() {
       </div>
 
       {message && (
-        <div data-testid="settle-message" className={`p-4 border rounded-sm text-sm ${message.type === 'success' ? 'bg-[#455D4A10] border-[var(--success)] text-[var(--success)]' : 'bg-[#9E473D10] border-[var(--error)] text-[var(--error)]'}`}>
-          {message.text}
+        <div data-testid="settle-message" className={`p-4 border rounded-sm text-sm flex items-center justify-between gap-4 ${message.type === 'success' ? 'bg-[#455D4A10] border-[var(--success)] text-[var(--success)]' : 'bg-[#9E473D10] border-[var(--error)] text-[var(--error)]'}`}>
+          <span>{message.text}</span>
+          {message.type === 'success' && lastSettledRef && (
+            <button onClick={() => setShowInvoice(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[var(--success)] text-white rounded-sm hover:opacity-90 flex-shrink-0">
+              <FilePdf size={14} /> View Invoice
+            </button>
+          )}
         </div>
+      )}
+      {showInvoice && lastSettledRef && (
+        <InvoiceModal billRef={lastSettledRef} onClose={() => setShowInvoice(false)} />
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -278,7 +291,8 @@ export default function Settlements() {
                   <h4 className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Pending Balances</h4>
                   <span className="font-mono text-sm font-medium text-[var(--error)]">Total: ₹{fmt(totalPending)}</span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+                  <div className="flex sm:grid sm:grid-cols-5 gap-3 min-w-max sm:min-w-0">
                   {[
                     { key: "fabric", label: "Fabric", value: balances.fabric, color: "var(--warning)" },
                     { key: "tailoring", label: "Tailoring", value: balances.tailoring, color: "var(--info)" },
@@ -286,12 +300,13 @@ export default function Settlements() {
                     { key: "addon", label: "Add-on", value: balances.addon, color: "var(--text-secondary)" },
                     { key: "advance", label: "Advance", value: balances.advance, color: "var(--success)" },
                   ].map(b => (
-                    <div key={b.key} className={`p-3 rounded-sm ${b.value < 0 ? 'bg-[#9E473D08] border border-[var(--error)]' : 'bg-[var(--bg)]'}`}>
+                    <div key={b.key} className={`p-3 rounded-sm min-w-[100px] sm:min-w-0 ${b.value < 0 ? 'bg-[#9E473D08] border border-[var(--error)]' : 'bg-[var(--bg)]'}`}>
                       <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">{b.label}</p>
                       <p className="font-mono text-lg font-medium mt-0.5" style={{ color: b.value < 0 ? 'var(--error)' : b.color }}>₹{fmt(b.value)}</p>
                       {b.value < 0 && <p className="text-[9px] text-[var(--error)] mt-0.5">Credit</p>}
                     </div>
                   ))}
+                  </div>
                 </div>
               </div>
             )}

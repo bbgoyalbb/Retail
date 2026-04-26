@@ -112,6 +112,24 @@ async def get_daybook_dates(current_user: dict = Depends(get_current_user_dep)):
 
     return sorted(list(dates), reverse=True)
 
+@router.get("/daybook/pending-count")
+async def get_daybook_pending_count(current_user: dict = Depends(get_current_user_dep)):
+    """Return the number of untallied payment entries for today."""
+    today = date.today().isoformat()
+    categories = [
+        ("fabric_pay_date",     "tally_fabric"),
+        ("tailoring_pay_date",  "tally_tailoring"),
+        ("embroidery_pay_date", "tally_embroidery"),
+        ("addon_pay_date",      "tally_addon"),
+    ]
+    count = 0
+    for date_field, tally_field in categories:
+        n = await db.items.count_documents({date_field: today, tally_field: {"$ne": True}})
+        count += n
+    adv_count = await db.advances.count_documents({"date": today, "tally": {"$ne": True}})
+    count += adv_count
+    return {"count": count}
+
 @router.post("/daybook/tally")
 async def tally_entries(req: TallyRequest, current_user: dict = Depends(get_current_user_dep)):
     tally_value = req.action == "tally"

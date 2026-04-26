@@ -41,16 +41,27 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     customer_name = items[0].get("name", "N/A")
     order_date = items[0].get("date", "N/A")
     
-    # Collect payment modes
+    # Collect payment modes (deduplicated, strip "Settled - " prefix)
     all_modes = set()
     for i in items:
         for field in ["fabric_pay_mode", "tailoring_pay_mode", "embroidery_pay_mode", "addon_pay_mode"]:
             mode = i.get(field, "")
             if mode and mode != "N/A":
-                all_modes.add(mode.replace("Settled - ", "").replace("Settled", ""))
-    payment_modes = " · ".join(sorted(all_modes)) if all_modes else "Cash"
-    
-    # Check settlement status
+                clean = mode.replace("Settled - ", "").replace("Settled", "").strip()
+                if clean:
+                    all_modes.add(clean)
+    payment_modes = " · ".join(sorted(all_modes)) if all_modes else "—"
+
+    # Collect latest payment date across all categories
+    pay_dates = []
+    for i in items:
+        for field in ["fabric_pay_date", "tailoring_pay_date", "embroidery_pay_date", "addon_pay_date"]:
+            d = i.get(field, "")
+            if d and d != "N/A":
+                pay_dates.append(d)
+    latest_pay_date = max(pay_dates) if pay_dates else order_date
+
+    # Settlement status — only unsettled (pay_mode not starting with "Settled") sections contribute
     total_pending = sum(float(i.get("fabric_pending", 0)) for i in items if not str(i.get("fabric_pay_mode", "")).startswith("Settled"))
     total_pending += sum(float(i.get("tailoring_pending", 0)) for i in items if not str(i.get("tailoring_pay_mode", "")).startswith("Settled"))
     total_pending += sum(float(i.get("embroidery_pending", 0)) for i in items if not str(i.get("embroidery_pay_mode", "")).startswith("Settled"))
@@ -95,33 +106,40 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     if tailoring_items:
         tail_rows = ""
         for ti in tailoring_items:
+            emb = ti.get("embroidery_status", "Not Required")
+            emb_display = emb if emb not in ("N/A", "", None, "Not Required") else "—"
             tail_rows += f"""
             <tr>
               <td>{ti.get("barcode", "N/A")}</td>
-              <td>{ti.get("order_no", "—")}</td>
               <td>{ti.get("article_type", "—")}</td>
+              <td>{ti.get("order_no", "—")}</td>
               <td>{ti.get("delivery_date", "—")}</td>
-              <td>{ti.get("embroidery_status", "Not Required")}</td>
+              <td>{ti.get("tailoring_status", "—")}</td>
+              <td>{emb_display}</td>
             </tr>"""
         tailoring_html = f"""
         <div class="inv-tailoring">
           <h5>✂ Tailoring Details</h5>
           <table>
-            <thead><tr><th>Article</th><th>Order No</th><th>Type</th><th>Delivery</th><th>Embroidery</th></tr></thead>
+            <thead><tr><th>Barcode</th><th>Article Type</th><th>Order No</th><th>Delivery</th><th>Status</th><th>Embroidery</th></tr></thead>
             <tbody>{tail_rows}</tbody>
           </table>
         </div>"""
 
     # ---- Totals ----
-    grand_total = sum(float(i.get("fabric_amount", 0)) + float(i.get("tailoring_amount", 0)) + 
+    grand_total = sum(float(i.get("fabric_amount", 0)) + float(i.get("tailoring_amount", 0)) +
                      float(i.get("embroidery_amount", 0)) + float(i.get("addon_amount", 0)) for i in items)
-    total_received = grand_total - total_pending
+    # Correct received = sum of all actual received fields (not derived from pending)
+    total_received = sum(
+        float(i.get("fabric_received", 0)) + float(i.get("tailoring_received", 0)) +
+        float(i.get("embroidery_received", 0)) + float(i.get("addon_received", 0))
+        for i in items
+    )
     total_adv = sum(float(a.get("amount", 0)) for a in advances)
     
     balance_status = "Fully Paid ✓" if is_settled else f"Balance Due: ₹{fmt(total_pending)}"
-    balance_color = "var(--success)" if is_settled else "var(--warning)"
-    status_dot = "●" if is_settled else "●"
-    status_color = "#455D4A" if is_settled else "#D49842"
+    status_dot = "●" if is_settled else "○"
+    status_color = "#111111"
 
     # ---- Thermal format ----
     is_thermal = format == "thermal"
@@ -195,22 +213,20 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
   
   :root {{
     --brand: {brand_color};
-    --brand-light: {brand_light};
-    --success: #455D4A;
-    --warning: #D49842;
-    --info: #5C8A9E;
-    --bg: #F5F3EE;
+    --success: #1a5c2a;
+    --warning: #7a4e00;
+    --bg: #f8f8f8;
     --surface: #FFFFFF;
-    --border: #EBE8E1;
-    --border-strong: #D6D1C4;
-    --text: #2D2A26;
-    --text-secondary: #6C6760;
+    --border: #d0d0d0;
+    --border-strong: #999;
+    --text: #111111;
+    --text-secondary: #111111;
   }}
   
   body {{ 
     font-family: 'IBM Plex Sans', sans-serif; 
     font-size: {font_size}; 
-    color: var(--text); 
+    color: #111; 
     background: var(--bg); 
     padding: 24px;
     line-height: 1.6;
@@ -223,81 +239,83 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     margin: 0 auto;
   }}
   
-  /* Header */
+  /* Header — solid black band */
   .inv-head {{ 
-    padding: 24px 28px 20px; 
-    border-bottom: 1px solid var(--border); 
+    padding: 20px 28px; 
+    background: #111111;
     display: flex; 
     justify-content: space-between; 
-    align-items: flex-start; 
+    align-items: center; 
     gap: 16px;
   }}
   
-  .inv-brand {{ display: flex; align-items: flex-start; gap: 12px; }}
+  .inv-brand {{ display: flex; align-items: center; gap: 14px; }}
   .inv-logo-img {{
     width: 40px;
     height: 40px;
     object-fit: contain;
-    border-radius: 8px;
+    border-radius: 4px;
     flex-shrink: 0;
+    background: #fff;
+    padding: 2px;
   }}
   .inv-firm h2 {{ 
     font-family: 'Manrope', sans-serif; 
-    font-size: 16px; 
-    font-weight: 600; 
-    letter-spacing: -0.2px; 
-    color: var(--text); 
-    margin-bottom: 1px;
+    font-size: 17px; 
+    font-weight: 700; 
+    letter-spacing: 0px; 
+    color: #ffffff; 
+    margin-bottom: 2px;
   }}
   
   .inv-firm p {{ 
     font-size: 10px; 
-    color: var(--text-secondary); 
+    color: #cccccc; 
     text-transform: uppercase; 
-    letter-spacing: 0.18em;
+    letter-spacing: 0.16em;
   }}
   
   .inv-meta {{ text-align: right; }}
   .inv-meta .inv-ref {{ 
     font-family: 'IBM Plex Mono', monospace; 
-    font-size: 14px; 
-    font-weight: 500; 
-    color: var(--brand); 
-    margin-bottom: 4px;
+    font-size: 15px; 
+    font-weight: 600; 
+    color: #ffffff; 
+    margin-bottom: 3px;
   }}
-  .inv-meta p {{ font-size: 10px; color: var(--text-secondary); margin-bottom: 2px; }}
+  .inv-meta p {{ font-size: 10px; color: #cccccc; margin-bottom: 2px; }}
   .inv-meta .inv-title {{ 
     font-family: 'Manrope', sans-serif; 
-    font-size: 10px; 
+    font-size: 9px; 
     font-weight: 700; 
     text-transform: uppercase; 
-    letter-spacing: 0.2em; 
-    color: var(--text-secondary); 
-    margin-bottom: 6px;
+    letter-spacing: 0.22em; 
+    color: #aaaaaa; 
+    margin-bottom: 5px;
   }}
   
   /* Customer */
   .inv-customer {{ 
-    padding: 16px 28px; 
-    background: var(--bg); 
-    border-bottom: 1px solid var(--border); 
+    padding: 14px 28px; 
+    background: #f0f0f0; 
+    border-bottom: 2px solid #111; 
     display: flex; 
     gap: 32px; 
     flex-wrap: wrap;
   }}
   .inv-customer .ic-group label {{ 
-    font-size: 9px; 
+    font-size: 8px; 
     text-transform: uppercase; 
     letter-spacing: 0.18em; 
     font-weight: 700; 
-    color: var(--text-secondary); 
+    color: #555555; 
     display: block; 
     margin-bottom: 2px;
   }}
   .inv-customer .ic-group p {{ 
     font-size: 12px; 
-    color: var(--text); 
-    font-weight: 500;
+    color: #111111; 
+    font-weight: 600;
   }}
   
   /* Items table */
@@ -308,30 +326,31 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     text-transform: uppercase; 
     letter-spacing: 0.12em; 
     font-weight: 700; 
-    color: var(--text-secondary); 
-    padding: 10px 12px 8px; 
-    background: var(--bg); 
-    border-bottom: 1px solid var(--border);
+    color: #ffffff; 
+    padding: 9px 12px; 
+    background: #333333; 
+    border-bottom: none;
     text-align: left;
   }}
   .inv-items th:not(:first-child) {{ text-align: right; }}
   .inv-items td {{ 
     font-size: 12px; 
-    padding: 10px 12px; 
-    border-bottom: 1px solid var(--border); 
-    color: var(--text); 
+    padding: 9px 12px; 
+    border-bottom: 1px solid #ddd; 
+    color: #111111; 
     vertical-align: top;
   }}
+  .inv-items tr:nth-child(even) td {{ background: #f9f9f9; }}
   .inv-items td:not(:first-child) {{ 
     text-align: right; 
     font-family: 'IBM Plex Mono', monospace;
   }}
-  .item-barcode {{ font-weight: 500; }}
+  .item-barcode {{ font-weight: 600; color: #111; }}
   .item-badge {{ 
     font-size: 9px; 
     padding: 1px 5px; 
-    background: var(--info); 
-    color: white; 
+    background: #333333; 
+    color: #ffffff; 
     border-radius: 2px; 
     font-weight: 600; 
     text-transform: uppercase; 
@@ -339,122 +358,138 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     margin-top: 2px; 
     display: inline-block;
   }}
-  .item-badge.addon {{ background: var(--brand); }}
+  .item-badge.addon {{ background: #555555; }}
   
   /* Totals */
-  .inv-totals {{ padding: 12px 28px; border-top: 1px solid var(--border); }}
+  .inv-totals {{ padding: 14px 28px; border-top: 2px solid #111; }}
   .inv-total-row {{ 
     display: flex; 
     justify-content: space-between; 
     align-items: center; 
-    padding: 4px 0;
+    padding: 3px 0;
   }}
-  .inv-total-row.subtotal {{ color: var(--text-secondary); font-size: 12px; }}
+  .inv-total-row.subtotal {{ color: #111111; font-size: 12px; }}
   .inv-total-row.grand {{ 
     font-family: 'Manrope', sans-serif; 
     font-size: 18px; 
-    font-weight: 600; 
-    color: var(--text); 
-    padding-top: 10px; 
-    border-top: 1px solid var(--border-strong); 
-    margin-top: 6px;
+    font-weight: 700; 
+    padding: 10px 14px;
+    margin-top: 8px;
+    background: #111111;
+    color: #ffffff;
   }}
-  .inv-total-row.grand span:last-child {{ color: var(--brand); }}
   .inv-total-row.received {{ 
-    color: var(--success); 
+    color: #111111; 
     font-size: 12px; 
     font-family: 'IBM Plex Mono', monospace;
   }}
   .inv-total-row.balance {{ 
-    color: {balance_color}; 
-    font-size: 12px; 
-    font-weight: 600; 
+    color: #111111; 
+    font-size: 13px; 
+    font-weight: 700; 
     font-family: 'IBM Plex Mono', monospace;
   }}
   
   /* Tailoring section */
   .inv-tailoring {{ 
     margin: 0 28px 16px; 
-    background: var(--info)10; 
-    border: 1px solid var(--info)30; 
+    background: #f0f0f0; 
+    border: 1px solid #999; 
     border-radius: 2px; 
     padding: 12px 14px;
+    overflow-x: auto;
   }}
   .inv-tailoring h5 {{ 
     font-size: 9px; 
     text-transform: uppercase; 
     letter-spacing: 0.18em; 
     font-weight: 700; 
-    color: var(--info); 
+    color: #111111; 
     margin-bottom: 8px;
   }}
-  .inv-tailoring table {{ width: 100%; border-collapse: collapse; }}
+  .inv-tailoring table {{ width: 100%; border-collapse: collapse; min-width: 360px; }}
   .inv-tailoring th {{ 
     font-size: 9px; 
-    color: var(--text-secondary); 
+    color: #ffffff; 
+    background: #555555;
     text-align: left; 
-    padding: 4px 6px; 
-    font-weight: 600;
+    padding: 5px 6px; 
+    font-weight: 700;
+    white-space: nowrap;
   }}
   .inv-tailoring td {{ 
     font-size: 10px; 
     padding: 4px 6px; 
-    color: var(--text); 
-    border-top: 1px solid var(--info)20;
+    color: #111111; 
+    border-top: 1px solid #ccc;
+    white-space: nowrap;
   }}
   
   /* Payment band */
   .inv-payment {{ 
     padding: 12px 28px; 
-    background: var(--bg); 
-    border-top: 1px solid var(--border); 
+    background: #f0f0f0; 
+    border-top: 1px solid #999; 
     display: flex; 
     gap: 24px; 
     flex-wrap: wrap;
   }}
   .inv-payment label {{ 
-    font-size: 9px; 
+    font-size: 8px; 
     text-transform: uppercase; 
     letter-spacing: 0.18em; 
     font-weight: 700; 
-    color: var(--text-secondary); 
+    color: #555555; 
     display: block; 
     margin-bottom: 2px;
   }}
-  .inv-payment p {{ font-size: 11px; color: var(--text); }}
+  .inv-payment p {{ font-size: 11px; color: #111111; font-weight: 500; }}
   
   /* Footer */
   .inv-footer {{ 
-    padding: 16px 28px; 
-    border-top: 1px solid var(--border); 
+    padding: 14px 28px; 
+    background: #111111;
     display: flex; 
     justify-content: space-between; 
     align-items: center;
   }}
   .inv-footer .ifooter-left {{ 
     font-size: 9px; 
-    color: var(--text-secondary); 
+    color: #cccccc; 
     text-transform: uppercase; 
     letter-spacing: 0.12em;
   }}
   .inv-footer .ifooter-right {{ 
     font-size: 9px; 
-    color: var(--text-secondary); 
+    color: #cccccc; 
     text-align: right;
   }}
   .inv-footer .ifooter-thanks {{ 
     font-family: 'Manrope', sans-serif; 
     font-size: 11px; 
-    font-weight: 500; 
-    color: var(--brand); 
+    font-weight: 600; 
+    color: #ffffff; 
     margin-bottom: 1px;
   }}
   
   /* Print */
   @media print {{
     body {{ background: #fff; padding: 0; margin: 0; }}
-    .inv {{ border: none; max-width: none; }}
-    @page {{ margin: 10mm 12mm; size: A4; }}
+    .inv {{ border: none; max-width: none; box-shadow: none; }}
+    .inv-head {{ flex-wrap: wrap; }}
+    .inv-tailoring {{ overflow-x: visible; }}
+    @page {{ margin: 12mm 14mm; size: A4; }}
+  }}
+  @media screen and (max-width: 480px) {{
+    body {{ padding: 8px; }}
+    .inv-head {{ flex-direction: column; gap: 12px; }}
+    .inv-meta {{ text-align: left; }}
+    .inv-customer {{ gap: 12px; }}
+    .inv-items th, .inv-items td {{ padding: 8px 6px; font-size: 11px; }}
+    .inv-totals {{ padding: 12px 16px; }}
+    .inv-payment {{ padding: 12px 16px; }}
+    .inv-footer {{ flex-direction: column; gap: 8px; padding: 12px 16px; }}
+    .inv-footer .ifooter-right {{ text-align: left; }}
   }}
 </style>
 </head>
@@ -467,14 +502,14 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
       <div class="inv-firm">
         <h2>{firm_name}</h2>
         <p>Fabric &amp; Tailoring</p>
-        <p style="font-size:10px;color:var(--text-secondary);margin-top:3px;font-style:normal;">{firm_address} · {firm_phones}</p>
+        <p style="font-size:10px;color:var(--text-secondary);margin-top:3px;">{firm_address} · {firm_phones}</p>
       </div>
     </div>
     <div class="inv-meta">
       <p class="inv-title">Tax Invoice</p>
       <p class="inv-ref">{ref_id}</p>
-      <p>Date: {order_date}</p>
-      <p>Payment: {order_date}</p>
+      <p>Bill Date: {order_date}</p>
+      <p>Pay Date: {latest_pay_date}</p>
     </div>
   </div>
 
@@ -485,13 +520,10 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
       <p>{customer_name}</p>
     </div>
     <div class="ic-group">
-      <label>Payment Mode</label>
-      <p>{payment_modes}</p>
-    </div>
-    <div class="ic-group">
       <label>Status</label>
       <p style="color:{status_color};font-weight:600;">{status_dot} {"Settled" if is_settled else "Pending"}</p>
     </div>
+    {f'<div class="ic-group"><label>GSTIN</label><p>{firm_gstin}</p></div>' if firm_gstin and firm_gstin != 'N/A' else ''}
   </div>
 
   <!-- Items -->
@@ -512,16 +544,20 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     </table>
   </div>
 
+  {tailoring_html}
+
   <!-- Totals -->
   <div class="inv-totals">
-    <div class="inv-total-row subtotal"><span>Subtotal ({len(items)} articles)</span><span style="font-family:'IBM Plex Mono',monospace;">₹{fmt(fab_total)}</span></div>
+    <div class="inv-total-row subtotal"><span>Fabric Subtotal ({len(items)} articles)</span><span style="font-family:'IBM Plex Mono',monospace;">₹{fmt(fab_total)}</span></div>
+    {'<div class="inv-total-row subtotal"><span>Tailoring</span><span style="font-family:\'IBM Plex Mono\',monospace;">₹' + fmt(sum(float(i.get("tailoring_amount",0)) for i in items)) + '</span></div>' if sum(float(i.get('tailoring_amount',0)) for i in items) > 0 else ''}
+    {'<div class="inv-total-row subtotal"><span>Embroidery</span><span style="font-family:\'IBM Plex Mono\',monospace;">₹' + fmt(sum(float(i.get("embroidery_amount",0)) for i in items)) + '</span></div>' if sum(float(i.get('embroidery_amount',0)) for i in items) > 0 else ''}
+    {'<div class="inv-total-row subtotal"><span>Add-ons</span><span style="font-family:\'IBM Plex Mono\',monospace;">₹' + fmt(sum(float(i.get("addon_amount",0)) for i in items)) + '</span></div>' if sum(float(i.get('addon_amount',0)) for i in items) > 0 else ''}
+    {('<div class="inv-total-row subtotal"><span>GST (' + str(int(GST_RATE)) + '%)</span><span style="font-family:\'IBM Plex Mono\',monospace;">₹' + fmt(grand_total * GST_RATE / 100) + '</span></div>') if GST_RATE > 0 else ''}
     <div class="inv-total-row grand"><span>Grand Total</span><span>₹{fmt(grand_total)}</span></div>
     <div style="height:8px;"></div>
     <div class="inv-total-row received"><span>Amount Received</span><span>₹{fmt(total_received)}</span></div>
-    <div class="inv-total-row balance"><span>{balance_status}</span></div>
+    <div class="inv-total-row balance" style="border-left: 3px solid #111; padding-left: 8px; margin-top: 4px;"><span>{balance_status}</span></div>
   </div>
-
-  {tailoring_html}
 
   <!-- Payment band -->
   <div class="inv-payment">
@@ -531,12 +567,13 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     </div>
     <div>
       <label>Payment Date</label>
-      <p>{order_date}</p>
+      <p>{latest_pay_date}</p>
     </div>
     <div>
-      <label>Bill Created</label>
+      <label>Bill Date</label>
       <p>{order_date}</p>
     </div>
+    {f'<div><label>Advances</label><p>₹{fmt(total_adv)}</p></div>' if total_adv > 0 else ''}
   </div>
 
   <!-- Footer -->
