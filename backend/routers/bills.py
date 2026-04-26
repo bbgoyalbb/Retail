@@ -156,106 +156,72 @@ async def seed_data(current_user: dict = Depends(get_current_user_dep)):
 # ==========================================
 
 @router.get("/dashboard")
-
-
-@router.get("/dashboard")
 async def get_dashboard(current_user: dict = Depends(get_current_user_dep)):
-    total_items = await db.items.count_documents({})
-    total_advances = await db.advances.count_documents({})
+    import asyncio
+    from datetime import date, timedelta
 
-    _not_settled = {"$not": {"$regex": "^Settled"}}
-    pipeline_fabric_pending = [
-        {"$match": {"fabric_amount": {"$gt": 0}, "fabric_pay_mode": _not_settled}},
-        {"$group": {"_id": None, "total": {"$sum": "$fabric_pending"}}}
-    ]
-    fab_pending = await db.items.aggregate(pipeline_fabric_pending).to_list(1)
+    _ns = {"$not": {"$regex": "^Settled"}}
 
-    pipeline_tail_pending = [
-        {"$match": {"tailoring_amount": {"$gt": 0}, "tailoring_pay_mode": _not_settled}},
-        {"$group": {"_id": None, "total": {"$sum": "$tailoring_pending"}}}
-    ]
-    tail_pending = await db.items.aggregate(pipeline_tail_pending).to_list(1)
+    # Build 7-day date list for trend
+    days = [(date.today() - timedelta(days=i)).isoformat() for i in range(6, -1, -1)]
 
-    pipeline_emb_pending = [
-        {"$match": {"embroidery_amount": {"$gt": 0}, "embroidery_pay_mode": _not_settled}},
-        {"$group": {"_id": None, "total": {"$sum": "$embroidery_pending"}}}
-    ]
-    emb_pending = await db.items.aggregate(pipeline_emb_pending).to_list(1)
+    # Single $facet aggregation covers all pending sums, status counts, revenue, trend — 1 DB round trip
+    facet_pipeline = [{"$facet": {
+        "fab_pending":  [{"$match": {"fabric_amount":     {"$gt": 0}, "fabric_pay_mode":     _ns}}, {"$group": {"_id": None, "t": {"$sum": "$fabric_pending"}}}],
+        "tail_pending": [{"$match": {"tailoring_amount":  {"$gt": 0}, "tailoring_pay_mode":  _ns}}, {"$group": {"_id": None, "t": {"$sum": "$tailoring_pending"}}}],
+        "emb_pending":  [{"$match": {"embroidery_amount": {"$gt": 0}, "embroidery_pay_mode": _ns}}, {"$group": {"_id": None, "t": {"$sum": "$embroidery_pending"}}}],
+        "addon_pending":[{"$match": {"addon_amount":      {"$gt": 0}, "addon_pay_mode":      _ns}}, {"$group": {"_id": None, "t": {"$sum": "$addon_pending"}}}],
+        "revenue":      [{"$group": {"_id": None, "t": {"$sum": "$fabric_received"}}}],
+        "tail_pend_ct": [{"$match": {"tailoring_status": "Pending"}},     {"$count": "n"}],
+        "tail_stit_ct": [{"$match": {"tailoring_status": "Stitched"}},    {"$count": "n"}],
+        "emb_req_ct":   [{"$match": {"embroidery_status": "Required"}},   {"$count": "n"}],
+        "emb_prog_ct":  [{"$match": {"embroidery_status": "In Progress"}},{"$count": "n"}],
+        "trend":        [{"$match": {"date": {"$in": days}}}, {"$group": {"_id": "$date", "t": {"$sum": "$fabric_received"}}}],
+        "customers":    [{"$group": {"_id": "$name"}}],
+        "total_ct":     [{"$count": "n"}],
+    }}]
 
-    pipeline_addon_pending = [
-        {"$match": {"addon_amount": {"$gt": 0}, "addon_pay_mode": _not_settled}},
-        {"$group": {"_id": None, "total": {"$sum": "$addon_pending"}}}
-    ]
-    addon_pending = await db.items.aggregate(pipeline_addon_pending).to_list(1)
-
-    tailoring_pending_count = await db.items.count_documents({"tailoring_status": "Pending"})
-    tailoring_stitched_count = await db.items.count_documents({"tailoring_status": "Stitched"})
-    emb_required = await db.items.count_documents({"embroidery_status": "Required"})
-    emb_inprogress = await db.items.count_documents({"embroidery_status": "In Progress"})
-
-    unique_customers = await db.items.distinct("name")
-
-    pipeline_revenue = [
-        {"$group": {"_id": None, "total": {"$sum": "$fabric_received"}}}
-    ]
-    revenue = await db.items.aggregate(pipeline_revenue).to_list(1)
-
-    pipeline_adv_total = [
-        {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
-    ]
-    adv_total = await db.advances.aggregate(pipeline_adv_total).to_list(1)
-
-    # Get recent unique bill refs (grouped by ref) with customer info and totals
     pipeline_recent = [
         {"$sort": {"date": -1, "ref": -1}},
-        {"$group": {
-            "_id": "$ref",
-            "date": {"$first": "$date"},
-            "name": {"$first": "$name"},
-            "fabric_total": {"$sum": "$fabric_amount"},
-            "item_count": {"$sum": 1}
-        }},
+        {"$group": {"_id": "$ref", "date": {"$first": "$date"}, "name": {"$first": "$name"}, "fabric_total": {"$sum": "$fabric_amount"}, "item_count": {"$sum": 1}}},
         {"$sort": {"date": -1}},
         {"$limit": 10},
-        {"$project": {
-            "_id": 0,
-            "ref": "$_id",
-            "date": 1,
-            "name": 1,
-            "fabric_total": 1,
-            "item_count": 1
-        }}
+        {"$project": {"_id": 0, "ref": "$_id", "date": 1, "name": 1, "fabric_total": 1, "item_count": 1}}
     ]
-    recent_items = await db.items.aggregate(pipeline_recent).to_list(10)
+    pipeline_adv = [{"$facet": {
+        "total_ct":  [{"$count": "n"}],
+        "total_amt": [{"$group": {"_id": None, "t": {"$sum": "$amount"}}}],
+    }}]
 
-    # 7-day revenue sparkline trend
-    from datetime import date, timedelta
-    trend_data = []
-    for i in range(6, -1, -1):
-        day = (date.today() - timedelta(days=i)).isoformat()
-        day_pipeline = [
-            {"$match": {"date": day}},
-            {"$group": {"_id": None, "total": {"$sum": "$fabric_received"}}}
-        ]
-        day_result = await db.items.aggregate(day_pipeline).to_list(1)
-        trend_data.append(day_result[0]["total"] if day_result else 0)
+    # Run all 3 aggregations concurrently
+    facet_res, recent_items, adv_res = await asyncio.gather(
+        db.items.aggregate(facet_pipeline).to_list(1),
+        db.items.aggregate(pipeline_recent).to_list(10),
+        db.advances.aggregate(pipeline_adv).to_list(1),
+    )
+
+    f = facet_res[0] if facet_res else {}
+    a = adv_res[0] if adv_res else {}
+
+    trend_map = {r["_id"]: r["t"] for r in f.get("trend", [])}
+    trend_data = [trend_map.get(d, 0) for d in days]
 
     return {
-        "total_items": total_items,
-        "revenue_trend": trend_data,
-        "total_advances": total_advances,
-        "fabric_pending_amount": fab_pending[0]["total"] if fab_pending else 0,
-        "tailoring_pending_amount": tail_pending[0]["total"] if tail_pending else 0,
-        "embroidery_pending_amount": emb_pending[0]["total"] if emb_pending else 0,
-        "addon_pending_amount": addon_pending[0]["total"] if addon_pending else 0,
-        "tailoring_pending_count": tailoring_pending_count,
-        "tailoring_stitched_count": tailoring_stitched_count,
-        "embroidery_required_count": emb_required,
-        "embroidery_inprogress_count": emb_inprogress,
-        "unique_customers": len(unique_customers),
-        "total_revenue": revenue[0]["total"] if revenue else 0,
-        "total_advances_amount": adv_total[0]["total"] if adv_total else 0,
-        "recent_items": recent_items,
+        "total_items":               f["total_ct"][0]["n"]   if f.get("total_ct")     else 0,
+        "revenue_trend":             trend_data,
+        "total_advances":            a["total_ct"][0]["n"]   if a.get("total_ct")     else 0,
+        "fabric_pending_amount":     f["fab_pending"][0]["t"]  if f.get("fab_pending")  else 0,
+        "tailoring_pending_amount":  f["tail_pending"][0]["t"] if f.get("tail_pending") else 0,
+        "embroidery_pending_amount": f["emb_pending"][0]["t"]  if f.get("emb_pending")  else 0,
+        "addon_pending_amount":      f["addon_pending"][0]["t"] if f.get("addon_pending") else 0,
+        "tailoring_pending_count":   f["tail_pend_ct"][0]["n"] if f.get("tail_pend_ct") else 0,
+        "tailoring_stitched_count":  f["tail_stit_ct"][0]["n"] if f.get("tail_stit_ct") else 0,
+        "embroidery_required_count": f["emb_req_ct"][0]["n"]   if f.get("emb_req_ct")   else 0,
+        "embroidery_inprogress_count":f["emb_prog_ct"][0]["n"] if f.get("emb_prog_ct")  else 0,
+        "unique_customers":          len(f.get("customers", [])),
+        "total_revenue":             f["revenue"][0]["t"]       if f.get("revenue")      else 0,
+        "total_advances_amount":     a["total_amt"][0]["t"]    if a.get("total_amt")    else 0,
+        "recent_items":              recent_items,
     }
 
 # ==========================================
@@ -294,8 +260,10 @@ async def get_items(
     order_no: Optional[str] = None,
     limit: int = 500,
     skip: int = 0,
+    summary: bool = False,
     current_user: dict = Depends(get_current_user_dep),
 ):
+    import asyncio
     query = {}
     if name:
         query["name"] = name
@@ -310,8 +278,23 @@ async def get_items(
     if order_no:
         query["order_no"] = order_no
 
-    items = await db.items.find(query, {"_id": 0}).sort("date", -1).skip(skip).limit(limit).to_list(limit)
-    total = await db.items.count_documents(query)
+    # summary=true returns only the fields needed for the ItemsManager grid rows
+    projection = {"_id": 0}
+    if summary:
+        for f in ["id", "ref", "name", "date", "order_no", "cancelled",
+                  "fabric_amount", "fabric_received", "fabric_pending", "fabric_pay_mode",
+                  "tailoring_amount", "tailoring_received", "tailoring_pending", "tailoring_pay_mode",
+                  "embroidery_amount", "embroidery_received", "embroidery_pending", "embroidery_pay_mode",
+                  "addon_amount", "addon_received", "addon_pending", "addon_pay_mode",
+                  "barcode", "price", "qty", "discount",
+                  "article_type", "order_no", "delivery_date", "tailoring_status", "embroidery_status",
+                  "addon_desc", "karigar"]:
+            projection[f] = 1
+
+    items, total = await asyncio.gather(
+        db.items.find(query, projection).sort("date", -1).skip(skip).limit(limit).to_list(limit),
+        db.items.count_documents(query),
+    )
     return {"items": items, "total": total}
 
 @router.get("/items/{item_id}")

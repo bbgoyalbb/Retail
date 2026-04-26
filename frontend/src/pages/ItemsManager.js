@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { getItems, updateItem, deleteItem, createItem, getAdvances, createAdvance, updateAdvance, deleteAdvance } from "@/api";
+import { getItems, getAdvances, updateItem, deleteItem, createItem, updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache } from "@/api";
 import { fmt } from "@/lib/fmt";
 import { PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle, Funnel } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
@@ -194,7 +194,7 @@ export default function ItemsManager() {
     setLoading(true);
     try {
       const [itemsRes, advancesRes] = await Promise.all([
-        getItems({ limit: 2000 }),
+        getItems({ limit: 2000, summary: true }),
         getAdvances()
       ]);
       setAllItems(itemsRes.data.items || []);
@@ -359,6 +359,7 @@ export default function ItemsManager() {
       setAdvanceData({}); setOriginalAdvanceData({}); setNewAdvances([]); setDeletedAdvances([]); setRefAdvances([]); setEditItems([]);
       setMessage({ type: advFailed === 0 ? "success" : "error", text: advFailed === 0 ? "Advances saved successfully" : `${advFailed} operation(s) failed, ${advSuccess} succeeded` });
       setTimeout(() => setMessage(null), 3000);
+      invalidateItemsCache();
       loadData();
       return;
     }
@@ -402,6 +403,7 @@ export default function ItemsManager() {
       setMessage({ type: "error", text: `${failed} operation(s) failed, ${success} succeeded` });
       setTimeout(() => setMessage(null), 3000);
     }
+    invalidateItemsCache();
     loadData();
   };
 
@@ -444,6 +446,7 @@ export default function ItemsManager() {
         setMessage({ type: "success", text: "Item deleted" });
       }
       setDelConfirm(null);
+      invalidateItemsCache();
       loadData();
     } catch {
       setMessage({ type: "error", text: "Failed to delete" });
@@ -481,6 +484,7 @@ export default function ItemsManager() {
     setMessage({ type: success === group.items.length ? "success" : "error", text: success === group.items.length ? `Order ${group.ref} cancelled — all amounts zeroed out` : `${group.items.length - success} items failed to cancel` });
     setTimeout(() => setMessage(null), 3000);
     setCancelConfirm(null);
+    invalidateItemsCache();
     loadData();
   };
 

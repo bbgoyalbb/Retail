@@ -17,43 +17,31 @@ router = APIRouter()
 
 @router.get("/settlements/balances")
 async def get_settlement_balances(name: Optional[str] = None, ref: Optional[str] = None, current_user: dict = Depends(get_current_user_dep)):
+    import asyncio
     if not ref:
         return {"fabric": 0, "tailoring": 0, "embroidery": 0, "addon": 0, "advance": 0}
 
-    not_settled = {"$not": {"$regex": "^Settled"}}
-    pipeline_fab = [
-        {"$match": {"ref": ref, "fabric_amount": {"$gt": 0}, "fabric_pay_mode": not_settled}},
-        {"$group": {"_id": None, "total": {"$sum": "$fabric_pending"}}}
-    ]
-    pipeline_tail = [
-        {"$match": {"ref": ref, "tailoring_amount": {"$gt": 0}, "tailoring_pay_mode": not_settled}},
-        {"$group": {"_id": None, "total": {"$sum": "$tailoring_pending"}}}
-    ]
-    pipeline_emb = [
-        {"$match": {"ref": ref, "embroidery_amount": {"$gt": 0}, "embroidery_pay_mode": not_settled}},
-        {"$group": {"_id": None, "total": {"$sum": "$embroidery_pending"}}}
-    ]
-    pipeline_addon = [
-        {"$match": {"ref": ref, "addon_amount": {"$gt": 0}, "addon_pay_mode": not_settled}},
-        {"$group": {"_id": None, "total": {"$sum": "$addon_pending"}}}
-    ]
-    pipeline_adv = [
-        {"$match": {"ref": ref}},
-        {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
-    ]
+    _ns = {"$not": {"$regex": "^Settled"}}
+    facet_pipeline = [{"$match": {"ref": ref}}, {"$facet": {
+        "fab":  [{"$match": {"fabric_amount":     {"$gt": 0}, "fabric_pay_mode":     _ns}}, {"$group": {"_id": None, "t": {"$sum": "$fabric_pending"}}}],
+        "tail": [{"$match": {"tailoring_amount":  {"$gt": 0}, "tailoring_pay_mode":  _ns}}, {"$group": {"_id": None, "t": {"$sum": "$tailoring_pending"}}}],
+        "emb":  [{"$match": {"embroidery_amount": {"$gt": 0}, "embroidery_pay_mode": _ns}}, {"$group": {"_id": None, "t": {"$sum": "$embroidery_pending"}}}],
+        "addon":[{"$match": {"addon_amount":      {"$gt": 0}, "addon_pay_mode":      _ns}}, {"$group": {"_id": None, "t": {"$sum": "$addon_pending"}}}],
+    }}]
+    pipeline_adv = [{"$match": {"ref": ref}}, {"$group": {"_id": None, "total": {"$sum": "$amount"}}}]
 
-    fab = await db.items.aggregate(pipeline_fab).to_list(1)
-    tail = await db.items.aggregate(pipeline_tail).to_list(1)
-    emb = await db.items.aggregate(pipeline_emb).to_list(1)
-    addon = await db.items.aggregate(pipeline_addon).to_list(1)
-    adv = await db.advances.aggregate(pipeline_adv).to_list(1)
+    items_res, adv = await asyncio.gather(
+        db.items.aggregate(facet_pipeline).to_list(1),
+        db.advances.aggregate(pipeline_adv).to_list(1),
+    )
 
+    r = items_res[0] if items_res else {}
     return {
-        "fabric": fab[0]["total"] if fab else 0,
-        "tailoring": tail[0]["total"] if tail else 0,
-        "embroidery": emb[0]["total"] if emb else 0,
-        "addon": addon[0]["total"] if addon else 0,
-        "advance": adv[0]["total"] if adv else 0,
+        "fabric":    r["fab"][0]["t"]  if r.get("fab")  else 0,
+        "tailoring": r["tail"][0]["t"] if r.get("tail") else 0,
+        "embroidery":r["emb"][0]["t"]  if r.get("emb")  else 0,
+        "addon":     r["addon"][0]["t"] if r.get("addon") else 0,
+        "advance":   adv[0]["total"]   if adv           else 0,
     }
 
 @router.post("/settlements/pay")

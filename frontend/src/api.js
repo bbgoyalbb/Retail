@@ -55,7 +55,24 @@ export const getCustomers = () => {
 };
 export const getPendingCustomers = () => api.get("/customers", { params: { pending_only: true } });
 export const invalidateCustomersCache = () => { _customersCache = null; };
-export const getItems = (params) => api.get("/items", { params });
+let _itemsCache = null;
+let _itemsCacheTime = 0;
+let _itemsCacheKey = "";
+const ITEMS_CACHE_TTL = 30000; // 30 seconds
+export const getItems = (params) => {
+  const key = JSON.stringify(params || {});
+  const now = Date.now();
+  if (_itemsCache && key === _itemsCacheKey && now - _itemsCacheTime < ITEMS_CACHE_TTL) {
+    return Promise.resolve(_itemsCache);
+  }
+  return api.get("/items", { params }).then(res => {
+    _itemsCache = res;
+    _itemsCacheKey = key;
+    _itemsCacheTime = Date.now();
+    return res;
+  });
+};
+export const invalidateItemsCache = () => { _itemsCache = null; };
 export const getItem = (id) => api.get(`/items/${id}`);
 export const getRefs = (name) => api.get("/refs", { params: { name } });
 export const getPendingRefs = (name) => api.get("/refs", { params: { name, pending_only: true } });
