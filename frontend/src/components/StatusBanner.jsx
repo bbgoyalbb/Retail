@@ -3,10 +3,11 @@ import { X, CheckCircle, WarningCircle } from "@phosphor-icons/react";
 
 export function StatusBanner({ message, onDismiss, showDismiss = true, autoDismiss = 5000 }) {
   const [progress, setProgress] = useState(100);
-  if (!message) return null;
 
   // Auto-dismiss success messages after specified time (errors stay until manually dismissed)
+  // NOTE: early return must come AFTER all hooks to satisfy Rules of Hooks
   useEffect(() => {
+    if (!message) return;
     if (autoDismiss && message.type === "success" && onDismiss) {
       setProgress(100);
       const startTime = Date.now();
@@ -28,6 +29,9 @@ export function StatusBanner({ message, onDismiss, showDismiss = true, autoDismi
       };
     }
   }, [message, autoDismiss, onDismiss]);
+
+  // Early return after all hooks
+  if (!message) return null;
 
   const isSuccess = message.type === "success";
   const isError = message.type === "error";

@@ -40,6 +40,7 @@ class LocalRegressionSuite:
         self.created_item_ids: list[str] = []
         self.test_customer = f"Regression Test Customer {date.today().isoformat()}"
         self.created_ref: str | None = None
+        self.token: str | None = None  # JWT set after login()
 
     def log(self, name: str, passed: bool, detail: str = "") -> None:
         self.results.append(TestResult(name, passed, detail))
@@ -55,6 +56,8 @@ class LocalRegressionSuite:
         if data is not None:
             body = json.dumps(data).encode("utf-8")
             headers["Content-Type"] = "application/json"
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
         req = urllib.request.Request(f"{self.base_url}{path}", data=body, headers=headers, method=method)
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
@@ -160,7 +163,18 @@ class LocalRegressionSuite:
         if self.created_item_ids:
             self.log("cleanup temporary records", True, f"deleted {len(self.created_item_ids)} items")
 
+    def login(self, username: str = "admin", password: str = "admin123") -> None:
+        """Authenticate and store the JWT so all subsequent requests are authorised."""
+        status, body = self.request("/auth/login", "POST", {"username": username, "password": password})
+        if status == 200 and isinstance(body, dict) and "access_token" in body:
+            self.token = body["access_token"]
+            self.log("auth login", True, f"Logged in as '{username}'")
+        else:
+            self.log("auth login", False, f"HTTP {status} — {str(body)[:120]}")
+
     def run(self) -> int:
+        creds = getattr(self, "_login_credentials", ("admin", "admin123"))
+        self.login(*creds)
         self.test_health()
         self.test_stats()
         self.test_settings()
@@ -177,8 +191,11 @@ class LocalRegressionSuite:
 
 
 def main() -> int:
-    base_url = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8001/api"
+    base_url  = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8001/api"
+    username  = sys.argv[2] if len(sys.argv) > 2 else "admin"
+    password  = sys.argv[3] if len(sys.argv) > 3 else "admin123"
     suite = LocalRegressionSuite(base_url)
+    suite._login_credentials = (username, password)  # override defaults before run()
     return suite.run()
 
 

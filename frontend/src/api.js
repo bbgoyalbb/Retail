@@ -73,6 +73,9 @@ export const addAddons = (data) => api.post("/addons", data);
 
 export const getJobwork = (params) => api.get("/jobwork", { params });
 export const moveJobwork = (data) => api.post("/jobwork/move", data);
+export const moveJobworkBack = (data) => api.post("/jobwork/move-back", data);
+export const moveJobworkEmb = (data) => api.post("/jobwork/move-emb", data);
+export const editJobworkEmb = (data) => api.post("/jobwork/edit-emb", data);
 export const getJobworkFilters = () => api.get("/jobwork/filters");
 
 export const getBalances = (params) => api.get("/settlements/balances", { params });

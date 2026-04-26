@@ -21,6 +21,16 @@ module.exports = {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		colors: {
+  			// Brand design tokens — use bg-brand, text-success etc. instead of bg-[var(--brand)]
+  			brand: {
+  				DEFAULT: 'var(--brand)',
+  				hover: 'var(--brand-hover)',
+  				fg: 'var(--brand-fg)',
+  			},
+  			success: 'var(--success)',
+  			warning: 'var(--warning)',
+  			error: 'var(--error)',
+  			info: 'var(--info)',
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

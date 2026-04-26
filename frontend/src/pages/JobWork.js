@@ -1,8 +1,7 @@
 ﻿import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { getJobwork, moveJobwork, getJobworkFilters } from "@/api";
+import { getJobwork, moveJobwork, moveJobworkBack, moveJobworkEmb, editJobworkEmb, getJobworkFilters } from "@/api";
 import { ArrowRight, ArrowLeft, Funnel, X, PencilSimple, CheckSquare } from "@phosphor-icons/react";
-import api from "@/api";
 
 function MoveDialog({ title, onConfirm, onCancel, fields }) {
   const [values, setValues] = useState({});
@@ -211,7 +210,7 @@ export default function JobWork() {
 
   const handleTailoringMoveBack = async (itemIds, currentStatus) => {
     try {
-      await api.post("/jobwork/move-back", { item_ids: itemIds, current_status: currentStatus });
+      await moveJobworkBack({ item_ids: itemIds, current_status: currentStatus });
       loadData();
     } catch (err) {
       toast({ title: "Error", description: err.message || "Failed to move items back", variant: "destructive" });
@@ -220,7 +219,7 @@ export default function JobWork() {
 
   const handleEmbMoveBack = async (itemIds, currentStatus) => {
     try {
-      await api.post("/jobwork/move-back", { item_ids: itemIds, current_status: currentStatus });
+      await moveJobworkBack({ item_ids: itemIds, current_status: currentStatus });
       loadData();
     } catch (err) {
       toast({ title: "Error", description: err.message || "Failed to move items back", variant: "destructive" });
@@ -252,7 +251,7 @@ export default function JobWork() {
       onConfirm: async (values, skips) => {
         try {
           if (!skips.karigar && values.karigar !== undefined) {
-            await api.post("/jobwork/edit-emb", { item_id: item.id, karigar: values.karigar || "" });
+            await editJobworkEmb({ item_id: item.id, karigar: values.karigar || "" });
           }
           setDialog(null);
           loadData();
@@ -285,7 +284,7 @@ export default function JobWork() {
             updates.emb_customer_amount = parseFloat(values.emb_customer);
           }
           if (Object.keys(updates).length > 1) {
-            await api.post("/jobwork/edit-emb", updates);
+            await editJobworkEmb(updates);
           }
           setDialog(null);
           loadData();
@@ -309,7 +308,7 @@ export default function JobWork() {
           const updates = { item_ids: itemIds, new_status: "Finished" };
           if (!skips.emb_labour && values.emb_labour) updates.emb_labour_amount = parseFloat(values.emb_labour);
           if (!skips.emb_customer && values.emb_customer) updates.emb_customer_amount = parseFloat(values.emb_customer);
-          await api.post("/jobwork/move-emb", updates);
+          await moveJobworkEmb(updates);
           setDialog(null);
           loadData();
         } catch (err) {

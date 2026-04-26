@@ -7,7 +7,6 @@ from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -40,33 +39,6 @@ ACCESS_TOKEN_EXPIRE_DAYS = 7
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
 
-
-# --- Models ---
-class UserCreateRequest(BaseModel):
-    username: str
-    password: str
-    full_name: str
-    role: str = "cashier"  # admin, cashier, manager
-    allowed_pages: list = []
-
-
-class UserResponse(BaseModel):
-    username: str
-    full_name: str
-    role: str
-    is_active: bool
-    allowed_pages: list = []
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str
-    user: UserResponse
 
 
 # --- Helpers ---

@@ -103,3 +103,4 @@ start "" "https://!IP!:%BACKEND_PORT%/"
 "%PYTHON%" -m uvicorn server:app --host 0.0.0.0 --port %BACKEND_PORT% --ssl-keyfile ssl.key --ssl-certfile ssl.crt --log-level info
 
 endlocal
+pause

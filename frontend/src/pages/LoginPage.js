@@ -122,13 +122,21 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right side - Fabric texture background (desktop only) */}
-      <div className="hidden lg:block lg:flex-1 relative bg-[#2D2A26]">
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-40"
-          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=1200&q=80')" }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#2D2A26] via-transparent to-transparent" />
+      {/* Right side - decorative panel (desktop only) */}
+      <div className="hidden lg:block lg:flex-1 relative bg-[#2D2A26] overflow-hidden">
+        {/* CSS-only woven fabric pattern — no external dependency */}
+        <div className="absolute inset-0 opacity-20" style={{
+          backgroundImage: `repeating-linear-gradient(
+            45deg,
+            #C86B4D 0px, #C86B4D 1px,
+            transparent 1px, transparent 12px
+          ), repeating-linear-gradient(
+            -45deg,
+            #C86B4D 0px, #C86B4D 1px,
+            transparent 1px, transparent 12px
+          )`
+        }} />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#2D2A26] via-[#2D2A26]/40 to-transparent" />
         <div className="absolute bottom-12 left-12 right-12 text-white">
           <p className="font-heading text-2xl font-light tracking-tight mb-2">Crafted for Fabric Professionals</p>
           <p className="text-sm text-white/70">Manage inventory, tailoring, and settlements in one elegant ledger.</p>

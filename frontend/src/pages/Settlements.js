@@ -46,7 +46,7 @@ export default function Settlements() {
       setBalances(res.data);
       // Don't pre-fill allotments — leave blank so fresh payment drives allocation.
       // User clicks Auto-distribute or enters amounts manually.
-      setAllotFab(""); setAllotTail(""); setAllotEmb(""); setAllotAddon(""); setAllotAdv("");
+      clearAllotments();
     }).catch(() => {});
   }, []);
 
@@ -107,9 +107,14 @@ export default function Settlements() {
 
   const toggleMode = (m) => setSelectedModes(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
 
+  // Helper to clear all allotment fields
+  const clearAllotments = useCallback(() => {
+    setAllotFab(""); setAllotTail(""); setAllotEmb(""); setAllotAddon(""); setAllotAdv("");
+  }, []);
+
   // Auto-distribute: allocate the full pool pro-rata by pending balance across active sections.
   // Works for both normal payments and over-payments (pool > total pending).
-  const autoDistribute = (pool = totalPool) => {
+  const autoDistribute = useCallback((pool = totalPool) => {
     if (pool <= 0) return;
 
     const all = [
@@ -138,16 +143,15 @@ export default function Settlements() {
     // Zero out sections with no balance
     all.filter(s => s.bal <= 0).forEach(s => s.setter(""));
     setAllotAdv("");
-  };
+  }, [balances, totalPool]);
 
-  // Auto-distribute whenever fresh payment changes (and a ref is loaded)
+  // Auto-distribute whenever fresh payment or advance toggle changes (and a ref is loaded)
   useEffect(() => {
     if (!selectedRef) return;
     const pool = (parseFloat(freshPay) || 0) + (useAdvance ? balances.advance : 0);
     if (pool > 0) autoDistribute(pool);
-    else { setAllotFab(""); setAllotTail(""); setAllotEmb(""); setAllotAddon(""); setAllotAdv(""); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [freshPay, useAdvance, selectedRef]);
+    else clearAllotments();
+  }, [freshPay, useAdvance, selectedRef, autoDistribute, clearAllotments]);
 
   // Settle full section
   const settleSection = (section) => {
@@ -176,7 +180,7 @@ export default function Settlements() {
         allot_advance: parseFloat(allotAdv) || 0,
       });
       setMessage({ type: "success", text: "Settlement processed!" });
-      setFreshPay(""); setAllotFab(""); setAllotTail(""); setAllotEmb(""); setAllotAddon(""); setAllotAdv("");
+      setFreshPay(""); clearAllotments();
       setSelectedModes([]);
       setSelectedCustomer(""); setSelectedRef(""); setSelectedOrder(""); setOrderInfo(null);
       setBalances({ fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0 });
@@ -201,7 +205,7 @@ export default function Settlements() {
     setSelectedCustomer(""); setSelectedRef(""); setSelectedOrder("");
     setOrderInfo(null);
     setBalances({ fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0 });
-    setAllotFab(""); setAllotTail(""); setAllotEmb(""); setAllotAddon(""); setAllotAdv("");
+    clearAllotments();
     setFreshPay("");
     setUseAdvance(false);
     setSelectedModes([]);

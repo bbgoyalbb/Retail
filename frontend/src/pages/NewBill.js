@@ -8,34 +8,87 @@ import InvoiceModal from "@/components/InvoiceModal";
 export default function NewBill() {
   const navigate = useNavigate();
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
-  const [customers, setCustomers] = useState([]);
-  const [articleTypes, setArticleTypes] = useState(["Shirt", "Pant", "Kurta"]);
-  const [addonItems, setAddonItems] = useState(["Buttons", "Tie", "Bow"]);
-  const [paymentModes, setPaymentModes] = useState(["Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer"]);
-  const [customerName, setCustomerName] = useState("");
-  const [orderDate, setOrderDate] = useState(today);
-  const [payDate, setPayDate] = useState(today);
+  // App config loaded from settings
+  const [config, setConfig] = useState({
+    customers: [],
+    articleTypes: ["Shirt", "Pant", "Kurta"],
+    addonItems: ["Buttons", "Tie", "Bow"],
+    paymentModes: ["Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer"],
+  });
+
+  // Bill-level form fields
+  const [billForm, setBillForm] = useState({
+    customerName: "",
+    orderDate: today,
+    payDate: today,
+    amountPaid: "",
+    selectedModes: [],
+    isSettled: false,
+    needsTailoring: false,
+  });
+
+  // Current item being added/edited
+  const [itemForm, setItemForm] = useState({
+    barcode: "",
+    qty: "",
+    price: "",
+    discount: "",
+    editingIndex: null,
+  });
+
+  // Saved items in the bill
   const [items, setItems] = useState([]);
-  const [barcode, setBarcode] = useState("");
-  const [qty, setQty] = useState("");
-  const [price, setPrice] = useState("");
-  const [discount, setDiscount] = useState("");
-  const [editingIndex, setEditingIndex] = useState(null);
-  const [amountPaid, setAmountPaid] = useState("");
-  const [selectedModes, setSelectedModes] = useState([]);
-  const [isSettled, setIsSettled] = useState(false);
-  const [needsTailoring, setNeedsTailoring] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState(null);
-  const [showScanner, setShowScanner] = useState(false);
-  const [lastBillRef, setLastBillRef] = useState(null);
-  const [lastBillTotal, setLastBillTotal] = useState(0);
-  const [showPostSave, setShowPostSave] = useState(false);
-  const [showInvoice, setShowInvoice] = useState(false);
-  const [showTailoringModal, setShowTailoringModal] = useState(false);
-  const [showAddonModal, setShowAddonModal] = useState(false);
-  const [dupWarning, setDupWarning] = useState(null);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // UI / modal state
+  const [ui, setUi] = useState({
+    saving: false,
+    message: null,
+    showScanner: false,
+    showPostSave: false,
+    showInvoice: false,
+    showTailoringModal: false,
+    showAddonModal: false,
+    dupWarning: null,
+    showSuggestions: false,
+    lastBillRef: null,
+    lastBillTotal: 0,
+  });
+
+  // Convenience updaters to avoid spreading manually every time
+  const updateBillForm  = (key, val) => setBillForm(p  => ({ ...p, [key]: val }));
+  const updateItemForm  = (key, val) => setItemForm(p  => ({ ...p, [key]: val }));
+  const updateUi        = (key, val) => setUi(p        => ({ ...p, [key]: val }));
+
+  // Destructure for backwards-compatible local names used throughout the component
+  const { customers, articleTypes, addonItems, paymentModes } = config;
+  const { customerName, orderDate, payDate, amountPaid, selectedModes, isSettled, needsTailoring } = billForm;
+  const { barcode, qty, price, discount, editingIndex } = itemForm;
+  const { saving, message, showScanner, showPostSave, showInvoice, showTailoringModal, showAddonModal, dupWarning, showSuggestions, lastBillRef, lastBillTotal } = ui;
+
+  // Setters that match the old individual-useState API so the rest of the file needs no changes
+  const setCustomerName    = (v) => updateBillForm("customerName", v);
+  const setOrderDate       = (v) => updateBillForm("orderDate", v);
+  const setPayDate         = (v) => updateBillForm("payDate", v);
+  const setAmountPaid      = (v) => updateBillForm("amountPaid", v);
+  const setSelectedModes   = (v) => updateBillForm("selectedModes", typeof v === "function" ? v(selectedModes) : v);
+  const setIsSettled       = (v) => updateBillForm("isSettled", v);
+  const setNeedsTailoring  = (v) => updateBillForm("needsTailoring", v);
+  const setBarcode         = (v) => updateItemForm("barcode", v);
+  const setQty             = (v) => updateItemForm("qty", v);
+  const setPrice           = (v) => updateItemForm("price", v);
+  const setDiscount        = (v) => updateItemForm("discount", v);
+  const setEditingIndex    = (v) => updateItemForm("editingIndex", v);
+  const setSaving          = (v) => updateUi("saving", v);
+  const setMessage         = (v) => updateUi("message", v);
+  const setShowScanner     = (v) => updateUi("showScanner", v);
+  const setShowPostSave    = (v) => updateUi("showPostSave", v);
+  const setShowInvoice     = (v) => updateUi("showInvoice", v);
+  const setShowTailoringModal = (v) => updateUi("showTailoringModal", v);
+  const setShowAddonModal  = (v) => updateUi("showAddonModal", v);
+  const setDupWarning      = (v) => updateUi("dupWarning", v);
+  const setShowSuggestions = (v) => updateUi("showSuggestions", v);
+  const setLastBillRef     = (v) => updateUi("lastBillRef", v);
+  const setLastBillTotal   = (v) => updateUi("lastBillTotal", v);
   const nameWrapRef = useRef(null);
 
   const nameSuggestions = customerName.trim()
@@ -62,12 +115,15 @@ export default function NewBill() {
   const saveBtnRef = useRef(null);
 
   useEffect(() => {
-    getCustomers().then(res => setCustomers(res.data || [])).catch(() => {});
+    getCustomers().then(res => setConfig(p => ({ ...p, customers: res.data || [] }))).catch(() => {});
     getSettings().then(res => {
       const s = res.data || {};
-      if (Array.isArray(s.article_types) && s.article_types.length > 0) setArticleTypes(s.article_types);
-      if (Array.isArray(s.addon_items) && s.addon_items.length > 0) setAddonItems(s.addon_items);
-      if (Array.isArray(s.payment_modes) && s.payment_modes.length > 0) setPaymentModes(s.payment_modes);
+      setConfig(p => ({
+        ...p,
+        ...(Array.isArray(s.article_types) && s.article_types.length > 0 ? { articleTypes: s.article_types } : {}),
+        ...(Array.isArray(s.addon_items)    && s.addon_items.length > 0    ? { addonItems: s.addon_items }       : {}),
+        ...(Array.isArray(s.payment_modes)  && s.payment_modes.length > 0  ? { paymentModes: s.payment_modes }   : {}),
+      }));
     }).catch(() => {});
   }, []);
 

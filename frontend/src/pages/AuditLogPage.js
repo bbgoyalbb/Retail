@@ -37,7 +37,7 @@ export default function AuditLogPage() {
 
   // Load users for filter dropdown
   useEffect(() => {
-    listUsers().then(res => setUsers(res.data || [])).catch(() => setUsers([]));
+    listUsers().then(res => setUsers(res || [])).catch(() => setUsers([]));
   }, []);
 
   const fetchLogs = useCallback(async (pageNum = 0, currentFilters = null) => {
