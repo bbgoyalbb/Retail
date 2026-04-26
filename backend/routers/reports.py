@@ -450,28 +450,21 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     margin-top: 3px;
     line-height: 1.4;
   }}
-  .hdr-tnc {{
-    font-size: 8px;
-    color: #555;
-    margin-top: 5px;
-    border-top: 1px solid #ddd;
-    padding-top: 4px;
-    line-height: 1.5;
-  }}
-
   /* ── BILL-TO / INVOICE DETAILS ── */
   .inv-billto {{
-    background: #1a1a1a;
-    color: #fff;
+    background: #fff;
+    color: #111;
     padding: 10px 18px;
     display: flex;
     gap: 0;
+    border: 2px solid #111;
+    margin: 0;
   }}
   .bt-col {{
     flex: 1;
   }}
   .bt-col + .bt-col {{
-    border-left: 1px solid #444;
+    border-left: 1px solid #bbb;
     padding-left: 14px;
     margin-left: 14px;
   }}
@@ -479,32 +472,36 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     font-size: 7.5px;
     text-transform: uppercase;
     letter-spacing: 0.18em;
-    color: #999;
+    color: #555;
     display: block;
     margin-bottom: 2px;
   }}
   .bt-val {{
     font-size: 12px;
     font-weight: 700;
-    color: #fff;
+    color: #111;
   }}
   .bt-val.small {{
     font-size: 10px;
-    font-weight: 500;
+    font-weight: 600;
+    color: #111;
   }}
 
   /* ── SECTION BLOCKS ── */
   .sec-block {{
-    border-top: 1px solid #ddd;
+    border-top: 2px solid #111;
+    margin-top: 6px;
   }}
   .sec-head {{
-    font-size: 8px;
-    font-weight: 700;
+    font-size: 9px;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.2em;
-    color: #fff;
-    background: #333;
-    padding: 4px 18px;
+    letter-spacing: 0.25em;
+    color: #111;
+    background: #fff;
+    padding: 6px 18px 4px;
+    border-left: 4px solid #111;
+    border-bottom: 1px solid #ccc;
   }}
   .sec-block table {{
     width: 100%;
@@ -516,7 +513,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     letter-spacing: 0.1em;
     font-weight: 700;
     color: #fff;
-    background: #555;
+    background: #444;
     padding: 5px 6px;
     white-space: nowrap;
   }}
@@ -595,26 +592,37 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
   .inv-footer {{
     margin-top: auto;
     border-top: 1.5px solid #111;
-    padding: 10px 18px;
+    padding: 10px 18px 8px;
+  }}
+  .footer-top {{
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
     gap: 12px;
-  }}
-  .footer-thanks {{
-    font-size: 10px;
-    font-weight: 700;
-    color: #111;
-    flex: 1;
+    margin-bottom: 8px;
   }}
   .footer-sig {{
-    font-size: 8.5px;
-    color: #555;
-    text-align: right;
+    font-size: 9px;
+    font-weight: 700;
+    color: #111;
+    text-align: center;
     border-top: 1px solid #aaa;
-    padding-top: 20px;
-    min-width: 90px;
+    padding-top: 22px;
+    min-width: 100px;
   }}
+  .footer-thanks {{
+    font-size: 11px;
+    font-weight: 800;
+    color: #111;
+  }}
+  .footer-tnc {{
+    border-top: 1px solid #ddd;
+    padding-top: 6px;
+    font-size: 7.5px;
+    color: #555;
+    line-height: 1.6;
+  }}
+  .footer-tnc strong {{ color: #111; font-size: 8px; }}
 
   /* ── PRINT ── */
   @media print {{
@@ -622,8 +630,6 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     .inv {{ width: 100%; min-height: 100vh; border: none; box-shadow: none; }}
     @page {{ size: A5; margin: 8mm 10mm; }}
     /* Force background colors/images to print on mobile Chrome & Safari */
-    .inv-billto,
-    .sec-head,
     .sec-block th,
     .inv-grand,
     .inv-pay-section .sec-head {{
@@ -636,16 +642,12 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
 <body>
 <div class="inv">
 
-  <!-- Header: Logo + Firm Name + Address + T&C -->
+  <!-- Header: Logo + Firm Name + Address -->
   <div class="inv-hdr">
     {logo_tag}
     <div class="hdr-firm">
       <h2>{firm_name}</h2>
       <div class="addr">{firm_address}<br/>Ph: {firm_phones}&nbsp;&nbsp;GSTIN: {firm_gstin}</div>
-      <div class="hdr-tnc">
-        <strong>T&amp;C:</strong> All disputes subject to local jurisdiction. Goods once sold will not be taken back.
-        Payment due within 30 days. GSTIN: {firm_gstin}
-      </div>
     </div>
   </div>
 
@@ -719,8 +721,16 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
 
   <!-- Footer -->
   <div class="inv-footer">
-    <div class="footer-thanks">Thank you for your business!</div>
-    <div class="footer-sig">Authorised Signatory</div>
+    <div class="footer-top">
+      <div class="footer-thanks">Thank you for your business!</div>
+      <div class="footer-sig">Authorised Signatory</div>
+    </div>
+    <div class="footer-tnc">
+      <strong>Terms &amp; Conditions:</strong> All disputes are subject to local jurisdiction only. &nbsp;|
+      Goods once sold will not be taken back or exchanged. &nbsp;|
+      Payment is due within 30 days of the bill date. &nbsp;|
+      We are not responsible for any damage after delivery.
+    </div>
   </div>
 
 </div>
