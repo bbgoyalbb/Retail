@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { getDashboard } from "@/api";
 import { fmt } from "@/lib/fmt";
-import { useToast } from "@/hooks/use-toast";
-import { CurrencyDollar, Scissors, UsersThree, TrendUp, ArrowsClockwise, Receipt } from "@phosphor-icons/react";
+import { CurrencyDollar, Scissors, UsersThree, TrendUp, ArrowsClockwise, Receipt, Warning, CalendarCheck, ChartBar, BookOpen, ArrowRight } from "@phosphor-icons/react";
 import { EmptyState } from "@/components/EmptyState";
 
 function Sparkline({ data, color = "var(--success)", width = 60, height = 24 }) {
@@ -58,6 +58,7 @@ function StatCard({ icon: Icon, label, value, sub, color = "var(--brand)", trend
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -105,99 +106,122 @@ export default function Dashboard() {
   );
 
 
+  const totalPending = (data.fabric_pending_amount || 0) + (data.tailoring_pending_amount || 0) + (data.embroidery_pending_amount || 0) + (data.addon_pending_amount || 0);
+
   return (
-    <div data-testid="dashboard-page" className="space-y-8">
+    <div data-testid="dashboard-page" className="space-y-6">
+
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight text-[var(--text-primary)]">Dashboard</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">Business overview at a glance</p>
         </div>
-        <button
-          onClick={() => fetchData(true)}
-          disabled={refreshing}
-          title="Refresh"
-          className="p-2 rounded-sm border border-[var(--border-subtle)] hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
-        >
+        <button onClick={() => fetchData(true)} disabled={refreshing} title="Refresh"
+          className="p-2 rounded-sm border border-[var(--border-subtle)] hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50">
           <ArrowsClockwise size={16} className={refreshing ? "animate-spin" : ""} />
         </button>
       </div>
 
       {data.total_items === 0 && (
-        <EmptyState
-          title="Welcome to your Dashboard"
-          description="Get started by creating your first bill. Your business overview will appear here."
-          action="Create First Bill"
-          onAction={() => window.location.href = '/new-bill'}
-        />
+        <EmptyState title="Welcome to your Dashboard" description="Get started by creating your first bill. Your business overview will appear here."
+          action="Create First Bill" onAction={() => navigate('/new-bill')} />
       )}
 
+      {/* Today's Summary Banner */}
+      {data.total_items > 0 && (
+        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm px-5 py-3.5 flex flex-wrap items-center gap-x-8 gap-y-2">
+          <div className="flex items-center gap-2">
+            <CalendarCheck size={16} className="text-[var(--brand)]" weight="duotone" />
+            <span className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Today</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-[var(--text-secondary)]">Bills</span>
+            <span className="font-heading text-lg font-semibold text-[var(--text-primary)]">{data.today_bills_count ?? 0}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-[var(--text-secondary)]">Collected</span>
+            <span className="font-heading text-lg font-semibold text-[var(--success)]">₹{fmt(data.today_collected ?? 0)}</span>
+          </div>
+          <button onClick={() => navigate('/new-bill')}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] transition-colors font-medium">
+            <Receipt size={13} weight="bold" /> New Bill
+          </button>
+        </div>
+      )}
+
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard 
-          icon={TrendUp} 
-          label="Revenue Collected" 
-          value={`₹${fmt(data.total_revenue)}`} 
-          sub={`${data.total_items} transactions`} 
-          color="var(--success)" 
-          trend={data.revenue_trend} 
-        />
-        <StatCard icon={CurrencyDollar} label="Fabric Pending" value={`₹${fmt(data.fabric_pending_amount)}`} sub="Outstanding payments" color="var(--warning)" />
-        <StatCard icon={Scissors} label="Tailoring Pending" value={`₹${fmt(data.tailoring_pending_amount)}`} sub={`${data.tailoring_pending_count} items in queue`} color="var(--info)" />
-        <StatCard icon={UsersThree} label="Customers" value={data.unique_customers} sub={`${data.total_advances} advances`} color="var(--brand)" />
+        <StatCard icon={TrendUp} label="Revenue Collected" value={`₹${fmt(data.total_revenue)}`}
+          sub={`${data.total_items} transactions`} color="var(--success)" trend={data.revenue_trend} />
+        <StatCard icon={Warning} label="Total Outstanding" value={`₹${fmt(totalPending)}`}
+          sub="All pending payments" color="var(--error)" />
+        <StatCard icon={Scissors} label="Tailoring Queue" value={data.tailoring_pending_count}
+          sub={`${data.tailoring_stitched_count} stitched, ready to deliver`} color="var(--info)" />
+        <StatCard icon={UsersThree} label="Customers" value={data.unique_customers}
+          sub={`₹${fmt(data.total_advances_amount)} in advances`} color="var(--brand)" />
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "New Bill", icon: Receipt, path: "/new-bill", color: "var(--brand)" },
+          { label: "Settlements", icon: CurrencyDollar, path: "/settlements", color: "var(--success)" },
+          { label: "Reports", icon: ChartBar, path: "/reports", color: "var(--info)" },
+          { label: "Daybook", icon: BookOpen, path: "/daybook", color: "var(--warning)" },
+        ].map(({ label, icon: Icon, path, color }) => (
+          <button key={path} onClick={() => navigate(path)}
+            className="flex items-center gap-3 px-4 py-3 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:bg-[#C86B4D06] transition-all group text-left">
+            <div className="p-2 rounded-sm flex-shrink-0" style={{ background: `${color}15` }}>
+              <Icon size={16} weight="duotone" style={{ color }} />
+            </div>
+            <span className="text-sm font-medium text-[var(--text-primary)] truncate">{label}</span>
+            <ArrowRight size={13} className="ml-auto text-[var(--border-strong)] group-hover:text-[var(--brand)] transition-colors flex-shrink-0" />
+          </button>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Job Work Status */}
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
-          <h3 className="font-heading text-lg font-medium tracking-tight mb-4">Job Work Status</h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between py-2 border-b border-[var(--border-subtle)]">
-              <span className="text-sm text-[var(--text-secondary)]">Tailoring - Pending</span>
-              <span className="font-mono text-sm font-medium">{data.tailoring_pending_count}</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-[var(--border-subtle)]">
-              <span className="text-sm text-[var(--text-secondary)]">Tailoring - Stitched</span>
-              <span className="font-mono text-sm font-medium text-[var(--success)]">{data.tailoring_stitched_count}</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-[var(--border-subtle)]">
-              <span className="text-sm text-[var(--text-secondary)]">Embroidery - Required</span>
-              <span className="font-mono text-sm font-medium">{data.embroidery_required_count}</span>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <span className="text-sm text-[var(--text-secondary)]">Embroidery - In Progress</span>
-              <span className="font-mono text-sm font-medium text-[var(--info)]">{data.embroidery_inprogress_count}</span>
-            </div>
+        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-5 rounded-sm">
+          <h3 className="font-heading text-base font-medium tracking-tight mb-4">Job Work Status</h3>
+          <div className="space-y-0">
+            {[
+              { label: "Tailoring — Pending", value: data.tailoring_pending_count, color: "var(--warning)" },
+              { label: "Tailoring — Stitched", value: data.tailoring_stitched_count, color: "var(--success)" },
+              { label: "Embroidery — Required", value: data.embroidery_required_count, color: "var(--info)" },
+              { label: "Embroidery — In Progress", value: data.embroidery_inprogress_count, color: "var(--brand)" },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="flex items-center justify-between py-2.5 border-b border-[var(--border-subtle)] last:border-0">
+                <span className="text-sm text-[var(--text-secondary)]">{label}</span>
+                <span className="font-mono text-sm font-semibold" style={{ color }}>{value}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Pending Summary */}
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
-          <h3 className="font-heading text-lg font-medium tracking-tight mb-4">Pending Amounts</h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between py-2 border-b border-[var(--border-subtle)]">
-              <span className="text-sm text-[var(--text-secondary)]">Fabric</span>
-              <span className="font-mono text-sm font-medium text-[var(--warning)]">₹{fmt(data.fabric_pending_amount)}</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-[var(--border-subtle)]">
-              <span className="text-sm text-[var(--text-secondary)]">Tailoring</span>
-              <span className="font-mono text-sm font-medium text-[var(--warning)]">₹{fmt(data.tailoring_pending_amount)}</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-[var(--border-subtle)]">
-              <span className="text-sm text-[var(--text-secondary)]">Embroidery</span>
-              <span className="font-mono text-sm font-medium text-[var(--warning)]">₹{fmt(data.embroidery_pending_amount)}</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-[var(--border-subtle)]">
-              <span className="text-sm text-[var(--text-secondary)]">Add-on</span>
-              <span className="font-mono text-sm font-medium text-[var(--warning)]">₹{fmt(data.addon_pending_amount)}</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-[var(--border-subtle)]">
+        {/* Pending Breakdown */}
+        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-5 rounded-sm">
+          <h3 className="font-heading text-base font-medium tracking-tight mb-4">Pending Breakdown</h3>
+          <div className="space-y-0">
+            {[
+              { label: "Fabric", value: data.fabric_pending_amount },
+              { label: "Tailoring", value: data.tailoring_pending_amount },
+              { label: "Embroidery", value: data.embroidery_pending_amount },
+              { label: "Add-on", value: data.addon_pending_amount },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex items-center justify-between py-2.5 border-b border-[var(--border-subtle)]">
+                <span className="text-sm text-[var(--text-secondary)]">{label}</span>
+                <span className="font-mono text-sm font-medium text-[var(--warning)]">₹{fmt(value)}</span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between py-2.5 border-b border-[var(--border-subtle)]">
               <span className="text-sm text-[var(--text-secondary)]">Advances Balance</span>
               <span className="font-mono text-sm font-medium text-[var(--success)]">₹{fmt(data.total_advances_amount)}</span>
             </div>
-            <div className="flex items-center justify-between py-2 font-medium">
-              <span className="text-sm">Total Pending</span>
-              <span className="font-mono text-base text-[var(--error)]">
-                ₹{fmt((data.fabric_pending_amount || 0) + (data.tailoring_pending_amount || 0) + (data.embroidery_pending_amount || 0) + (data.addon_pending_amount || 0))}
-              </span>
+            <div className="flex items-center justify-between pt-3 font-semibold">
+              <span className="text-sm">Total Outstanding</span>
+              <span className="font-mono text-base text-[var(--error)]">₹{fmt(totalPending)}</span>
             </div>
           </div>
         </div>
@@ -205,49 +229,43 @@ export default function Dashboard() {
 
       {/* Recent Transactions */}
       <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm">
-        <div className="px-4 py-3 sm:p-6 border-b border-[var(--border-subtle)]">
-          <h3 className="font-heading text-base sm:text-lg font-medium tracking-tight">Recent Transactions</h3>
+        <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
+          <h3 className="font-heading text-base font-medium tracking-tight">Recent Transactions</h3>
+          <button onClick={() => navigate('/items')} className="flex items-center gap-1 text-xs text-[var(--brand)] hover:underline">
+            View all <ArrowRight size={12} />
+          </button>
         </div>
-        {(!data.recent_items || data.recent_items.length === 0) && (
+        {(!data.recent_items || data.recent_items.length === 0) ? (
           <div className="flex flex-col items-center justify-center py-14 gap-3">
-            <div className="p-4 rounded-sm" style={{ background: "var(--bg)" }}>
-              <Receipt size={28} className="text-[var(--border-strong)]" weight="duotone" />
-            </div>
+            <Receipt size={28} className="text-[var(--border-strong)]" weight="duotone" />
             <p className="text-sm text-[var(--text-secondary)]">No recent transactions found.</p>
           </div>
-        )}
-        <div className="overflow-x-auto">
-          <table className="w-full" data-testid="recent-transactions-table">
-            <thead>
-              <tr className="bg-[var(--bg)]">
-                <th className="text-left px-3 sm:px-4 py-3 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Date</th>
-                <th className="text-left px-3 sm:px-4 py-3 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Customer</th>
-                <th className="hidden sm:table-cell text-left px-4 py-3 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Ref</th>
-                <th className="hidden md:table-cell text-left px-4 py-3 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Item</th>
-                <th className="text-right px-3 sm:px-4 py-3 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Amount</th>
-                <th className="text-left px-3 sm:px-4 py-3 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.recent_items?.map((item, i) => (
-                <tr key={i} className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D08] transition-colors">
-                  <td className="px-3 sm:px-4 py-3 font-mono text-xs sm:text-sm">{item.date}</td>
-                  <td className="px-3 sm:px-4 py-3 text-sm font-medium max-w-[100px] sm:max-w-none truncate">{item.name}</td>
-                  <td className="hidden sm:table-cell px-4 py-3 font-mono text-sm text-[var(--text-secondary)]">{item.ref}</td>
-                  <td className="hidden md:table-cell px-4 py-3 text-sm">{item.barcode}</td>
-                  <td className="px-3 sm:px-4 py-3 font-mono text-xs sm:text-sm text-right">₹{fmt(item.fabric_amount)}</td>
-                  <td className="px-3 sm:px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 sm:gap-1.5 text-xs font-medium uppercase tracking-wider
-                      ${item.fabric_pay_mode?.startsWith('Settled') ? 'text-[var(--success)]' : 'text-[var(--warning)]'}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${item.fabric_pay_mode?.startsWith('Settled') ? 'bg-[var(--success)]' : 'bg-[var(--warning)]'}`} />
-                      <span className="hidden xs:inline">{item.fabric_pay_mode?.startsWith('Settled') ? 'Settled' : 'Pending'}</span>
-                    </span>
-                  </td>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full" data-testid="recent-transactions-table">
+              <thead>
+                <tr className="bg-[var(--bg)]">
+                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Date</th>
+                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Customer</th>
+                  <th className="hidden sm:table-cell text-left px-4 py-3 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Ref</th>
+                  <th className="hidden md:table-cell text-center px-4 py-3 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Items</th>
+                  <th className="text-right px-4 py-3 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {data.recent_items.map((item, i) => (
+                  <tr key={i} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D06] transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs text-[var(--text-secondary)]">{item.date}</td>
+                    <td className="px-4 py-3 text-sm font-medium truncate max-w-[140px]">{item.name}</td>
+                    <td className="hidden sm:table-cell px-4 py-3 font-mono text-xs text-[var(--brand)]">{item.ref}</td>
+                    <td className="hidden md:table-cell px-4 py-3 text-xs text-center text-[var(--text-secondary)]">{item.item_count}</td>
+                    <td className="px-4 py-3 font-mono text-sm text-right font-medium">₹{fmt(item.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

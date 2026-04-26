@@ -165,6 +165,8 @@ async def get_dashboard(current_user: dict = Depends(get_current_user_dep)):
     # Build 7-day date list for trend
     days = [(date.today() - timedelta(days=i)).isoformat() for i in range(6, -1, -1)]
 
+    today = date.today().isoformat()
+
     # Single $facet aggregation covers all pending sums, status counts, revenue, trend — 1 DB round trip
     facet_pipeline = [{"$facet": {
         "fab_pending":  [{"$match": {"fabric_amount":     {"$gt": 0}, "fabric_pay_mode":     _ns}}, {"$group": {"_id": None, "t": {"$sum": "$fabric_pending"}}}],
@@ -179,14 +181,20 @@ async def get_dashboard(current_user: dict = Depends(get_current_user_dep)):
         "trend":        [{"$match": {"date": {"$in": days}}}, {"$group": {"_id": "$date", "t": {"$sum": "$fabric_received"}}}],
         "customers":    [{"$group": {"_id": "$name"}}],
         "total_ct":     [{"$count": "n"}],
+        "today_refs":   [{"$match": {"date": today}}, {"$group": {"_id": "$ref"}}],
+        "today_collected": [{"$match": {"date": today}}, {"$group": {"_id": None,
+            "t": {"$sum": {"$add": ["$fabric_received", "$tailoring_received", "$embroidery_received", "$addon_received"]}}
+        }}],
     }}]
 
     pipeline_recent = [
         {"$sort": {"date": -1, "ref": -1}},
-        {"$group": {"_id": "$ref", "date": {"$first": "$date"}, "name": {"$first": "$name"}, "fabric_total": {"$sum": "$fabric_amount"}, "item_count": {"$sum": 1}}},
+        {"$group": {"_id": "$ref", "date": {"$first": "$date"}, "name": {"$first": "$name"},
+            "total": {"$sum": {"$add": ["$fabric_amount", "$tailoring_amount", "$embroidery_amount", "$addon_amount"]}},
+            "item_count": {"$sum": 1}}},
         {"$sort": {"date": -1}},
         {"$limit": 10},
-        {"$project": {"_id": 0, "ref": "$_id", "date": 1, "name": 1, "fabric_total": 1, "item_count": 1}}
+        {"$project": {"_id": 0, "ref": "$_id", "date": 1, "name": 1, "total": 1, "item_count": 1}}
     ]
     pipeline_adv = [{"$facet": {
         "total_ct":  [{"$count": "n"}],
@@ -221,6 +229,8 @@ async def get_dashboard(current_user: dict = Depends(get_current_user_dep)):
         "unique_customers":          len(f.get("customers", [])),
         "total_revenue":             f["revenue"][0]["t"]       if f.get("revenue")      else 0,
         "total_advances_amount":     a["total_amt"][0]["t"]    if a.get("total_amt")    else 0,
+        "today_bills_count":         len(f.get("today_refs", [])),
+        "today_collected":           f["today_collected"][0]["t"] if f.get("today_collected") else 0,
         "recent_items":              recent_items,
     }
 

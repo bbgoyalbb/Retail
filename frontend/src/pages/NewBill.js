@@ -114,6 +114,8 @@ export default function NewBill() {
   const tailoringRef = useRef(null);
   const saveBtnRef = useRef(null);
 
+  useEffect(() => { setTimeout(() => nameRef.current?.focus(), 100); }, []);
+
   useEffect(() => {
     getCustomers().then(res => setConfig(p => ({ ...p, customers: res.data || [] }))).catch(() => {});
     getSettings().then(res => {
