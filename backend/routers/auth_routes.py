@@ -59,7 +59,11 @@ router = APIRouter()
 async def get_public_settings():
     settings = await db.settings.find_one({"key": "app_settings"}, {"_id": 0})
     merged = merge_settings(settings)
-    return {"firm_name": merged.get("firm_name", "Retail Book")}
+    return {
+        "firm_name": merged.get("firm_name", "Retail Book"),
+        "firm_logo": merged.get("firm_logo"),
+        "firm_name_color": merged.get("firm_name_color", "#C86B4D"),
+    }
 
 @router.get("/settings")
 async def get_settings(current_user: dict = Depends(get_current_user_dep)):

@@ -123,8 +123,11 @@ export const createItem = (data) => api.post("/items", data);
 // Search
 export const searchItems = (params) => api.get("/search", { params });
 
-// Invoice (HTML only)
-export const getInvoiceUrl = (ref) => `${BACKEND_URL}/api/invoice?ref=${encodeURIComponent(ref)}`;
+// Auth token helper for direct URL links (iframe / anchor href)
+const _authToken = () => { try { return localStorage.getItem("token") || ""; } catch { return ""; } };
+
+// Invoice (HTML only) — include token so iframe/direct links authenticate
+export const getInvoiceUrl = (ref) => { const t = _authToken(); return `${BACKEND_URL}/api/invoice?ref=${encodeURIComponent(ref)}${t ? `&token=${encodeURIComponent(t)}` : ''}`; };
 
 // Reports
 export const getRevenueReport = (params) => api.get("/reports/revenue", { params });
@@ -133,7 +136,6 @@ export const getSummaryReport = (params) => api.get("/reports/summary", { params
 
 // Import / Export / Backup
 export const importExcel = (formData, mode) => api.post(`/import/excel?mode=${mode}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-const _authToken = () => { try { return localStorage.getItem("token") || ""; } catch { return ""; } };
 export const exportExcelUrl = () => { const t = _authToken(); return `${BACKEND_URL}/api/export/excel${t ? `?token=${encodeURIComponent(t)}` : ''}`; };
 export const backupUrl = () => { const t = _authToken(); return `${BACKEND_URL}/api/backup${t ? `?token=${encodeURIComponent(t)}` : ''}`; };
 export const restoreBackup = (formData) => api.post("/restore", formData, { headers: { 'Content-Type': 'multipart/form-data' } });

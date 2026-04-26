@@ -5,7 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useTheme } from "@/components/ThemeProvider";
 
 import { useAuth } from "@/context/AuthContext";
-import { getDaybookPendingCount } from "@/api";
+import { getDaybookPendingCount, getPublicSettings } from "@/api";
 
 import {
 
@@ -83,6 +83,15 @@ export default function Sidebar({ open, setOpen }) {
 
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [daybookPending, setDaybookPending] = useState(0);
+  const [firmLogo, setFirmLogo] = useState(null);
+  const [firmName, setFirmName] = useState("Retail Book");
+
+  useEffect(() => {
+    getPublicSettings().then(s => {
+      if (s?.firm_logo) setFirmLogo(s.firm_logo);
+      if (s?.firm_name) setFirmName(s.firm_name);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const fetch = () => getDaybookPendingCount().then(r => setDaybookPending(r.data?.count || 0)).catch(() => {});
@@ -167,9 +176,12 @@ export default function Sidebar({ open, setOpen }) {
 
           <div className={`flex items-center gap-3 overflow-hidden ${collapsed ? 'justify-center w-full' : ''}`}>
 
-            <div className="w-8 h-8 flex-shrink-0 rounded-sm flex items-center justify-center" style={{ background: "var(--brand)" }}>
+            <div className="w-8 h-8 flex-shrink-0 rounded-sm overflow-hidden" style={{ background: "var(--brand)" }}>
 
-              <span className="text-white font-serif font-bold text-lg leading-none">R</span>
+              {firmLogo
+                ? <img src={firmLogo.startsWith("http") ? firmLogo : `${window.location.origin}${firmLogo}`} alt="logo" className="w-full h-full object-contain" />
+                : <span className="w-full h-full flex items-center justify-center text-white font-serif font-bold text-lg leading-none">{firmName.charAt(0).toUpperCase()}</span>
+              }
 
             </div>
 
@@ -179,7 +191,7 @@ export default function Sidebar({ open, setOpen }) {
 
                 <h1 className="font-heading text-base font-semibold tracking-tight text-[var(--text-primary)] truncate">
 
-                  Retail Book
+                  {firmName}
 
                 </h1>
 
