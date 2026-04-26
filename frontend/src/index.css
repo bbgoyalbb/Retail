@@ -252,3 +252,9 @@ button, a, [role="button"] {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
+
+/* iOS: Use dynamic viewport height for overlays so keyboard doesn't break layout */
+.sidebar-overlay,
+.modal-overlay {
+  height: 100dvh;
+}

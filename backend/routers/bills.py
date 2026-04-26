@@ -228,8 +228,21 @@ async def get_dashboard(current_user: dict = Depends(get_current_user_dep)):
     ]
     recent_items = await db.items.aggregate(pipeline_recent).to_list(10)
 
+    # 7-day revenue sparkline trend
+    from datetime import date, timedelta
+    trend_data = []
+    for i in range(6, -1, -1):
+        day = (date.today() - timedelta(days=i)).isoformat()
+        day_pipeline = [
+            {"$match": {"date": day}},
+            {"$group": {"_id": None, "total": {"$sum": "$fabric_received"}}}
+        ]
+        day_result = await db.items.aggregate(day_pipeline).to_list(1)
+        trend_data.append(day_result[0]["total"] if day_result else 0)
+
     return {
         "total_items": total_items,
+        "revenue_trend": trend_data,
         "total_advances": total_advances,
         "fabric_pending_amount": fab_pending[0]["total"] if fab_pending else 0,
         "tailoring_pending_amount": tail_pending[0]["total"] if tail_pending else 0,

@@ -47,7 +47,14 @@ _deps.set_db(db)
 # ==========================================
 # APP
 # ==========================================
-app = FastAPI(title="Retail Management API", version="2.0.0")
+_debug = os.environ.get("DEBUG", "false").lower() == "true"
+app = FastAPI(
+    title="Retail Management API",
+    version="2.0.0",
+    docs_url="/docs" if _debug else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if _debug else None,
+)
 
 # Max upload size: 50 MB
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024

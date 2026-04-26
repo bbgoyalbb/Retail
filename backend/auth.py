@@ -34,7 +34,7 @@ def _load_or_create_secret() -> str:
 
 SECRET_KEY = _load_or_create_secret()
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = 7
+ACCESS_TOKEN_EXPIRE_DAYS = 1  # Reduced from 7 for security
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)

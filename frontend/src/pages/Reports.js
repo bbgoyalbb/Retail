@@ -4,7 +4,20 @@ import { fmt } from "@/lib/fmt";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
 import { ChartBar, Users, TrendUp, Warning } from "@phosphor-icons/react";
 
-const COLORS = ["#C86B4D", "#455D4A", "#5C8A9E", "#D49842", "#9E473D", "#6C6760", "#B35A3E"];
+// CSS-variable-aware chart colours — respond to dark/light mode
+const getChartColors = () => {
+  const s = getComputedStyle(document.documentElement);
+  return [
+    s.getPropertyValue("--brand").trim()       || "#C86B4D",
+    s.getPropertyValue("--success").trim()     || "#455D4A",
+    s.getPropertyValue("--info").trim()        || "#5C8A9E",
+    s.getPropertyValue("--warning").trim()     || "#D49842",
+    s.getPropertyValue("--error").trim()       || "#9E473D",
+    s.getPropertyValue("--text-secondary").trim() || "#6C6760",
+    "#B35A3E",
+  ];
+};
+const COLORS = getChartColors();
 
 function SummaryCards({ summary }) {
   const cards = [
@@ -161,12 +174,12 @@ export default function Reports() {
             <div style={{ width: "100%", height: 350 }}>
               <ResponsiveContainer>
                 <BarChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#EBE8E1" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
                   <XAxis dataKey="_id" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="fabric_total" name="Total" fill="#C86B4D" radius={[2, 2, 0, 0]} />
-                  <Bar dataKey="fabric_received" name="Received" fill="#455D4A" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="fabric_total" name="Total" fill="var(--brand)" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="fabric_received" name="Received" fill="var(--success)" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -177,12 +190,12 @@ export default function Reports() {
             <div style={{ width: "100%", height: 300 }}>
               <ResponsiveContainer>
                 <LineChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#EBE8E1" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
                   <XAxis dataKey="_id" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="fabric_received" name="Fabric" stroke="#C86B4D" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="tailoring_received" name="Tailoring" stroke="#5C8A9E" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="fabric_received" name="Fabric" stroke="var(--brand)" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="tailoring_received" name="Tailoring" stroke="var(--info)" strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -263,11 +276,11 @@ export default function Reports() {
               <div style={{ width: "100%", height: 300 }}>
                 <ResponsiveContainer>
                   <BarChart data={summary.article_types} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#EBE8E1" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
                     <XAxis type="number" tick={{ fontSize: 10 }} />
                     <YAxis dataKey="type" type="category" width={90} tick={{ fontSize: 10 }} />
                     <Tooltip />
-                    <Bar dataKey="count" name="Count" fill="#5C8A9E" radius={[0, 2, 2, 0]} />
+                    <Bar dataKey="count" name="Count" fill="var(--info)" radius={[0, 2, 2, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

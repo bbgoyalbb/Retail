@@ -68,7 +68,7 @@ function StatusColumn({ title, items, color, onMove, moveLabel, onMoveBack, move
   };
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm flex flex-col">
+    <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm flex flex-col" data-kanban-col={title}>
       <div className="p-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
@@ -352,7 +352,10 @@ export default function JobWork() {
       {dialog && <MoveDialog title={dialog.title} fields={dialog.fields} onConfirm={dialog.onConfirm} onCancel={() => setDialog(null)} />}
 
       {tab === "tailoring" ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          {/* Mobile: tap column header to collapse others */}
+          <p className="md:hidden text-[10px] text-[var(--text-secondary)] text-center mb-2 tracking-wider uppercase">Tap a column header to focus it</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <StatusColumn 
             title="Pending" 
             items={sortItems(data.pending)} 
@@ -385,9 +388,10 @@ export default function JobWork() {
             onSort={handleSort} 
             sortDir={sortDir} 
           />
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <StatusColumn 
             title="Required" 
             items={sortItems(data.required)} 

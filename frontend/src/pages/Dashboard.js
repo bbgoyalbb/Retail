@@ -138,7 +138,7 @@ export default function Dashboard() {
           value={`₹${fmt(data.total_revenue)}`} 
           sub={`${data.total_items} transactions`} 
           color="var(--success)" 
-          trend={data.revenue_trend || [45000, 52000, 48000, 61000, 58000, 72000, data.total_revenue / 7]} 
+          trend={data.revenue_trend} 
         />
         <StatCard icon={CurrencyDollar} label="Fabric Pending" value={`₹${fmt(data.fabric_pending_amount)}`} sub="Outstanding payments" color="var(--warning)" />
         <StatCard icon={Scissors} label="Tailoring Pending" value={`₹${fmt(data.tailoring_pending_amount)}`} sub={`${data.tailoring_pending_count} items in queue`} color="var(--info)" />
