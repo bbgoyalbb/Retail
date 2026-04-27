@@ -200,8 +200,14 @@ export default function AuditLogPage() {
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={badge(log.action)}>{log.action || "—"}</span>
                     </td>
-                    <td className="px-4 py-3 text-[var(--text-secondary)] max-w-xs truncate" title={log.details || log.message || ""}>
-                      {log.details || log.message || "—"}
+                    <td className="px-4 py-3 text-[var(--text-secondary)] max-w-xs truncate" title={
+                      log.details && typeof log.details === "object"
+                        ? Object.entries(log.details).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" | ")
+                        : (log.details || log.message || "")
+                    }>
+                      {log.details && typeof log.details === "object"
+                        ? Object.entries(log.details).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" | ") || "—"
+                        : (log.details || log.message || "—")}
                     </td>
                   </tr>
                 ))}
