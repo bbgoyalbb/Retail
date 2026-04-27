@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { DatePickerInput } from "@/components/DatePickerInput";
 import { useNavigate } from "react-router-dom";
 import { getRevenueReport, getCustomerReport, getSummaryReport, exportExcelUrl } from "@/api";
 import { fmt } from "@/lib/fmt";
@@ -193,8 +194,8 @@ export default function Reports() {
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
               </select>
-              <input data-testid="report-date-from" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm" />
-              <input data-testid="report-date-to" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm" />
+              <DatePickerInput value={dateFrom} onChange={setDateFrom} placeholder="From date" />
+              <DatePickerInput value={dateTo} onChange={setDateTo} placeholder="To date" />
             </div>
           </div>
 

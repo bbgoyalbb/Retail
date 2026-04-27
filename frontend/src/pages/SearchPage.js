@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { DatePickerInput } from "@/components/DatePickerInput";
 import { searchItems, getCustomers } from "@/api";
 import { fmt } from "@/lib/fmt";
 import { MagnifyingGlass, Funnel, FilePdf, X, CaretLeft, CaretRight, ArrowRight } from "@phosphor-icons/react";
@@ -177,11 +178,11 @@ export default function SearchPage() {
             </div>
             <div>
               <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Date From</label>
-              <input data-testid="search-date-from" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm" />
+              <DatePickerInput value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-full" />
             </div>
             <div>
               <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Date To</label>
-              <input data-testid="search-date-to" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm" />
+              <DatePickerInput value={dateTo} onChange={setDateTo} placeholder="To date" className="w-full" />
             </div>
             <div>
               <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Tailoring Status</label>

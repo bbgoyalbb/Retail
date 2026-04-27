@@ -194,8 +194,12 @@ export default function ItemsManager() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      const params = { limit: 2000, summary: true };
+      if (nameFilter)  params.name     = nameFilter;
+      if (dateFilter)  params.date     = dateFilter;
+      if (orderFilter) params.order_no = orderFilter;
       const [itemsRes, advancesRes] = await Promise.all([
-        getItems({ limit: 2000, summary: true }),
+        getItems(params),
         getAdvances()
       ]);
       setAllItems(itemsRes.data.items || []);
@@ -206,7 +210,7 @@ export default function ItemsManager() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [nameFilter, dateFilter, orderFilter]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -504,12 +508,8 @@ export default function ItemsManager() {
   // FILTERING & GROUPING
   // ==========================================
   const uniqueDates = [...new Set(allItems.map(i => i.date).filter(Boolean))].sort().reverse();
-  const filteredByDate = dateFilter ? allItems.filter(i => i.date === dateFilter) : allItems;
-  const filteredCustomers = [...new Set(filteredByDate.map(i => i.name).filter(Boolean))].sort();
-  const filteredItems = filteredByDate.filter(i =>
-    (!nameFilter || i.name === nameFilter) &&
-    (!orderFilter || i.order_no === orderFilter)
-  );
+  const filteredCustomers = [...new Set(allItems.map(i => i.name).filter(Boolean))].sort();
+  const filteredItems = allItems;
 
   const grouped = {};
   filteredItems.forEach(item => {
