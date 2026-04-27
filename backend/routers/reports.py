@@ -215,11 +215,11 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
                 disc_pct = float(item.get("discount", 0))
                 base_pre_disc = price * qty
                 disc_amt = base_pre_disc * disc_pct / 100
-                base = base_pre_disc - disc_amt
-                gst  = round(base * GST_RATE / 100, 2)
+                total_with_gst = base_pre_disc - disc_amt  # original total = amt stored in DB
+                base = round(total_with_gst * 100 / (100 + GST_RATE), 2)  # back-calculate GST-exclusive base
+                gst  = round(total_with_gst - base, 2)
                 disc_str = f"₹{fmt(disc_amt)}" if disc_pct > 0 else "—"
                 desc = f'<div class="sec-barcode">{item.get("barcode","N/A")}</div>'
-                total_with_gst = base + gst
                 cols = [desc, f"{qty:.2f}", f"₹{fmt(price)}", f"{disc_pct:.0f}%", disc_str, f"₹{fmt(base)}", f"₹{fmt(gst)}", f"₹{fmt(total_with_gst)}"]
             elif section_label == "Tailoring":
                 tail_amt = float(item.get("tailoring_amount", 0))
@@ -248,9 +248,9 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
                 disc_pct = 0
 
             if section_label == "Fabric":
-                sub_base += base_pre_disc - disc_amt
+                sub_base += base
                 sub_disc += disc_amt
-                sub_amt += base + gst
+                sub_amt += total_with_gst
             else:
                 sub_base += base
                 sub_disc += 0
@@ -327,15 +327,15 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
         for a in advances:
             amt_a = float(a.get("amount", 0))
             adv_total += amt_a
-            adv_rows += f'<tr><td>{a.get("date","—")}</td><td class="r mono">₹{fmt(amt_a)}</td><td class="adv-mode">{a.get("mode","—")}</td></tr>'
+            adv_rows += f'<tr><td>{a.get("date","—")}</td><td class="adv-mode">{a.get("mode","—")}</td><td class="r mono">₹{fmt(amt_a)}</td></tr>'
         adv_block = f"""
         <div class="sec-block">
           <div class="sec-head">Advances</div>
           <table>
-            <thead><tr><th>Date</th><th class="r">Amount</th><th class="adv-mode-h">Mode</th></tr></thead>
+            <thead><tr><th>Date</th><th class="adv-mode-h">Mode</th><th class="r">Amount</th></tr></thead>
             <tbody>
               {adv_rows}
-              <tr class="sub-row"><td class="subtd">Total Advances</td><td class="subtd r">₹{fmt(adv_total)}</td><td class="subtd"></td></tr>
+              <tr class="sub-row"><td class="subtd" colspan="2">Total Advances</td><td class="subtd r">₹{fmt(adv_total)}</td></tr>
             </tbody>
           </table>
         </div>"""
@@ -543,6 +543,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     padding: 5px 6px;
     white-space: nowrap;
   }}
+  .sec-block th:first-child {{ padding-left: 18px; }}
   .sec-block th.r {{ text-align: right; }}
   .sec-block td {{
     font-size: 10px;
@@ -551,6 +552,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     color: #111;
     vertical-align: top;
   }}
+  .sec-block td:first-child {{ padding-left: 18px; }}
   .sec-block td.r {{
     text-align: right;
     font-family: 'IBM Plex Mono', monospace;
@@ -651,11 +653,10 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     font-size: 9px;
     font-weight: 700;
     color: #111;
-    text-align: center;
-    border-top: 1px solid #aaa;
-    padding-top: 22px;
+    text-align: right;
     min-width: 110px;
     flex-shrink: 0;
+    align-self: flex-end;
   }}
 
   /* ── PRINT ── */
