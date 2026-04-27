@@ -94,7 +94,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
             <div class="item-barcode">{item.get("barcode", "N/A")}</div>
             {badges_html}
           </td>
-          <td>{item.get("qty", 0)}</td>
+          <td>{float(item.get("qty", 0)):.2f}</td>
           <td>₹{fmt(item.get("price", 0))}</td>
           <td>{float(item.get("discount", 0)):.0f}%</td>
           <td>₹{fmt(amt)}</td>
@@ -219,13 +219,17 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
                 gst  = round(base * GST_RATE / 100, 2)
                 disc_str = f"₹{fmt(disc_amt)}" if disc_pct > 0 else "—"
                 desc = f'<div class="sec-barcode">{item.get("barcode","N/A")}</div>'
-                cols = [desc, fmt(qty), f"₹{fmt(price)}", f"{disc_pct:.0f}%", disc_str, f"₹{fmt(base)}", f"₹{fmt(gst)}", f"₹{fmt(amt)}"]
+                total_with_gst = base + gst
+                cols = [desc, f"{qty:.2f}", f"₹{fmt(price)}", f"{disc_pct:.0f}%", disc_str, f"₹{fmt(base)}", f"₹{fmt(gst)}", f"₹{fmt(total_with_gst)}"]
             elif section_label == "Tailoring":
                 tail_amt = float(item.get("tailoring_amount", 0))
                 gst = 0.0
                 base = tail_amt
-                desc = f'<div class="sec-barcode">{item.get("barcode","N/A")}</div><div class="sec-sub">{item.get("article_type","—")}</div>'
-                cols = [desc, f"₹{fmt(tail_amt)}"]
+                article = item.get("article_type", "—") or "—"
+                order_no = item.get("order_no", "—") or "—"
+                delivery = item.get("delivery_date", "—") or "—"
+                desc = f'<div class="sec-barcode">{item.get("barcode","N/A")}</div><div class="sec-sub">{article}</div>'
+                cols = [desc, order_no, delivery, f"₹{fmt(tail_amt)}"]
             elif section_label == "Embroidery":
                 emb_amt = float(item.get("embroidery_amount", 0))
                 gst = 0.0
@@ -237,7 +241,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
                 gst = 0.0
                 base = ao_amt
                 desc = f'<div class="sec-barcode">{item.get("addon_desc","Add-on")}</div>'
-                cols = [desc, f"₹{fmt(ao_amt)}"]
+                cols = [desc, f"₹{fmt(ao_amt)}"]  # 2 cols only
             else:
                 cols = ["—","—","—","—","—","—","—","—"]
                 base = gst = disc_amt = amt
@@ -246,11 +250,12 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
             if section_label == "Fabric":
                 sub_base += base_pre_disc - disc_amt
                 sub_disc += disc_amt
+                sub_amt += base + gst
             else:
                 sub_base += base
                 sub_disc += 0
+                sub_amt += amt
             sub_gst += gst
-            sub_amt += amt
 
             tds = "".join(
                 f'<td{"" if i==0 else " class=\"r\""}>{"" if i==0 else ""}{c}</td>'
@@ -277,8 +282,12 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
             headers = ["Article / Barcode", "Qty (m)", "Rate", "Disc %", "Disc Amt", f"Base (excl GST {int(GST_RATE)}%)", f"GST {int(GST_RATE)}%", "Total"]
             th_row = "".join(f'<th{"" if i==0 else " class=\"r\""} >{h}</th>' for i, h in enumerate(headers))
             sub_tds = f'<td class="subtd" colspan="4">Subtotal ({len(items_list)} articles)</td><td class="subtd r">₹{fmt(sub_disc)}</td><td class="subtd r">₹{fmt(sub_base)}</td><td class="subtd r">₹{fmt(sub_gst)}</td><td class="subtd r">₹{fmt(sub_amt)}</td>'
+        elif label == "Tailoring":
+            headers = ["Tailoring Item", "Order No", "Delivery", "Amount"]
+            th_row = f'<th>{headers[0]}</th><th>{headers[1]}</th><th>{headers[2]}</th><th class="r">{headers[3]}</th>'
+            sub_tds = f'<td class="subtd" colspan="3">Subtotal</td><td class="subtd r">₹{fmt(sub_amt)}</td>'
         else:
-            # Non-fabric: just 2 cols — item desc + amount
+            # Add-on / Embroidery: 2 cols
             headers = [label + " Item", "Amount"]
             th_row = f'<th>{headers[0]}</th><th class="r">{headers[1]}</th>'
             sub_tds = f'<td class="subtd">Subtotal</td><td class="subtd r">₹{fmt(sub_amt)}</td>'
@@ -318,15 +327,15 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
         for a in advances:
             amt_a = float(a.get("amount", 0))
             adv_total += amt_a
-            adv_rows += f'<tr><td>{a.get("date","—")}</td><td class="r mono">₹{fmt(amt_a)}</td><td>{a.get("mode","—")}</td><td>{a.get("note","")}</td></tr>'
+            adv_rows += f'<tr><td>{a.get("date","—")}</td><td class="r mono">₹{fmt(amt_a)}</td><td class="adv-mode">{a.get("mode","—")}</td></tr>'
         adv_block = f"""
         <div class="sec-block">
           <div class="sec-head">Advances</div>
           <table>
-            <thead><tr><th>Date</th><th class="r">Amount</th><th>Mode</th><th>Note</th></tr></thead>
+            <thead><tr><th>Date</th><th class="r">Amount</th><th class="adv-mode-h">Mode</th></tr></thead>
             <tbody>
               {adv_rows}
-              <tr class="sub-row"><td class="subtd" colspan="1">Total Advances</td><td class="subtd r">₹{fmt(adv_total)}</td><td class="subtd" colspan="2"></td></tr>
+              <tr class="sub-row"><td class="subtd">Total Advances</td><td class="subtd r">₹{fmt(adv_total)}</td><td class="subtd"></td></tr>
             </tbody>
           </table>
         </div>"""
@@ -615,19 +624,29 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
   .bal-due {{ color: #8b0000; }}
   .bal-ok  {{ color: #1a5c2a; }}
 
+  /* ── ADVANCES mode cell alignment ── */
+  .adv-mode-h {{ text-align: left; }}
+  .adv-mode   {{ text-align: left; }}
+
   /* ── FOOTER ── */
   .inv-footer {{
     margin-top: auto;
     border-top: 1.5px solid #111;
     padding: 10px 18px 8px;
   }}
-  .footer-top {{
+  .footer-bottom {{
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    gap: 12px;
-    margin-bottom: 8px;
+    gap: 16px;
   }}
+  .footer-tnc {{
+    flex: 1;
+    font-size: 7.5px;
+    color: #555;
+    line-height: 1.6;
+  }}
+  .footer-tnc strong {{ color: #111; font-size: 8px; }}
   .footer-sig {{
     font-size: 9px;
     font-weight: 700;
@@ -635,21 +654,9 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     text-align: center;
     border-top: 1px solid #aaa;
     padding-top: 22px;
-    min-width: 100px;
+    min-width: 110px;
+    flex-shrink: 0;
   }}
-  .footer-thanks {{
-    font-size: 11px;
-    font-weight: 800;
-    color: #111;
-  }}
-  .footer-tnc {{
-    border-top: 1px solid #ddd;
-    padding-top: 6px;
-    font-size: 7.5px;
-    color: #555;
-    line-height: 1.6;
-  }}
-  .footer-tnc strong {{ color: #111; font-size: 8px; }}
 
   /* ── PRINT ── */
   @media print {{
@@ -746,16 +753,15 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
 
   <!-- Footer -->
   <div class="inv-footer">
-    <div class="footer-top">
-      <div></div>
+    <div class="footer-bottom">
+      <div class="footer-tnc">
+        <strong>Terms &amp; Conditions</strong><br/>
+        1. All disputes are subject to local jurisdiction only.<br/>
+        2. Goods once sold will not be taken back or exchanged.<br/>
+        3. Payment is due within 30 days of the bill date.<br/>
+        4. We are not responsible for any damage after delivery.
+      </div>
       <div class="footer-sig">Authorised Signatory</div>
-    </div>
-    <div class="footer-tnc">
-      <strong>Terms &amp; Conditions</strong><br/>
-      1. All disputes are subject to local jurisdiction only.<br/>
-      2. Goods once sold will not be taken back or exchanged.<br/>
-      3. Payment is due within 30 days of the bill date.<br/>
-      4. We are not responsible for any damage after delivery.
     </div>
   </div>
 
