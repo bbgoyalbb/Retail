@@ -629,7 +629,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
   .bal-ok  {{ color: #1a5c2a; }}
 
   /* ── ADVANCES inside payment table ── */
-  .adv-pay-row td {{ background: #f7f7f0 !important; font-style: italic; color: #444; }}
+  .adv-pay-row td {{ background: #f7f7f0 !important; color: #444; }}
   .adv-credit {{ color: #1a5c2a; font-family: 'IBM Plex Mono', monospace; }}
 
   /* ── FOOTER ── */
