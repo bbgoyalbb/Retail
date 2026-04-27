@@ -3,6 +3,7 @@ import { getItems, getItem, getAdvances, updateItem, deleteItem, createItem, upd
 import { fmt } from "@/lib/fmt";
 import { PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle, Funnel, DownloadSimple } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
+import SettlementPanel from "@/components/SettlementPanel";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 // ==========================================
@@ -199,6 +200,8 @@ export default function ItemsManager() {
   const [delMode, setDelMode] = useState(null);
   const [invoiceRef, setInvoiceRef] = useState(null);
   const [mismatchPrompt, setMismatchPrompt] = useState(null);
+  const [reSettlePrompt, setReSettlePrompt] = useState(null);  // { ref, customer, sections[] }
+  const [showSettlementPanel, setShowSettlementPanel] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -380,6 +383,23 @@ export default function ItemsManager() {
     });
   };
 
+  // Detect sections that were already Settled but whose _amount has now changed
+  const detectSettledAmountChanges = (original, current) => {
+    const changed = [];
+    const check = (amountKey, modeKey, label) => {
+      const mode = String(original[modeKey] || "");
+      if (!mode.startsWith("Settled")) return;
+      const oldAmt = parseFloat(original[amountKey]) || 0;
+      const newAmt = parseFloat(current[amountKey]) || 0;
+      if (Math.abs(oldAmt - newAmt) > 0.01) changed.push({ label, oldAmt, newAmt });
+    };
+    check("fabric_amount",     "fabric_pay_mode",     "Fabric");
+    check("tailoring_amount",  "tailoring_pay_mode",  "Tailoring");
+    check("embroidery_amount", "embroidery_pay_mode",  "Embroidery");
+    check("addon_amount",      "addon_pay_mode",       "Add-on");
+    return changed;
+  };
+
   const detectMismatches = (itemId, original, current) => {
     const mismatches = [];
     const checkMismatch = (amountKey, receivedKey, modeKey, label) => {
@@ -435,6 +455,9 @@ export default function ItemsManager() {
     let success = 0, failed = 0;
     const allMismatches = [];
     const affectedRefs = new Set();
+    let reSettleRef = null;
+    let reSettleCustomer = null;
+    let reSettleSections = [];
 
     for (const itemId of itemIds) {
       if (newItemIds.includes(itemId)) continue;
@@ -447,6 +470,13 @@ export default function ItemsManager() {
         });
         const mismatches = detectMismatches(itemId, original, current);
         if (mismatches.length > 0) { allMismatches.push(...mismatches); affectedRefs.add(original.ref); }
+        // Detect settled sections whose amounts changed — prompt re-settle after save
+        const settledChanges = detectSettledAmountChanges(original, current);
+        if (settledChanges.length > 0) {
+          reSettleRef = original.ref;
+          reSettleCustomer = original.name;
+          reSettleSections = [...reSettleSections, ...settledChanges];
+        }
         if (Object.keys(changedFields).length > 0) { await updateItem(itemId, changedFields); success++; }
       } catch { failed++; }
     }
@@ -462,6 +492,11 @@ export default function ItemsManager() {
     if (failed === 0) {
       if (allMismatches.length > 0) {
         setMismatchPrompt({ refs: Array.from(affectedRefs), mismatches: allMismatches });
+      } else if (reSettleRef) {
+        // Show re-settle prompt — amounts on already-settled sections have changed
+        setReSettlePrompt({ ref: reSettleRef, customer: reSettleCustomer, sections: reSettleSections });
+        setMessage({ type: "success", text: `${success} item(s) saved` });
+        setTimeout(() => setMessage(null), 2000);
       } else {
         setMessage({ type: "success", text: `${success} item(s) saved successfully` });
         setTimeout(() => setMessage(null), 3000);
@@ -954,6 +989,43 @@ export default function ItemsManager() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Re-Settle Prompt Modal */}
+      {reSettlePrompt && !showSettlementPanel && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setReSettlePrompt(null)}>
+          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="font-heading text-lg font-medium mb-1 text-[var(--warning)]">Settled amounts have changed</h3>
+            <p className="text-sm text-[var(--text-secondary)] mb-4">
+              The following sections were previously settled but their amounts have been updated. Would you like to re-settle now?
+            </p>
+            <div className="mb-5 space-y-1.5">
+              {reSettlePrompt.sections.map((s, i) => (
+                <div key={i} className="flex items-center justify-between px-3 py-2 bg-[var(--bg)] rounded-sm text-sm">
+                  <span className="font-medium text-[var(--text-primary)]">{s.label}</span>
+                  <span className="font-mono text-xs text-[var(--text-secondary)]">
+                    ₹{fmt(s.oldAmt)} → <span className="text-[var(--brand)] font-medium">₹{fmt(s.newAmt)}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setReSettlePrompt(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">Skip for now</button>
+              <button onClick={() => setShowSettlementPanel(true)} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] flex items-center gap-2">
+                Settle Now →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Settlement Panel (opens after re-settle prompt) */}
+      {reSettlePrompt && showSettlementPanel && (
+        <SettlementPanel
+          billRef={reSettlePrompt.ref}
+          customer={reSettlePrompt.customer}
+          onClose={() => { setShowSettlementPanel(false); setReSettlePrompt(null); loadData(); }}
+        />
       )}
 
       {/* ==========================================
