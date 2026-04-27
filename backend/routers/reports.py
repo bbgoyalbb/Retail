@@ -670,6 +670,29 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     body {{ background: #fff; padding: 0; }}
     .inv {{ width: 100%; min-height: 100vh; border: none; box-shadow: none; }}
     @page {{ size: A5; margin: 8mm 10mm; }}
+
+    /* Keep each section block together — avoid splitting across pages */
+    .sec-block,
+    .inv-pay-section,
+    .inv-grand,
+    .inv-footer {{
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }}
+
+    /* If a section is too tall to fit whole, at least keep the header with first row */
+    .sec-block thead,
+    .inv-pay-section thead {{
+      display: table-header-group;
+    }}
+
+    /* Avoid splitting individual rows */
+    .sec-block tr,
+    .inv-pay-section tr {{
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }}
+
     /* Force background colors/images to print on mobile Chrome & Safari */
     .sec-block th,
     .inv-grand,
