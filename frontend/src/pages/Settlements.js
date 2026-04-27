@@ -171,6 +171,7 @@ export default function Settlements() {
   const handleSubmit = async () => {
     if (!selectedRef) { setMessage({ type: "error", text: "Please select a reference" }); return; }
     if (totalAllocated <= 0) { setMessage({ type: "error", text: "Please allocate at least some amount" }); return; }
+    if (selectedModes.length === 0) { setMessage({ type: "error", text: "Please select at least one payment mode" }); return; }
     setSaving(true);
     try {
       await processSettlement({
@@ -412,7 +413,7 @@ export default function Settlements() {
           </div>
 
           <div>
-            <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-2">Payment Mode</label>
+            <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-2">Payment Mode <span className="text-[var(--error)]">*</span></label>
             <div className="flex flex-wrap gap-2">
               {paymentModes.map(m => (
                 <button key={m} onClick={() => toggleMode(m)} className={`px-2.5 py-1 text-xs font-medium rounded-sm border transition-all ${selectedModes.includes(m) ? 'bg-[var(--brand)] text-white border-[var(--brand)]' : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border-subtle)]'}`}>
@@ -420,9 +421,12 @@ export default function Settlements() {
                 </button>
               ))}
             </div>
+            {selectedModes.length === 0 && hasRef && totalAllocated > 0 && (
+              <p className="text-[10px] text-[var(--error)] mt-1">Select at least one payment mode</p>
+            )}
           </div>
 
-          <button data-testid="submit-settlement-btn" onClick={handleSubmit} disabled={saving || !hasRef} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 transition-all">
+          <button data-testid="submit-settlement-btn" onClick={handleSubmit} disabled={saving || !hasRef || selectedModes.length === 0} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 transition-all">
             {saving ? "Processing..." : <><CurrencyDollar size={18} weight="bold" /> Process Settlement</>}
           </button>
         </div>

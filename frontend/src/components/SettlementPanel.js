@@ -82,6 +82,7 @@ export default function SettlementPanel({ billRef, customer, onClose }) {
 
   const handleSubmit = async () => {
     if (totalAllocated <= 0) { setMessage({ type: "error", text: "Please allocate at least some amount" }); return; }
+    if (selectedModes.length === 0) { setMessage({ type: "error", text: "Please select at least one payment mode" }); return; }
     setSaving(true);
     try {
       await processSettlement({
@@ -231,7 +232,7 @@ export default function SettlementPanel({ billRef, customer, onClose }) {
 
               {/* Payment Mode */}
               <div>
-                <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-2">Payment Mode</label>
+                <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-2">Payment Mode <span className="text-[var(--error)]">*</span></label>
                 <div className="flex flex-wrap gap-2">
                   {paymentModes.map(m => (
                     <button key={m} onClick={() => toggleMode(m)} className={`px-2.5 py-1 text-xs font-medium rounded-sm border transition-all ${selectedModes.includes(m) ? "bg-[var(--brand)] text-white border-[var(--brand)]" : "bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border-subtle)]"}`}>
@@ -239,6 +240,9 @@ export default function SettlementPanel({ billRef, customer, onClose }) {
                     </button>
                   ))}
                 </div>
+                {selectedModes.length === 0 && totalAllocated > 0 && (
+                  <p className="text-[10px] text-[var(--error)] mt-1">Select at least one payment mode</p>
+                )}
               </div>
             </>
           )}
@@ -248,7 +252,7 @@ export default function SettlementPanel({ billRef, customer, onClose }) {
         {!loading && (
           <div className="px-5 py-4 border-t border-[var(--border-subtle)] flex gap-2 justify-end flex-shrink-0 bg-[var(--bg)]">
             <button onClick={onClose} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)] transition-colors">Skip for now</button>
-            <button onClick={handleSubmit} disabled={saving || totalAllocated <= 0} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 flex items-center gap-2 transition-colors">
+            <button onClick={handleSubmit} disabled={saving || totalAllocated <= 0 || selectedModes.length === 0} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 flex items-center gap-2 transition-colors">
               {saving ? "Processing…" : <><CurrencyDollar size={14} weight="bold" /> Process Settlement</>}
             </button>
           </div>
