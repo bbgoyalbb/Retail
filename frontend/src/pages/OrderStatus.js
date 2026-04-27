@@ -154,7 +154,56 @@ export default function OrderStatus() {
           <span className="ml-auto text-xs text-[var(--text-secondary)]">{loading ? "Loading..." : `${rows.length} orders`}</span>
         </div>
 
-        <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-[var(--border-strong)]">
+        {/* Mobile card view */}
+        <div className="md:hidden divide-y divide-[var(--border-subtle)]">
+          {!loading && rows.length === 0 && (
+            <p className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">No orders found.</p>
+          )}
+          {rows.map((row) => {
+            const hasUndelivered = (row.tailoring_pending || 0) + (row.tailoring_stitched || 0) > 0;
+            return (
+              <div key={row._id || row.order_no} className="p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-sm font-semibold">{row.order_no || "-"}</span>
+                  <span className="font-mono text-xs text-[var(--brand)]">₹{fmt(row.order_total || 0)}</span>
+                </div>
+                <p className="text-xs text-[var(--text-secondary)]">{(row.customers || []).join(", ") || "-"}</p>
+                <div className="flex flex-wrap gap-1 text-[10px]">
+                  <StatusPill label="Pnd" value={row.tailoring_pending || 0} tone="warning" />
+                  <StatusPill label="Stc" value={row.tailoring_stitched || 0} tone="info" />
+                  <StatusPill label="Dlv" value={row.tailoring_delivered || 0} tone="success" />
+                  <StatusPill label="Emb" value={row.emb_in_progress || 0} tone="info" />
+                  <StatusPill label="EFin" value={row.emb_finished || 0} tone="success" />
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)]">
+                  <span>Bill: {row.latest_bill_date || "-"}</span>
+                  <span>Delivery: {row.latest_delivery_date && row.latest_delivery_date !== "N/A" ? row.latest_delivery_date : "-"}</span>
+                </div>
+                {hasUndelivered && (
+                  <button
+                    disabled={delivering === row.order_no}
+                    onClick={async () => {
+                      setDelivering(row.order_no);
+                      try {
+                        await markOrderDelivered(row.order_no);
+                        setMessage({ type: "success", text: `Order ${row.order_no} marked as Delivered` });
+                        setTimeout(() => setMessage(null), 3000);
+                        loadData();
+                      } catch (err) {
+                        setMessage({ type: "error", text: err.message || "Failed" });
+                        setTimeout(() => setMessage(null), 3000);
+                      } finally { setDelivering(null); }
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-[var(--success)] text-white rounded-sm hover:opacity-90 disabled:opacity-50">
+                    <CheckCircle size={12} /> {delivering === row.order_no ? "…" : "Mark Delivered"}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-[var(--border-strong)]">
           <table className="w-full min-w-[980px]">
             <thead>
               <tr className="bg-[var(--bg)]">

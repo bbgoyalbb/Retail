@@ -7,7 +7,7 @@ export default function BackToTop() {
   useEffect(() => {
     const main = document.querySelector("main");
     if (!main) return;
-    const onScroll = () => setVisible(main.scrollTop > 400);
+    const onScroll = () => setVisible(main.scrollTop > 300);
     main.addEventListener("scroll", onScroll, { passive: true });
     return () => main.removeEventListener("scroll", onScroll);
   }, []);

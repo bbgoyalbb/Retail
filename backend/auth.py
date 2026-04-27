@@ -1,6 +1,7 @@
 """Authentication and audit utilities for the Retail API."""
 import os
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -56,7 +57,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -76,6 +77,7 @@ async def get_current_user(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
+        jti: str = payload.get("jti")
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token")
     except JWTError:
@@ -83,6 +85,9 @@ async def get_current_user(
 
     if db is None:
         raise HTTPException(status_code=500, detail="Database not available")
+
+    if jti and await db.token_blocklist.find_one({"jti": jti}):
+        raise HTTPException(status_code=401, detail="Token has been revoked")
 
     user = await db.users.find_one({"username": username.lower().strip() if username else username}, {"password_hash": 0})
     if user is None:

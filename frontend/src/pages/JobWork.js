@@ -141,6 +141,7 @@ function StatusColumn({ title, items, color, onMove, moveLabel, onMoveBack, move
 
 export default function JobWork() {
   const [tab, setTab] = useState("tailoring");
+  const [activeCol, setActiveCol] = useState("Pending");
   const [data, setData] = useState({});
   const [filters, setFilters] = useState({ order_nos: [], dates: [], delivery_dates: [] });
   const [orderFilter, setOrderFilter] = useState("All");
@@ -327,7 +328,7 @@ export default function JobWork() {
 
       <div className="flex gap-1 border-b border-[var(--border-subtle)]">
         {["tailoring", "embroidery"].map(t => (
-          <button key={t} data-testid={`tab-${t}`} onClick={() => setTab(t)} className={`px-4 py-2.5 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${tab === t ? 'border-[var(--brand)] text-[var(--brand)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+          <button key={t} data-testid={`tab-${t}`} onClick={() => { setTab(t); setActiveCol(t === "tailoring" ? "Pending" : "Required"); }} className={`px-4 py-2.5 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${tab === t ? 'border-[var(--brand)] text-[var(--brand)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
             {t}
           </button>
         ))}
@@ -353,79 +354,47 @@ export default function JobWork() {
 
       {tab === "tailoring" ? (
         <div>
-          {/* Mobile: tap column header to collapse others */}
-          <p className="md:hidden text-[10px] text-[var(--text-secondary)] text-center mb-2 tracking-wider uppercase">Tap a column header to focus it</p>
+          <div className="flex md:hidden gap-1 mb-3 p-1 bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm">
+            {["Pending", "Stitched", "Delivered"].map(col => (
+              <button key={col} onClick={() => setActiveCol(col)}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-sm transition-colors ${
+                  activeCol === col ? "bg-[var(--brand)] text-white" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                }`}>{col}</button>
+            ))}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <StatusColumn 
-            title="Pending" 
-            items={sortItems(data.pending)} 
-            color="var(--warning)" 
-            moveLabel="Stitched" 
-            onMove={(ids) => handleTailoringMove(ids, "Stitched")} 
-            sortKey={sortKey} 
-            onSort={handleSort} 
-            sortDir={sortDir} 
-          />
-          <StatusColumn 
-            title="Stitched" 
-            items={sortItems(data.stitched)} 
-            color="var(--info)" 
-            moveLabel="Delivered" 
-            onMove={(ids) => handleTailoringMove(ids, "Delivered")} 
-            onMoveBack={(ids) => handleTailoringMoveBack(ids, "Stitched")}
-            moveBackLabel="to Pending"
-            sortKey={sortKey} 
-            onSort={handleSort} 
-            sortDir={sortDir} 
-          />
-          <StatusColumn 
-            title="Delivered" 
-            items={sortItems(data.delivered)} 
-            color="var(--success)" 
-            onMoveBack={(ids) => handleTailoringMoveBack(ids, "Delivered")}
-            moveBackLabel="to Stitched"
-            sortKey={sortKey} 
-            onSort={handleSort} 
-            sortDir={sortDir} 
-          />
+            <div className={activeCol === "Pending" ? "block md:block" : "hidden md:block"}>
+              <StatusColumn title="Pending" items={sortItems(data.pending)} color="var(--warning)" moveLabel="Stitched" onMove={(ids) => handleTailoringMove(ids, "Stitched")} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+            </div>
+            <div className={activeCol === "Stitched" ? "block md:block" : "hidden md:block"}>
+              <StatusColumn title="Stitched" items={sortItems(data.stitched)} color="var(--info)" moveLabel="Delivered" onMove={(ids) => handleTailoringMove(ids, "Delivered")} onMoveBack={(ids) => handleTailoringMoveBack(ids, "Stitched")} moveBackLabel="to Pending" sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+            </div>
+            <div className={activeCol === "Delivered" ? "block md:block" : "hidden md:block"}>
+              <StatusColumn title="Delivered" items={sortItems(data.delivered)} color="var(--success)" onMoveBack={(ids) => handleTailoringMoveBack(ids, "Delivered")} moveBackLabel="to Stitched" sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+            </div>
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <StatusColumn 
-            title="Required" 
-            items={sortItems(data.required)} 
-            color="var(--warning)" 
-            moveLabel="In Progress" 
-            onMove={handleEmbRequiredMove} 
-            sortKey={sortKey} 
-            onSort={handleSort} 
-            sortDir={sortDir} 
-          />
-          <StatusColumn 
-            title="In Progress" 
-            items={sortItems(data.in_progress)} 
-            color="var(--info)" 
-            moveLabel="Finished" 
-            onMove={handleEmbProgressMove} 
-            onMoveBack={(ids) => handleEmbMoveBack(ids, "In Progress")}
-            moveBackLabel="to Required"
-            onItemDoubleClick={handleEditInProgress}
-            sortKey={sortKey} 
-            onSort={handleSort} 
-            sortDir={sortDir} 
-          />
-          <StatusColumn 
-            title="Finished" 
-            items={sortItems(data.finished)} 
-            color="var(--success)" 
-            onMoveBack={(ids) => handleEmbMoveBack(ids, "Finished")}
-            moveBackLabel="to In Progress"
-            onItemDoubleClick={handleEditFinished}
-            sortKey={sortKey} 
-            onSort={handleSort} 
-            sortDir={sortDir} 
-          />
+        <div>
+          <div className="flex md:hidden gap-1 mb-3 p-1 bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm">
+            {["Required", "In Progress", "Finished"].map(col => (
+              <button key={col} onClick={() => setActiveCol(col)}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-sm transition-colors ${
+                  activeCol === col ? "bg-[var(--brand)] text-white" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                }`}>{col}</button>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className={activeCol === "Required" ? "block md:block" : "hidden md:block"}>
+              <StatusColumn title="Required" items={sortItems(data.required)} color="var(--warning)" moveLabel="In Progress" onMove={handleEmbRequiredMove} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+            </div>
+            <div className={activeCol === "In Progress" ? "block md:block" : "hidden md:block"}>
+              <StatusColumn title="In Progress" items={sortItems(data.in_progress)} color="var(--info)" moveLabel="Finished" onMove={handleEmbProgressMove} onMoveBack={(ids) => handleEmbMoveBack(ids, "In Progress")} moveBackLabel="to Required" onItemDoubleClick={handleEditInProgress} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+            </div>
+            <div className={activeCol === "Finished" ? "block md:block" : "hidden md:block"}>
+              <StatusColumn title="Finished" items={sortItems(data.finished)} color="var(--success)" onMoveBack={(ids) => handleEmbMoveBack(ids, "Finished")} moveBackLabel="to In Progress" onItemDoubleClick={handleEditFinished} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+            </div>
+          </div>
         </div>
       )}
     </div>

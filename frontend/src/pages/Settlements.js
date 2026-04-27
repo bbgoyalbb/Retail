@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { getPendingCustomers, getPendingRefs, getPendingOrders, getBalances, processSettlement, getItems, getSettings } from "@/api";
+import { invalidate } from "@/lib/dataEvents";
 import { fmt } from "@/lib/fmt";
 import { CurrencyDollar, CheckCircle, FilePdf } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
@@ -185,6 +186,8 @@ export default function Settlements() {
       });
       setLastSettledRef(selectedRef);
       setMessage({ type: "success", text: "Settlement processed!" });
+      invalidate("dashboard");
+      invalidate("daybook");
       setFreshPay(""); clearAllotments();
       setSelectedModes([]);
       setSelectedCustomer(""); setSelectedRef(""); setSelectedOrder(""); setOrderInfo(null);

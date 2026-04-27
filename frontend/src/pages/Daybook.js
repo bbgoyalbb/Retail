@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getDaybook, getDaybookDates, tallyEntries } from "@/api";
+import { dataEvents } from "@/lib/dataEvents";
 import { fmt } from "@/lib/fmt";
 import { Check, Circle, Spinner } from "@phosphor-icons/react";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +20,7 @@ function TallyButton({ isTallied, onClick, hasAmount, label, loading }) {
     <button
       onClick={onClick}
       disabled={loading}
-      className={`min-w-11 min-h-11 sm:min-w-0 sm:min-h-0 sm:w-6 sm:h-6 rounded-full flex items-center justify-center transition-colors ${
+      className={`min-w-11 min-h-11 md:min-w-0 md:min-h-0 md:w-6 md:h-6 rounded-full flex items-center justify-center transition-colors ${
         isTallied
           ? 'bg-[var(--success)] text-white hover:opacity-80'
           : 'bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--border-strong)]'
@@ -196,7 +197,31 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
       {visibleEntries.length === 0 ? (
         <p className="p-6 text-sm text-[var(--text-secondary)] text-center">No entries</p>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        {/* Mobile card view */}
+        <div className="md:hidden divide-y divide-[var(--border-subtle)]">
+          {visibleEntries.map((entry) => (
+            <div key={entry.id || entry.ref} className="p-3 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs text-[var(--text-secondary)]">{entry.date}</span>
+                <span className="font-mono text-sm font-semibold text-[var(--brand)]">₹{fmt(entry.total || 0)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-medium">{entry.ref}</span>
+                <span className="text-xs text-[var(--text-secondary)] truncate">{entry.name}</span>
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--text-secondary)]">
+                {entry.fabric  > 0 && <span>Fabric ₹{fmt(entry.fabric)}</span>}
+                {entry.tailoring > 0 && <span>Tailoring ₹{fmt(entry.tailoring)}</span>}
+                {entry.embroidery > 0 && <span>Emb ₹{fmt(entry.embroidery)}</span>}
+                {entry.addon > 0 && <span>Add-on ₹{fmt(entry.addon)}</span>}
+                {entry.advance > 0 && <span>Adv ₹{fmt(entry.advance)}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full min-w-[860px]">
             <thead>
               <tr className="bg-[var(--bg)]">
@@ -311,6 +336,7 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );
@@ -343,7 +369,12 @@ export default function Daybook() {
       if (res.data && res.data.includes(todayStr)) setDateFilter(todayStr);
     }).catch(() => {});
   }, []);
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+    const handler = () => loadData();
+    dataEvents.addEventListener("daybook", handler);
+    return () => dataEvents.removeEventListener("daybook", handler);
+  }, [loadData]);
 
   const handleCategoryTally = async (ref, date, category, action) => {
     await tallyEntries({ entry_ids: [ref], date, category, action });
@@ -403,14 +434,14 @@ export default function Daybook() {
         <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-4 flex flex-wrap items-center gap-6">
           <div>
             <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Total Collected</p>
-            <p className="font-mono text-2xl font-semibold mt-0.5">₹{summaryStats.total.toLocaleString("en-IN")}</p>
+            <p className="font-mono text-2xl font-semibold mt-0.5">₹{fmt(summaryStats.total)}</p>
           </div>
           <div className="h-8 w-px bg-[var(--border-subtle)] hidden sm:block" />
           <div className="flex flex-wrap gap-4">
             {Object.entries(summaryStats.byMode).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]).map(([mode, amt]) => (
               <div key={mode}>
                 <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">{mode}</p>
-                <p className="font-mono text-sm font-medium mt-0.5">₹{amt.toLocaleString("en-IN")}</p>
+                <p className="font-mono text-sm font-medium mt-0.5">₹{fmt(amt)}</p>
               </div>
             ))}
           </div>

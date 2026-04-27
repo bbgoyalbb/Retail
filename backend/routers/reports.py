@@ -857,59 +857,66 @@ async def get_summary_report(date_from: Optional[str] = None, date_to: Optional[
     if date_to:
         match_query.setdefault("date", {})["$lte"] = date_to
 
-    items = await db.items.find(match_query if match_query else {}, {"_id": 0}).to_list(5000)
-    advances = await db.advances.find({}, {"_id": 0}).to_list(500)
+    _ns = {"$not": {"$regex": "^Settled"}}
+    pipeline = [
+        {"$match": match_query} if match_query else {"$match": {}},
+        {"$facet": {
+            "totals": [{"$group": {
+                "_id": None,
+                "total_fabric":              {"$sum": "$fabric_amount"},
+                "total_fabric_received":     {"$sum": "$fabric_received"},
+                "total_tailoring":           {"$sum": "$tailoring_amount"},
+                "total_tailoring_received":  {"$sum": "$tailoring_received"},
+                "total_embroidery":          {"$sum": "$embroidery_amount"},
+                "total_embroidery_received": {"$sum": "$embroidery_received"},
+                "total_addon":               {"$sum": "$addon_amount"},
+                "total_addon_received":      {"$sum": "$addon_received"},
+                "total_items":               {"$sum": 1},
+            }}],
+            "fabric_pending":     [{"$match": {"fabric_pay_mode":     _ns}}, {"$group": {"_id": None, "v": {"$sum": "$fabric_pending"}}}],
+            "tailoring_pending":  [{"$match": {"tailoring_pay_mode":  _ns}}, {"$group": {"_id": None, "v": {"$sum": "$tailoring_pending"}}}],
+            "embroidery_pending": [{"$match": {"embroidery_pay_mode": _ns}}, {"$group": {"_id": None, "v": {"$sum": "$embroidery_pending"}}}],
+            "addon_pending":      [{"$match": {"addon_pay_mode":      _ns}}, {"$group": {"_id": None, "v": {"$sum": "$addon_pending"}}}],
+            "article_types":      [{"$match": {"article_type": {"$nin": ["N/A", "", None]}}}, {"$group": {"_id": "$article_type", "count": {"$sum": 1}}}],
+            "mode_counts":        [{"$match": {"fabric_pay_mode": {"$regex": "^Settled"}}}, {"$group": {"_id": "$fabric_pay_mode", "amount": {"$sum": "$fabric_received"}}}],
+        }}
+    ]
+    import asyncio
+    res_list, adv = await asyncio.gather(
+        db.items.aggregate(pipeline).to_list(1),
+        db.advances.aggregate([{"$group": {"_id": None, "total": {"$sum": "$amount"}}}]).to_list(1),
+    )
+    r = res_list[0] if res_list else {}
+    t = r.get("totals", [{}])[0] if r.get("totals") else {}
 
-    total_fabric = sum(i.get("fabric_amount", 0) for i in items)
-    total_fabric_received = sum(i.get("fabric_received", 0) for i in items)
-    # max(0, sum) so over-paid credits (negative pending) correctly reduce the outstanding total
-    total_fabric_pending = sum(i.get("fabric_pending", 0) for i in items if not str(i.get("fabric_pay_mode", "")).startswith("Settled"))
-    total_tailoring = sum(i.get("tailoring_amount", 0) for i in items)
-    total_tailoring_received = sum(i.get("tailoring_received", 0) for i in items)
-    total_tailoring_pending = sum(i.get("tailoring_pending", 0) for i in items if not str(i.get("tailoring_pay_mode", "")).startswith("Settled"))
-    total_embroidery = sum(i.get("embroidery_amount", 0) for i in items)
-    total_embroidery_received = sum(i.get("embroidery_received", 0) for i in items)
-    total_embroidery_pending = sum(i.get("embroidery_pending", 0) for i in items if not str(i.get("embroidery_pay_mode", "")).startswith("Settled"))
-    total_addon = sum(i.get("addon_amount", 0) for i in items)
-    total_addon_received = sum(i.get("addon_received", 0) for i in items)
-    total_addon_pending = sum(i.get("addon_pending", 0) for i in items if not str(i.get("addon_pay_mode", "")).startswith("Settled"))
-    total_advance = sum(a.get("amount", 0) for a in advances)
-
-    # Payment mode breakdown
+    # Parse mode_counts from aggregated fabric_pay_mode labels
     mode_counts = {}
-    for i in items:
-        mode = i.get("fabric_pay_mode", "N/A")
-        if mode.startswith("Settled"):
-            parts = mode.replace("Settled - ", "").split(", ")
-            for p in parts:
-                p = p.strip()
-                if p:
-                    mode_counts[p] = mode_counts.get(p, 0) + i.get("fabric_received", 0)
-
-    # Article type breakdown
-    article_counts = {}
-    for i in items:
-        at = i.get("article_type", "N/A")
-        if at != "N/A":
-            article_counts[at] = article_counts.get(at, 0) + 1
+    for entry in r.get("mode_counts", []):
+        label = entry.get("_id", "") or ""
+        amount = entry.get("amount", 0)
+        parts = label.replace("Settled - ", "").split(", ")
+        for p in parts:
+            p = p.strip()
+            if p:
+                mode_counts[p] = mode_counts.get(p, 0) + amount
 
     return {
-        "total_fabric": total_fabric,
-        "total_fabric_received": total_fabric_received,
-        "total_fabric_pending": total_fabric_pending,
-        "total_tailoring": total_tailoring,
-        "total_tailoring_received": total_tailoring_received,
-        "total_tailoring_pending": total_tailoring_pending,
-        "total_embroidery": total_embroidery,
-        "total_embroidery_received": total_embroidery_received,
-        "total_embroidery_pending": total_embroidery_pending,
-        "total_addon": total_addon,
-        "total_addon_received": total_addon_received,
-        "total_addon_pending": total_addon_pending,
-        "total_advance": total_advance,
-        "total_items": len(items),
+        "total_fabric":              t.get("total_fabric", 0),
+        "total_fabric_received":     t.get("total_fabric_received", 0),
+        "total_fabric_pending":      r["fabric_pending"][0]["v"]     if r.get("fabric_pending")     else 0,
+        "total_tailoring":           t.get("total_tailoring", 0),
+        "total_tailoring_received":  t.get("total_tailoring_received", 0),
+        "total_tailoring_pending":   r["tailoring_pending"][0]["v"]  if r.get("tailoring_pending")  else 0,
+        "total_embroidery":          t.get("total_embroidery", 0),
+        "total_embroidery_received": t.get("total_embroidery_received", 0),
+        "total_embroidery_pending":  r["embroidery_pending"][0]["v"] if r.get("embroidery_pending") else 0,
+        "total_addon":               t.get("total_addon", 0),
+        "total_addon_received":      t.get("total_addon_received", 0),
+        "total_addon_pending":       r["addon_pending"][0]["v"]      if r.get("addon_pending")      else 0,
+        "total_advance":             adv[0]["total"] if adv else 0,
+        "total_items":               t.get("total_items", 0),
         "payment_modes": [{"mode": k, "amount": v} for k, v in sorted(mode_counts.items(), key=lambda x: -x[1])],
-        "article_types": [{"type": k, "count": v} for k, v in sorted(article_counts.items(), key=lambda x: -x[1])],
+        "article_types": [{"type": e["_id"], "count": e["count"]} for e in sorted(r.get("article_types", []), key=lambda x: -x["count"])],
     }
 
 # ==========================================

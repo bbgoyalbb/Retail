@@ -7,12 +7,18 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, date
 import uuid
 import re
+import os
+import logging
+from pathlib import Path
+ROOT_DIR = Path(__file__).parent.parent
+logger = logging.getLogger(__name__)
 from bson import ObjectId
 from .deps import db, get_current_user_dep
 from data_quality import round_money, determine_payment_status, build_payment_mode_label
 import auth as auth_module
 from auth import audit_log
 from .models import LoginRequest, UserCreateRequest, DEFAULT_SETTINGS, merge_settings
+from jose import jwt as jose_jwt, JWTError
 
 # ==========================================
 # RATE LIMITING
@@ -135,7 +141,19 @@ async def login(req: LoginRequest, request: Request):
     }
 
 @router.post("/auth/logout")
-async def logout(current_user: dict = Depends(get_current_user_dep)):
+async def logout(request: Request, current_user: dict = Depends(get_current_user_dep)):
+    try:
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.removeprefix("Bearer ").strip()
+        payload = jose_jwt.decode(token, auth_module.SECRET_KEY, algorithms=[auth_module.ALGORITHM])
+        jti = payload.get("jti")
+        if jti:
+            await db.token_blocklist.insert_one({
+                "jti": jti,
+                "created_at": datetime.now(timezone.utc),
+            })
+    except Exception:
+        pass
     return {"message": "Logged out"}
 
 @router.get("/auth/me")

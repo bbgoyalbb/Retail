@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { createBill, getCustomers, getInvoiceUrl, getSettings } from "@/api";
+import { invalidate } from "@/lib/dataEvents";
 import { Plus, Trash, FloppyDisk, Barcode, Printer, PencilSimple, X, Scissors, ArrowsSplit, CheckCircle, Spinner } from "@phosphor-icons/react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import InvoiceModal from "@/components/InvoiceModal";
@@ -357,6 +358,9 @@ export default function NewBill() {
       setLastBillTotal(res.data.grand_total);
       setShowPostSave(true);
       setMessage(null);
+      invalidate("dashboard");
+      invalidate("daybook");
+      getCustomers().then(res => setConfig(p => ({ ...p, customers: res.data || [] }))).catch(() => {});
       resetFormFields();
     } catch (err) {
       setMessage({ type: "error", text: err.response?.data?.detail || "Failed to save bill" });

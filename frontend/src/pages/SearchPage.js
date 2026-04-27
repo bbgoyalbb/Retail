@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { searchItems, getCustomers } from "@/api";
 import { fmt } from "@/lib/fmt";
@@ -48,19 +48,7 @@ export default function SearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Debounced search for query changes
-  useEffect(() => {
-    if (!searched && !query) return;
-    const timer = setTimeout(() => {
-      if (query || searched) {
-        handleSearch(0);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
-
-  const handleSearch = async (page = 0, overrides = {}) => {
+  const handleSearch = useCallback(async (page = 0, overrides = {}) => {
     setLoading(true);
     setError(null);
     setCurrentPage(page);
@@ -90,7 +78,16 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [query, customer, dateFrom, dateTo, status, paymentStatus, minAmount, maxAmount, searched]);
+
+  // Debounced search for query changes
+  useEffect(() => {
+    if (!searched && !query) return;
+    const timer = setTimeout(() => {
+      if (query || searched) handleSearch(0);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, handleSearch]);
 
   const clearFilters = () => {
     setQuery(""); setCustomer("All"); setDateFrom(""); setDateTo("");

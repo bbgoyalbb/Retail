@@ -272,7 +272,12 @@ class UserCreateRequest(BaseModel):
     role: str = "cashier"
     allowed_pages: List[str] = []
 
-# --- Rate limiting ---
+# --- SplitItem ---
+class SplitItem(BaseModel):
+    article_type: str
+    qty: float
+    embroidery_status: str = "Not Required"
+
 
 # --- SplitTailoringRequest ---
 class SplitTailoringRequest(BaseModel):

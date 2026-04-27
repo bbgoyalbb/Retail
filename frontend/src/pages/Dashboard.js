@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getDashboard } from "@/api";
 import { fmt } from "@/lib/fmt";
+import { dataEvents } from "@/lib/dataEvents";
 import { CurrencyDollar, Scissors, UsersThree, TrendUp, ArrowsClockwise, Receipt, Warning, CalendarCheck, ChartBar, BookOpen, ArrowRight } from "@phosphor-icons/react";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -76,7 +77,9 @@ export default function Dashboard() {
   useEffect(() => {
     fetchData();
     const interval = setInterval(() => fetchData(true), 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    const handler = () => fetchData(true);
+    dataEvents.addEventListener("dashboard", handler);
+    return () => { clearInterval(interval); dataEvents.removeEventListener("dashboard", handler); };
   }, [fetchData]);
 
   if (loading) {

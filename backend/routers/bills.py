@@ -6,6 +6,9 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, date
 import uuid
 import re
+import os
+import logging
+logger = logging.getLogger(__name__)
 from bson import ObjectId
 from .deps import db, get_current_user_dep
 from data_quality import round_money, determine_payment_status, build_payment_mode_label
@@ -13,10 +16,25 @@ import auth as auth_module
 from auth import audit_log
 from .models import ADDON_ITEMS, ARTICLE_TYPES, BillLineItem, CreateBillRequest, PAYMENT_MODES, TAILORING_RATES, validate_date
 
+def safe_float(v):
+    if v is None or str(v).strip() in ("N/A", "", "None"):
+        return 0
+    try:
+        return float(v)
+    except (ValueError, TypeError):
+        return 0
+
+def safe_str(v):
+    if v is None:
+        return "N/A"
+    return str(v).strip()
+
 router = APIRouter()
 
 @router.post("/seed")
 async def seed_data(current_user: dict = Depends(get_current_user_dep)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     count = await db.items.count_documents({})
     if count > 0:
         return {"message": "Data already seeded", "items_count": count}
@@ -60,19 +78,6 @@ async def seed_data(current_user: dict = Depends(get_current_user_dep)):
             labour_pay_date = ""
             if row[23] and hasattr(row[23], 'strftime'):
                 labour_pay_date = row[23].strftime("%Y-%m-%d")
-
-            def safe_float(v):
-                if v is None or str(v).strip() in ("N/A", "", "None"):
-                    return 0
-                try:
-                    return float(v)
-                except (ValueError, TypeError):
-                    return 0
-
-            def safe_str(v):
-                if v is None:
-                    return "N/A"
-                return str(v).strip()
 
             item = {
                 "id": str(uuid.uuid4()),

@@ -11,7 +11,12 @@ set "BACKEND_PORT=8001"
 set "ENV_FILE=%ROOT%backend\.env"
 set "PYTHON=%ROOT%backend\venv\Scripts\python.exe"
 
-if not exist "%PYTHON%" set "PYTHON=py"
+if not exist "%PYTHON%" (
+    echo [WARN] Virtual environment not found at %ROOT%backend\venv
+    echo        Falling back to system Python. For isolated dependencies, run:
+    echo          cd backend ^&^& python -m venv venv ^&^& venv\Scripts\activate ^&^& pip install -r requirements.txt
+    set "PYTHON=py"
+)
 
 echo ==========================================
 echo  Retail App - Production Build ^& Run

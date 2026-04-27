@@ -7,6 +7,7 @@ from datetime import datetime, timezone, date
 import uuid
 import re
 from bson import ObjectId
+from pymongo import UpdateOne
 from .deps import db, get_current_user_dep
 from data_quality import round_money, determine_payment_status, build_payment_mode_label
 import auth as auth_module
@@ -62,6 +63,10 @@ async def process_settlement(req: SettlementRequest, current_user: dict = Depend
     if req.use_advance:
         advance_to_use = min(available_advance, max(0.0, round_money(total_allocated - fresh_payment)))
 
+    if fresh_payment + advance_to_use < total_allocated - 0.01:
+        raise HTTPException(status_code=400,
+            detail=f"Payment shortfall: allocated ₹{total_allocated:.2f} but only ₹{fresh_payment + advance_to_use:.2f} available")
+
     # Over-payment is allowed: excess is distributed pro-rata and pending goes negative.
     # Pool-match is validated on the frontend as a warning, not a hard block here.
 
@@ -69,19 +74,14 @@ async def process_settlement(req: SettlementRequest, current_user: dict = Depend
     all_items = await db.items.find({"ref": req.ref}, {"_id": 0}).to_list(500)
     
     async def apply_pro_rata(pay_mode_field, pay_date_field, received_field, pending_field, total_to_pay):
-        # Derive the amount field name from the pending field name
-        # e.g. "fabric_pending" -> "fabric_amount", "tailoring_pending" -> "tailoring_amount"
         amount_field = pending_field.replace("_pending", "_amount")
-
-        # Use pre-fetched items instead of querying DB again
-        # We cannot filter by pending>0 because over-payment must also reach
-        # already-settled items (pending=0). Pro-rata weight = category amount.
         eligible = [i for i in all_items if round_money(i.get(amount_field, 0)) > 0]
         if not eligible:
             return
 
         total_weight = sum(round_money(i.get(amount_field, 0)) for i in eligible)
         running_paid = 0
+        bulk_ops = []
 
         for idx, item in enumerate(eligible):
             weight = round_money(item.get(amount_field, 0))
@@ -94,14 +94,17 @@ async def process_settlement(req: SettlementRequest, current_user: dict = Depend
 
             existing_received = round_money(item.get(received_field, 0))
             new_received = round_money(existing_received + share)
-            new_balance = round_money(bal - share)  # negative when over-paid
+            new_balance = round_money(bal - share)
             update = {
                 pay_date_field: req.payment_date,
                 received_field: new_received,
                 pending_field: new_balance,
                 pay_mode_field: build_payment_mode_label(req.payment_modes, new_balance, new_received),
             }
-            await db.items.update_one({"id": item["id"]}, {"$set": update})
+            bulk_ops.append(UpdateOne({"id": item["id"]}, {"$set": update}))
+
+        if bulk_ops:
+            await db.items.bulk_write(bulk_ops, ordered=False)
 
     if req.allot_fabric > 0:
         await apply_pro_rata("fabric_pay_mode", "fabric_pay_date", "fabric_received", "fabric_pending", req.allot_fabric)

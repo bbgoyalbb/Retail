@@ -1,10 +1,19 @@
 from datetime import datetime, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import List
 import uuid
 
 
+PENNY_TOLERANCE = 0.01
+RUPEE_TOLERANCE = 1.0
+
 def round_money(value: float) -> float:
     return round(float(value or 0), 2)
+
+
+def round_money_precise(value) -> Decimal:
+    """Decimal-based rounding for exact financial arithmetic (avoids float drift)."""
+    return Decimal(str(value or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def determine_payment_status(pending_amount: float, received_amount: float) -> str:
@@ -41,7 +50,7 @@ def analyze_payment_field(
     mode = item.get(mode_field, "N/A") or "N/A"
     expected_status = determine_payment_status(pending, received)
 
-    if pending < 0 or (total >= 0 and received - total > 0.01):
+    if pending < 0 or (total >= 0 and received - total > PENNY_TOLERANCE):
         issues.append({
             "type": "overpaid",
             "category": label,
@@ -63,7 +72,7 @@ def analyze_payment_field(
             "mode": mode,
         })
 
-    if total >= 0 and pending - total > 0.01:
+    if total >= 0 and pending - total > PENNY_TOLERANCE:
         issues.append({
             "type": "pending_exceeds_total",
             "category": label,
@@ -74,7 +83,7 @@ def analyze_payment_field(
             "mode": mode,
         })
 
-    if total > 0 and pending >= 0 and abs(round_money(received + pending) - total) > 1:
+    if total > 0 and pending >= 0 and abs(round_money(received + pending) - total) > RUPEE_TOLERANCE:
         issues.append({
             "type": "amount_mismatch",
             "category": label,

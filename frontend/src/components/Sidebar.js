@@ -15,58 +15,32 @@ import {
 
   MagnifyingGlass, Table, ChartBar, Database, Gear, ClipboardText,
 
-  CaretDoubleLeft, CaretDoubleRight, Sun, Moon, SignOut, UserCircle, UsersFour, ClockCounterClockwise
+  CaretDoubleLeft, CaretDoubleRight, Sun, Moon, SignOut, UserCircle, UsersFour, ClockCounterClockwise, Keyboard
 
 } from "@phosphor-icons/react";
 
 
 
 const NAV_ITEMS = [
-
   { key: "dashboard", label: "Dashboard", icon: House, path: "/" },
-
-
-
   { key: "section-tx", type: "section", label: "Transactions" },
-
   { key: "new-bill", label: "New Bill", icon: Receipt, path: "/new-bill" },
-
   { key: "tailoring", label: "Tailoring Orders", icon: Scissors, path: "/tailoring" },
-
   { key: "addons", label: "Add-ons", icon: PlusCircle, path: "/addons" },
-
   { key: "jobwork", label: "Job Work", icon: Kanban, path: "/jobwork" },
-
-
-
   { key: "section-fin", type: "section", label: "Finances", managerOnly: true },
-
   { key: "settlements", label: "Settlements", icon: CurrencyDollar, path: "/settlements", managerOnly: true },
-
   { key: "daybook", label: "Daybook", icon: BookOpen, path: "/daybook", managerOnly: true },
-
   { key: "labour", label: "Labour Payments", icon: UsersThree, path: "/labour", managerOnly: true },
-
-
-
   { key: "section-mgmt", type: "section", label: "Manage" },
-
   { key: "items", label: "Manage Orders", icon: Table, path: "/items", managerOnly: true },
-
   { key: "order-status", label: "Order Status", icon: ClipboardText, path: "/order-status" },
-
   { key: "search", label: "Search", icon: MagnifyingGlass, path: "/search" },
-
   { key: "reports", label: "Reports", icon: ChartBar, path: "/reports", managerOnly: true },
-
   { key: "data", label: "Data Manager", icon: Database, path: "/data", adminOnly: true },
-
   { key: "settings", label: "Settings", icon: Gear, path: "/settings", adminOnly: true },
-
   { key: "users", label: "Users", icon: UsersFour, path: "/users", adminOnly: true },
-
   { key: "audit", label: "Audit Log", icon: ClockCounterClockwise, path: "/audit", adminOnly: true },
-
 ];
 
 
@@ -337,6 +311,19 @@ export default function Sidebar({ open, setOpen }) {
             >
               <Receipt size={14} weight="bold" />
               New Bill
+            </button>
+          )}
+
+          {/* Keyboard shortcuts hint */}
+          {!collapsed && (
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('shortcuts:open'))}
+              className="w-full flex items-center justify-center gap-1.5 mt-1 py-1.5 text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg)] rounded-sm transition-colors"
+              title="Keyboard shortcuts"
+            >
+              <Keyboard size={13} />
+              <span>Shortcuts</span>
+              <kbd className="ml-auto px-1 py-0.5 text-[9px] border border-[var(--border-subtle)] rounded bg-[var(--bg)] font-mono">?</kbd>
             </button>
           )}
 

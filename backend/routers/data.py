@@ -7,16 +7,37 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, date
 import uuid
 import re
+import os
+import logging
+logger = logging.getLogger(__name__)
 from bson import ObjectId
 from .deps import db, get_current_user_dep
 from data_quality import round_money, determine_payment_status, build_payment_mode_label
 import auth as auth_module
 from auth import audit_log
-from .models import ADDON_ITEMS, ARTICLE_TYPES, ItemUpdateRequest, PAYMENT_MODES, TAILORING_RATES
+from .models import ADDON_ITEMS, ARTICLE_TYPES, ItemUpdateRequest, PAYMENT_MODES, TAILORING_RATES, DEFAULT_SETTINGS, merge_settings
 import io, json, shutil
 from pathlib import Path
 from data_quality import generate_data_audit as dq_generate_data_audit, normalize_low_risk_data as dq_normalize_low_risk_data, repair_high_risk_data as dq_repair_high_risk_data
 ROOT_DIR = Path(__file__).parent.parent
+
+def safe_float(v):
+    if v is None or str(v).strip() in ("N/A", "", "None"):
+        return 0
+    try:
+        return float(v)
+    except (ValueError, TypeError):
+        return 0
+
+def safe_str(v):
+    if v is None:
+        return "N/A"
+    return str(v).strip()
+
+def safe_date(v):
+    if v and hasattr(v, 'strftime'):
+        return v.strftime("%Y-%m-%d")
+    return "N/A"
 
 router = APIRouter()
 
@@ -48,24 +69,6 @@ async def import_excel(
             for row in ws.iter_rows(min_row=2, max_row=ws.max_row, values_only=True):
                 if not row[0]:
                     continue
-
-                def safe_float(v):
-                    if v is None or str(v).strip() in ("N/A", "", "None"):
-                        return 0
-                    try:
-                        return float(v)
-                    except (ValueError, TypeError):
-                        return 0
-
-                def safe_str(v):
-                    if v is None:
-                        return "N/A"
-                    return str(v).strip()
-
-                def safe_date(v):
-                    if v and hasattr(v, 'strftime'):
-                        return v.strftime("%Y-%m-%d")
-                    return "N/A"
 
                 item = {
                     "id": str(uuid.uuid4()),
@@ -378,30 +381,4 @@ async def repair_db_data(limit: int = 100, current_user: dict = Depends(get_curr
 # SETTINGS (authenticated)
 # ==========================================
 
-DEFAULT_SETTINGS = {
-    "article_types": ARTICLE_TYPES,
-    "tailoring_rates": {k: {"tailoring": v[0], "labour": v[1]} for k, v in TAILORING_RATES.items()},
-    "payment_modes": PAYMENT_MODES,
-    "addon_items": ADDON_ITEMS,
-    "gst_rate": 5.0,
-    "firm_name": "Narwana Agencies",
-    "firm_address": "Jasmeet Nagar, Near Kalka Chowk, Ambala City, Pin: 134003, Haryana",
-    "firm_phones": "9467902343, 7056212655",
-    "firm_gstin": "06ADMPG9353K1Z4",
-    "firm_logo": None,
-    "firm_name_color": "#C86B4D",
-    "firm_name_size": "16",
-    "firm_name_case": "uppercase",
-}
-
-def merge_settings(stored_settings: Optional[dict] = None) -> dict:
-    merged = dict(DEFAULT_SETTINGS)
-    if stored_settings:
-        merged.update({k: v for k, v in stored_settings.items() if k != "key"})
-    # Deduplicate list fields (case-preserving, first occurrence wins)
-    for list_key in ("payment_modes", "addon_items", "article_types"):
-        if isinstance(merged.get(list_key), list):
-            seen = set()
-            merged[list_key] = [x for x in merged[list_key] if not (x.lower() in seen or seen.add(x.lower()))]
-    return merged
 

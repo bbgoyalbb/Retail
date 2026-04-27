@@ -10,7 +10,7 @@ const api = axios.create({ baseURL: `${BACKEND_URL}/api` });
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -24,8 +24,8 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      const hadToken = !!localStorage.getItem("token");
-      localStorage.removeItem("token");
+      const hadToken = !!sessionStorage.getItem("token");
+      sessionStorage.removeItem("token");
       if (hadToken) {
         window.dispatchEvent(new CustomEvent("auth:expired"));
       }
@@ -124,7 +124,7 @@ export const createItem = (data) => api.post("/items", data);
 export const searchItems = (params) => api.get("/search", { params });
 
 // Auth token helper for direct URL links (iframe / anchor href)
-const _authToken = () => { try { return localStorage.getItem("token") || ""; } catch { return ""; } };
+const _authToken = () => { try { return sessionStorage.getItem("token") || ""; } catch { return ""; } };
 
 // Invoice (HTML only) — include token so iframe/direct links authenticate
 export const getInvoiceUrl = (ref) => { const t = _authToken(); return `${BACKEND_URL}/api/invoice?ref=${encodeURIComponent(ref)}${t ? `&token=${encodeURIComponent(t)}` : ''}`; };

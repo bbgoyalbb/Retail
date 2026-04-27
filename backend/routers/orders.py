@@ -112,8 +112,8 @@ async def mark_order_delivered(
     )
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="No items updated — order may not exist or is already delivered")
-    await audit_log(db, current_user["username"], "update", "items",
-        f"Mark order {order_no} as Delivered ({result.modified_count} items)", request)
+    await audit_log(db, "update", current_user, "items",
+        order_no, {"note": f"Marked as Delivered ({result.modified_count} items)"})
     return {"modified": result.modified_count}
 
 # ==========================================

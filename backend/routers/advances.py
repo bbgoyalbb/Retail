@@ -2,7 +2,6 @@
 Advances router.
 """
 from fastapi import APIRouter, HTTPException, Query, Depends, Request
-from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, date
 import uuid
@@ -25,21 +24,6 @@ async def get_advances(name: Optional[str] = None, ref: Optional[str] = None, cu
         query["ref"] = ref
     advances = await db.advances.find(query, {"_id": 0}).sort("date", -1).to_list(500)
     return advances
-
-class AdvanceCreateRequest(BaseModel):
-    ref: str
-    name: str
-    amount: float
-    date: str
-    mode: Optional[str] = "Cash"
-
-class AdvanceUpdateRequest(BaseModel):
-    ref: Optional[str] = None
-    name: Optional[str] = None
-    amount: Optional[float] = None
-    date: Optional[str] = None
-    mode: Optional[str] = None
-    tally: Optional[bool] = None
 
 @router.post("/advances")
 async def create_advance(req: AdvanceCreateRequest, current_user: dict = Depends(get_current_user_dep)):

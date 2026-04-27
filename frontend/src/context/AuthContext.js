@@ -9,12 +9,12 @@ export function AuthProvider({ children }) {
   const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     if (token) {
       getMe()
         .then((data) => setUser(data))
         .catch(() => {
-          localStorage.removeItem("token");
+          sessionStorage.removeItem("token");
           setUser(null);
         })
         .finally(() => setLoading(false));
@@ -34,14 +34,14 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (username, password) => {
     const res = await apiLogin(username, password);
-    localStorage.setItem("token", res.access_token);
+    sessionStorage.setItem("token", res.access_token);
     setSessionExpired(false);
     setUser(res.user);
     return res.user;
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
     setUser(null);
     setSessionExpired(false);
   }, []);

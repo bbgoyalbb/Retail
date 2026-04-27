@@ -196,7 +196,7 @@ export default function AuditLogPage() {
                     <td className="px-4 py-3 font-mono text-xs text-[var(--text-secondary)] whitespace-nowrap">
                       {log.timestamp ? new Date(log.timestamp).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
                     </td>
-                    <td className="px-4 py-3 font-medium whitespace-nowrap">{log.user || log.username || "—"}</td>
+                    <td className="px-4 py-3 font-medium whitespace-nowrap">{log.username || log.user || "—"}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={badge(log.action)}>{log.action || "—"}</span>
                     </td>
