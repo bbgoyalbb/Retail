@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { getItems, getItem, getAdvances, updateItem, deleteItem, createItem, updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache, exportExcelUrl, getSettings } from "@/api";
+import { getItems, getItem, getAdvances, updateItem, deleteItem, createItem, updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache, invalidateAdvancesCache, exportExcelUrl, getSettings } from "@/api";
 import { fmt } from "@/lib/fmt";
 import { PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle, Funnel, DownloadSimple, CurrencyDollar } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
@@ -98,8 +98,9 @@ const SECTIONS = {
 // ==========================================
 // GRID LAYOUT — single source of truth
 // Columns: caret | date | ref | order# | customer | fab | tail | emb | add-on | adv | items | total | rcvd | pending | actions
+// (checkbox 20px is prepended separately in JSX so it stays outside GRID_COLS)
 // ==========================================
-const GRID_COLS = "20px 84px 96px 90px 1fr 74px 60px 60px 60px 52px 36px 80px 72px 88px 112px";
+const GRID_COLS = "20px 80px 92px 82px 1fr 68px 56px 56px 56px 48px 32px 76px 68px 82px 136px";
 
 // ==========================================
 // UTILITY FUNCTIONS
@@ -456,7 +457,7 @@ export default function ItemsManager() {
       setAdvanceData({}); setOriginalAdvanceData({}); setNewAdvances([]); setDeletedAdvances([]); setRefAdvances([]); setEditItems([]);
       setMessage({ type: advFailed === 0 ? "success" : "error", text: advFailed === 0 ? "Advances saved successfully" : `${advFailed} operation(s) failed, ${advSuccess} succeeded` });
       setTimeout(() => setMessage(null), 3000);
-      invalidateItemsCache();
+      invalidateItemsCache(); invalidateAdvancesCache();
       loadData();
       return;
     }
@@ -1368,7 +1369,7 @@ export default function ItemsManager() {
         <SettlementPanel
           orders={settlementOrders}
           onClose={() => setSettlementOrders(null)}
-          onSuccess={() => { invalidateItemsCache(); setSelectedRefs(new Set()); loadData(); }}
+          onSuccess={() => { invalidateItemsCache(); invalidateAdvancesCache(); setSelectedRefs(new Set()); loadData(); }}
         />
       )}
 

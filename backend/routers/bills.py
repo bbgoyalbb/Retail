@@ -308,6 +308,9 @@ async def get_items(
                   "addon_desc", "karigar"]:
             projection[f] = 1
 
+    if summary:
+        items = await db.items.find(query, projection).sort("date", -1).skip(skip).limit(limit).to_list(limit)
+        return {"items": items, "total": len(items)}
     items, total = await asyncio.gather(
         db.items.find(query, projection).sort("date", -1).skip(skip).limit(limit).to_list(limit),
         db.items.count_documents(query),

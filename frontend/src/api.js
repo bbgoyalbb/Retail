@@ -110,7 +110,24 @@ export const getKarigars = () => api.get("/labour/karigars");
 export const payLabour = (data) => api.post("/labour/pay", data);
 export const deleteLabourPayment = (data) => api.post("/labour/delete-payment", data);
 
-export const getAdvances = (params) => api.get("/advances", { params });
+let _advancesCache = null;
+let _advancesCacheTime = 0;
+const ADVANCES_CACHE_TTL = 60000;
+export const getAdvances = (params) => {
+  if (!params || Object.keys(params).length === 0) {
+    const now = Date.now();
+    if (_advancesCache && now - _advancesCacheTime < ADVANCES_CACHE_TTL) {
+      return Promise.resolve(_advancesCache);
+    }
+    return api.get("/advances").then(res => {
+      _advancesCache = res;
+      _advancesCacheTime = Date.now();
+      return res;
+    });
+  }
+  return api.get("/advances", { params });
+};
+export const invalidateAdvancesCache = () => { _advancesCache = null; };
 export const createAdvance = (data) => api.post("/advances", data);
 export const updateAdvance = (id, data) => api.put(`/advances/${id}`, data);
 export const deleteAdvance = (id) => api.delete(`/advances/${id}`);
