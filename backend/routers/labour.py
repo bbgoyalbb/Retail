@@ -91,9 +91,9 @@ async def pay_labour(req: LabourPaymentRequest, current_user: dict = Depends(get
 async def delete_labour_payment(req: LabourDeleteRequest, current_user: dict = Depends(get_current_user_dep)):
     from pymongo import UpdateOne
     if req.labour_type == "tailoring":
-        update = {"labour_paid": "N/A", "labour_pay_date": "N/A"}
+        update = {"labour_paid": "N/A", "labour_pay_date": "N/A", "labour_payment_mode": "N/A", "labour_payment_id": ""}
     else:
-        update = {"emb_labour_paid": "N/A", "emb_labour_date": "N/A"}
+        update = {"emb_labour_paid": "N/A", "emb_labour_date": "N/A", "emb_labour_payment_mode": "N/A", "emb_labour_payment_id": ""}
     bulk_ops = [UpdateOne({"id": item_id}, {"$set": update}) for item_id in req.item_ids]
     result = await db.items.bulk_write(bulk_ops, ordered=False)
     return {"message": f"{result.modified_count} items marked as unpaid"}

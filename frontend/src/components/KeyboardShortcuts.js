@@ -7,13 +7,12 @@ const SHORTCUTS = [
   { keys: "Ctrl + D",   desc: "Dashboard" },
   { keys: "Ctrl + 1",   desc: "Dashboard" },
   { keys: "Ctrl + 2",   desc: "New Bill" },
-  { keys: "Ctrl + 3",   desc: "Tailoring" },
+  { keys: "Ctrl + 3",   desc: "Job Work" },
   { keys: "Ctrl + 4",   desc: "Manage Orders" },
   { keys: "Ctrl + 5",   desc: "Daybook" },
-  { keys: "Ctrl + 6",   desc: "Items" },
-  { keys: "Ctrl + 7",   desc: "Order Status" },
-  { keys: "Ctrl + 8",   desc: "Search" },
-  { keys: "Ctrl + 9",   desc: "Settings" },
+  { keys: "Ctrl + 6",   desc: "Order Status" },
+  { keys: "Ctrl + 7",   desc: "Search" },
+  { keys: "Ctrl + 8",   desc: "Settings" },
   { keys: "Ctrl + S",   desc: "Save Bill (on New Bill page)" },
   { keys: "?",          desc: "Show this help" },
   { keys: "Esc",        desc: "Close modals / dialogs" },
@@ -41,7 +40,7 @@ export function KeyboardShortcuts() {
 
       if ((e.ctrlKey || e.metaKey) && e.key >= "1" && e.key <= "9") {
         e.preventDefault();
-        const map = { "1": "/", "2": "/new-bill", "3": "/tailoring", "4": "/items", "5": "/daybook", "6": "/order-status", "7": "/search", "8": "/settings" };
+        const map = { "1": "/", "2": "/new-bill", "3": "/jobwork", "4": "/items", "5": "/daybook", "6": "/order-status", "7": "/search", "8": "/settings" };
         if (map[e.key]) navigate(map[e.key]);
       }
     };

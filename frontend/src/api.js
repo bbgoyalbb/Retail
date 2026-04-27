@@ -53,7 +53,6 @@ export const getCustomers = () => {
     return res;
   });
 };
-export const getPendingCustomers = () => api.get("/customers", { params: { pending_only: true } });
 export const invalidateCustomersCache = () => { _customersCache = null; };
 let _itemsCache = null;
 let _itemsCacheTime = 0;
@@ -75,16 +74,13 @@ export const getItems = (params) => {
 export const invalidateItemsCache = () => { _itemsCache = null; };
 export const getItem = (id) => api.get(`/items/${id}`);
 export const getRefs = (name) => api.get("/refs", { params: { name } });
-export const getPendingRefs = (name) => api.get("/refs", { params: { name, pending_only: true } });
 export const getOrders = () => api.get("/orders");
-export const getPendingOrders = () => api.get("/orders", { params: { pending_only: true } });
 export const getOrderStatus = (params) => api.get("/orders/status", { params });
 export const markOrderDelivered = (order_no) => api.post("/orders/deliver", { order_no });
 
 export const createBill = (data) => api.post("/bills", data);
 export const getNextBillRef = (date) => api.get("/bills/next-ref", { params: { date } });
 
-export const getAwaitingOrders = () => api.get("/tailoring/awaiting");
 export const assignTailoring = (data) => api.post("/tailoring/assign", data);
 export const splitTailoring = (data) => api.post("/tailoring/split", data);
 

@@ -9,7 +9,7 @@ import { getDaybookPendingCount, getPublicSettings, BACKEND_URL } from "@/api";
 
 import {
 
-  House, Receipt, Scissors, PlusCircle, Kanban,
+  House, Receipt, Kanban,
 
   BookOpen, UsersThree,
 
@@ -25,8 +25,6 @@ const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: House, path: "/" },
   { key: "section-tx", type: "section", label: "Transactions" },
   { key: "new-bill", label: "New Bill", icon: Receipt, path: "/new-bill" },
-  { key: "tailoring", label: "Tailoring Orders", icon: Scissors, path: "/tailoring" },
-  { key: "addons", label: "Add-ons", icon: PlusCircle, path: "/addons" },
   { key: "jobwork", label: "Job Work", icon: Kanban, path: "/jobwork" },
   { key: "section-fin", type: "section", label: "Finances", managerOnly: true },
   { key: "daybook", label: "Daybook", icon: BookOpen, path: "/daybook", managerOnly: true },

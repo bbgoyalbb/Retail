@@ -13,8 +13,6 @@ import { useLocation } from "react-router-dom";
 const PAGE_TITLES = {
   "/": "Dashboard",
   "/new-bill": "New Bill",
-  "/tailoring": "Tailoring Orders",
-  "/addons": "Add-ons",
   "/jobwork": "Job Work",
   "/daybook": "Daybook",
   "/labour": "Labour Payments",
@@ -31,8 +29,6 @@ const PAGE_TITLES = {
 // Lazy-load all pages for better initial load performance
 const Dashboard     = lazy(() => import("@/pages/Dashboard"));
 const NewBill       = lazy(() => import("@/pages/NewBill"));
-const TailoringOrders = lazy(() => import("@/pages/TailoringOrders"));
-const AddOns        = lazy(() => import("@/pages/AddOns"));
 const JobWork       = lazy(() => import("@/pages/JobWork"));
 const Daybook       = lazy(() => import("@/pages/Daybook"));
 const LabourPayments = lazy(() => import("@/pages/LabourPayments"));
@@ -143,8 +139,6 @@ function AppShell() {
                 {/* All roles */}
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/new-bill" element={<NewBill />} />
-                <Route path="/tailoring" element={<TailoringOrders />} />
-                <Route path="/addons" element={<AddOns />} />
                 <Route path="/jobwork" element={<JobWork />} />
                 <Route path="/order-status" element={<OrderStatus />} />
                 <Route path="/search" element={<SearchPage />} />
