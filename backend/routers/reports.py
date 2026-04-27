@@ -250,7 +250,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
             if section_label == "Fabric":
                 sub_base += base
                 sub_disc += disc_amt
-                sub_amt += total_with_gst
+                sub_amt += total_with_gst  # use original to avoid rounding drift
             else:
                 sub_base += base
                 sub_disc += 0
@@ -532,6 +532,8 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
   .sec-block table {{
     width: 100%;
     border-collapse: collapse;
+    margin-left: 4px;
+    width: calc(100% - 4px);
   }}
   .sec-block th {{
     font-size: 8px;
