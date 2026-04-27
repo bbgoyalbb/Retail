@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { getItems, getItem, getAdvances, updateItem, deleteItem, createItem, updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache, exportExcelUrl, getSettings } from "@/api";
 import { fmt } from "@/lib/fmt";
 import { PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle, Funnel, DownloadSimple } from "@phosphor-icons/react";
@@ -1079,16 +1079,27 @@ export default function ItemsManager() {
         )}
 
         {/* Reference rows */}
-        {!loading && refs.map(group => {
-          const isCancelled = group.items.some(i => i.cancelled);
-          const isSettled = Math.round(group.totals.pending) === 0 && group.totals.total > 0;
+        {!loading && (() => {
+          let lastDate = null;
+          return refs.map(group => {
+            const isCancelled = group.items.some(i => i.cancelled);
+            const isSettled = Math.round(group.totals.pending) === 0 && group.totals.total > 0;
+            const showDateDivider = group.date !== lastDate;
+            lastDate = group.date;
           const hasTailoringOrder = group.items.some(i => i.order_no && i.order_no !== "N/A");
           const tailoringOrderNo = hasTailoringOrder
             ? group.items.find(i => i.order_no && i.order_no !== "N/A")?.order_no
             : "-";
 
           return (
-            <div key={group.ref} className={`bg-[var(--surface)] border rounded-sm overflow-hidden transition-colors ${isCancelled ? "border-[var(--border-strong)] opacity-75" : "border-[var(--border-subtle)]"}`}>
+            <React.Fragment key={group.ref}>
+              {showDateDivider && (
+                <div className="flex items-center gap-3 pt-2 pb-1">
+                  <span className="text-[10px] uppercase tracking-[0.18em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">{group.date || "—"}</span>
+                  <div className="flex-1 border-t border-[var(--border-subtle)]" />
+                </div>
+              )}
+            <div className={`bg-[var(--surface)] border rounded-sm overflow-hidden transition-colors ${isCancelled ? "border-[var(--border-strong)] opacity-75" : "border-[var(--border-subtle)]"}`}>
 
               {/* Collapsed row — clickable */}
               <div
@@ -1278,8 +1289,10 @@ export default function ItemsManager() {
                 </div>
               )}
             </div>
+          </React.Fragment>
           );
-        })}
+        });
+        })()}
       </div>
 
       {invoiceRef && <InvoiceModal billRef={invoiceRef} onClose={() => setInvoiceRef(null)} />}
