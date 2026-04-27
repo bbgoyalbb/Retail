@@ -1,5 +1,4 @@
 import { useState, useEffect, lazy, Suspense } from "react"; // useEffect used in OfflineBanner
-import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
 import BackToTop from "@/components/BackToTop";

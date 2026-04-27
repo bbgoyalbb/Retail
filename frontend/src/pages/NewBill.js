@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { createBill, getCustomers, getInvoiceUrl, getSettings } from "@/api";
+import { createBill, getCustomers, getInvoiceUrl, getSettings, invalidateCustomersCache } from "@/api";
 import { invalidate } from "@/lib/dataEvents";
 import { Plus, Trash, FloppyDisk, Barcode, Printer, PencilSimple, X, Scissors, ArrowsSplit, CheckCircle, Spinner } from "@phosphor-icons/react";
 import BarcodeScanner from "@/components/BarcodeScanner";
@@ -363,6 +363,7 @@ export default function NewBill() {
       setMessage(null);
       invalidate("dashboard");
       invalidate("daybook");
+      invalidateCustomersCache();
       getCustomers().then(res => setConfig(p => ({ ...p, customers: res.data || [] }))).catch(() => {});
       resetFormFields();
     } catch (err) {

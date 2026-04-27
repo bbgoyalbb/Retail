@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { DatePickerInput } from "@/components/DatePickerInput";
 import { useNavigate } from "react-router-dom";
 import { getRevenueReport, getCustomerReport, getSummaryReport, exportExcelUrl } from "@/api";
@@ -19,8 +19,6 @@ const getChartColors = () => {
     "#B35A3E",
   ];
 };
-const COLORS = getChartColors();
-
 function SummaryCards({ summary }) {
   const cards = [
     { label: "Fabric Total", value: `₹${fmt(summary.total_fabric)}`, color: "var(--brand)" },
@@ -61,6 +59,7 @@ const DATE_PRESETS = [
 
 export default function Reports() {
   const navigate = useNavigate();
+  const COLORS = useMemo(() => getChartColors(), []);
   const [tab, setTab] = useState("revenue");
   const [period, setPeriod] = useState("daily");
   const [dateFrom, setDateFrom] = useState("");
