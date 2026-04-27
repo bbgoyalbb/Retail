@@ -340,8 +340,11 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
           </table>
         </div>"""
 
+    # Use raw DB fabric_amount for totals to avoid GST back-calc rounding drift
+    fabric_amt_db = sum(float(i.get("fabric_amount", 0)) for i in items)
+
     # Grand total
-    grand_total_calc = fab_amt + tail_amt_total + emb_amt_total + ao_amt_total
+    grand_total_calc = fabric_amt_db + tail_amt_total + emb_amt_total + ao_amt_total
     total_gst_calc   = fab_gst  # only fabric has GST
 
     # ---- Payment details table (section-wise) ----
@@ -358,7 +361,6 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
         bal_cls    = "bal-ok" if is_settled_sec else ("bal-due" if bal > 0 else "")
         return f'<tr><td>{label}</td><td class="r">₹{fmt(amt)}</td><td class="r">{rcvd_str}</td><td class="r">{date_str}</td><td>{mode_str}</td><td class="r {bal_cls}">{bal_str}</td></tr>'
 
-    fabric_amt_db = sum(float(i.get("fabric_amount", 0)) for i in items)  # raw DB value matches received
     fabric_rcvd = sum(float(i.get("fabric_received", 0)) for i in items)
     tail_rcvd   = sum(float(i.get("tailoring_received", 0)) for i in items)
     emb_rcvd    = sum(float(i.get("embroidery_received", 0)) for i in items)
