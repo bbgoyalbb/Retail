@@ -82,6 +82,7 @@ export const getOrderStatus = (params) => api.get("/orders/status", { params });
 export const markOrderDelivered = (order_no) => api.post("/orders/deliver", { order_no });
 
 export const createBill = (data) => api.post("/bills", data);
+export const getNextBillRef = (date) => api.get("/bills/next-ref", { params: { date } });
 
 export const getAwaitingOrders = () => api.get("/tailoring/awaiting");
 export const assignTailoring = (data) => api.post("/tailoring/assign", data);

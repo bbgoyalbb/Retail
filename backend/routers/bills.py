@@ -346,6 +346,27 @@ async def get_refs(name: Optional[str] = None, pending_only: bool = False, curre
 # NEW BILL
 # ==========================================
 
+@router.get("/bills/next-ref")
+async def get_next_ref(date: str, current_user: dict = Depends(get_current_user_dep)):
+    try:
+        parts = date.split("-")
+        date_suffix = f"{parts[2]}{parts[1]}{parts[0][2:]}"
+    except Exception:
+        date_suffix = "000000"
+    counter_key = f"bill_seq_{date}"
+    existing_refs = await db.items.distinct("ref", {"date": date})
+    max_existing_seq = 0
+    for r in existing_refs:
+        try:
+            max_existing_seq = max(max_existing_seq, int(r.split("/")[0]))
+        except (ValueError, IndexError):
+            pass
+    counter_doc = await db.counters.find_one({"_id": counter_key})
+    current_seq = max(counter_doc.get("seq", 0) if counter_doc else 0, max_existing_seq)
+    next_seq = current_seq + 1
+    return {"ref": f"{next_seq:02d}/{date_suffix}", "seq": next_seq}
+
+
 @router.post("/bills")
 async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_current_user_dep)):
     if not req.items:
@@ -367,47 +388,60 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
 
     counter_key = f"bill_seq_{req.date}"
 
-    # For back-dated bills the counter doc may not exist yet (bills created on
-    # the actual date were never written to counters, e.g. Excel imports).
-    # Atomically seed the counter to the current DB max seq for that date so
-    # the next $inc starts AFTER all existing refs — no collision possible.
-    existing_refs = await db.items.distinct("ref", {"date": req.date})
-    max_existing_seq = 0
-    for r in existing_refs:
+    # If user supplied a custom ref, validate it's not already used and use it directly.
+    if req.custom_ref and req.custom_ref.strip():
+        ref = req.custom_ref.strip()
+        if await db.items.find_one({"ref": ref}):
+            raise HTTPException(status_code=400, detail=f"Reference '{ref}' already exists. Please choose a different one.")
+        # Sync counter so next auto-generated ref doesn't collide.
         try:
-            max_existing_seq = max(max_existing_seq, int(r.split("/")[0]))
+            custom_seq = int(ref.split("/")[0])
+            await db.counters.update_one(
+                {"_id": counter_key},
+                {"$max": {"seq": custom_seq}},
+                upsert=True,
+            )
         except (ValueError, IndexError):
             pass
+    else:
+        # For back-dated bills the counter doc may not exist yet (bills created on
+        # the actual date were never written to counters, e.g. Excel imports).
+        # Atomically seed the counter to the current DB max seq for that date so
+        # the next $inc starts AFTER all existing refs — no collision possible.
+        existing_refs = await db.items.distinct("ref", {"date": req.date})
+        max_existing_seq = 0
+        for r in existing_refs:
+            try:
+                max_existing_seq = max(max_existing_seq, int(r.split("/")[0]))
+            except (ValueError, IndexError):
+                pass
 
-    if max_existing_seq > 0:
-        # $max is atomic: sets seq = max(current_seq, max_existing_seq) on upsert.
-        # This is safe even with concurrent back-dated bill creation.
-        await db.counters.update_one(
-            {"_id": counter_key},
-            {"$max": {"seq": max_existing_seq}},
-            upsert=True,
-        )
+        if max_existing_seq > 0:
+            await db.counters.update_one(
+                {"_id": counter_key},
+                {"$max": {"seq": max_existing_seq}},
+                upsert=True,
+            )
 
-    counter_doc = await db.counters.find_one_and_update(
-        {"_id": counter_key},
-        {"$inc": {"seq": 1}},
-        upsert=True,
-        return_document=True
-    )
-    seq = counter_doc.get("seq", 1) if counter_doc else 1
-    ref = f"{seq:02d}/{date_suffix}"
-
-    # Final safety net: if ref still collides keep incrementing (e.g. two
-    # concurrent back-dated bills that both ran the seeding step in parallel).
-    while await db.items.find_one({"ref": ref}):
         counter_doc = await db.counters.find_one_and_update(
             {"_id": counter_key},
             {"$inc": {"seq": 1}},
             upsert=True,
             return_document=True
         )
-        seq = counter_doc.get("seq", 1) if counter_doc else seq + 1
+        seq = counter_doc.get("seq", 1) if counter_doc else 1
         ref = f"{seq:02d}/{date_suffix}"
+
+        # Final safety net: if ref still collides keep incrementing.
+        while await db.items.find_one({"ref": ref}):
+            counter_doc = await db.counters.find_one_and_update(
+                {"_id": counter_key},
+                {"$inc": {"seq": 1}},
+                upsert=True,
+                return_document=True
+            )
+            seq = counter_doc.get("seq", 1) if counter_doc else seq + 1
+            ref = f"{seq:02d}/{date_suffix}"
     modes_str = ", ".join(req.payment_modes) if req.payment_modes else "Cash"
     tailoring_status = "Awaiting Order" if req.needs_tailoring else "N/A"
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { createBill, getCustomers, getInvoiceUrl, getSettings, invalidateCustomersCache } from "@/api";
+import { createBill, getCustomers, getInvoiceUrl, getSettings, invalidateCustomersCache, getNextBillRef } from "@/api";
 import { invalidate } from "@/lib/dataEvents";
 import { Plus, Trash, FloppyDisk, Barcode, Printer, PencilSimple, X, Scissors, ArrowsSplit, CheckCircle, Spinner } from "@phosphor-icons/react";
 import BarcodeScanner from "@/components/BarcodeScanner";
@@ -39,6 +39,11 @@ export default function NewBill() {
 
   // Saved items in the bill
   const [items, setItems] = useState([]);
+
+  // Ref preview/override state
+  const [refPreview, setRefPreview] = useState("");
+  const [customRef, setCustomRef] = useState("");
+  const [refEdited, setRefEdited] = useState(false);
 
   // UI / modal state
   const [ui, setUi] = useState({
@@ -117,6 +122,18 @@ export default function NewBill() {
   const saveBtnRef = useRef(null);
 
   useEffect(() => { setTimeout(() => nameRef.current?.focus(), 100); }, []);
+
+  // Fetch ref preview whenever order date changes (and user hasn't manually edited it)
+  useEffect(() => {
+    if (!orderDate) return;
+    getNextBillRef(orderDate)
+      .then(res => {
+        setRefPreview(res.data.ref);
+        if (!refEdited) setCustomRef(res.data.ref);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderDate]);
 
   useEffect(() => {
     getCustomers().then(res => setConfig(p => ({ ...p, customers: res.data || [] }))).catch(() => {});
@@ -355,6 +372,7 @@ export default function NewBill() {
         amount_paid: parseFloat(amountPaid) || 0,
         is_settled: isSettled,
         needs_tailoring: needsTailoring || hasTailoringRows,
+        ...(refEdited && customRef.trim() ? { custom_ref: customRef.trim() } : {}),
       });
 
       setLastBillRef(res.data.ref);
@@ -404,6 +422,8 @@ export default function NewBill() {
     setNeedsTailoring(false);
     setShowTailoringModal(false);
     setShowAddonModal(false);
+    setRefEdited(false);
+    setCustomRef("");
     resetItemForm();
   };
 
@@ -485,6 +505,25 @@ export default function NewBill() {
             <div>
               <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Order Date</label>
               <input ref={dateRef} data-testid="order-date-input" type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} onKeyDown={e => enterNav(e, barcodeRef)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" />
+            </div>
+            <div>
+              <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">
+                Bill Ref
+                {refEdited && customRef !== refPreview && (
+                  <button onClick={() => { setCustomRef(refPreview); setRefEdited(false); }} className="ml-2 text-[9px] text-[var(--brand)] hover:underline normal-case tracking-normal font-normal">reset</button>
+                )}
+              </label>
+              <input
+                data-testid="bill-ref-input"
+                value={customRef}
+                onChange={e => { setCustomRef(e.target.value); setRefEdited(true); }}
+                placeholder={refPreview || "Auto"}
+                className={`w-full px-3 py-2 text-sm font-mono border rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] ${
+                  refEdited && customRef !== refPreview
+                    ? 'border-[var(--warning)] bg-[#D4984210]'
+                    : 'border-[var(--border-subtle)]'
+                }`}
+              />
             </div>
           </div>
 

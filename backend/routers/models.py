@@ -74,6 +74,7 @@ class CreateBillRequest(BaseModel):
     amount_paid: float = 0
     is_settled: bool = False
     needs_tailoring: bool = False
+    custom_ref: Optional[str] = None
 
 class TailoringOrderRequest(BaseModel):
     item_ids: List[str]
