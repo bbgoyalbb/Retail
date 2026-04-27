@@ -190,6 +190,12 @@ async def startup_db_client():
     await db.items.create_index([(  "ref",              ASCENDING), ("fabric_pay_mode",  ASCENDING)], background=True)
     await db.items.create_index([(  "name",             ASCENDING), ("fabric_pay_mode",  ASCENDING)], background=True)
     await db.items.create_index([(  "tailoring_status", ASCENDING), ("labour_paid",      ASCENDING)], background=True)
+    await db.items.create_index([(  "embroidery_status", ASCENDING), ("emb_labour_paid",  ASCENDING)], background=True)
+    await db.items.create_index([(  "embroidery_status", ASCENDING), ("date",             DESCENDING)], background=True)
+    await db.items.create_index("fabric_pay_mode",      background=True)
+    await db.items.create_index("tailoring_pay_mode",   background=True)
+    await db.items.create_index("embroidery_pay_mode",  background=True)
+    await db.items.create_index("addon_pay_mode",       background=True)
 
     await db.items.create_index("fabric_pay_date",      background=True)
     await db.items.create_index("tailoring_pay_date",   background=True)

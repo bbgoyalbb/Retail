@@ -67,41 +67,36 @@ async def get_karigars(current_user: dict = Depends(get_current_user_dep)):
 
 @router.post("/labour/pay")
 async def pay_labour(req: LabourPaymentRequest, current_user: dict = Depends(get_current_user_dep)):
-    updated = 0
+    from pymongo import UpdateOne
     mode_str = ", ".join(req.payment_modes) if req.payment_modes else "Cash"
-    for item_id in req.item_ids:
-        if req.labour_type == "tailoring":
-            update = {
-                "labour_paid": "Yes",
-                "labour_pay_date": req.payment_date,
-                "labour_payment_mode": mode_str,
-                "labour_payment_id": req.payment_id or "",
-            }
-        else:
-            update = {
-                "emb_labour_paid": "Yes",
-                "emb_labour_date": req.payment_date,
-                "emb_labour_payment_mode": mode_str,
-                "emb_labour_payment_id": req.payment_id or "",
-            }
-        result = await db.items.update_one({"id": item_id}, {"$set": update})
-        if result.modified_count > 0:
-            updated += 1
-
-    return {"message": f"{updated} labour payments processed"}
+    if req.labour_type == "tailoring":
+        update = {
+            "labour_paid": "Yes",
+            "labour_pay_date": req.payment_date,
+            "labour_payment_mode": mode_str,
+            "labour_payment_id": req.payment_id or "",
+        }
+    else:
+        update = {
+            "emb_labour_paid": "Yes",
+            "emb_labour_date": req.payment_date,
+            "emb_labour_payment_mode": mode_str,
+            "emb_labour_payment_id": req.payment_id or "",
+        }
+    bulk_ops = [UpdateOne({"id": item_id}, {"$set": update}) for item_id in req.item_ids]
+    result = await db.items.bulk_write(bulk_ops, ordered=False)
+    return {"message": f"{result.modified_count} labour payments processed"}
 
 @router.post("/labour/delete-payment")
 async def delete_labour_payment(req: LabourDeleteRequest, current_user: dict = Depends(get_current_user_dep)):
-    updated = 0
-    for item_id in req.item_ids:
-        if req.labour_type == "tailoring":
-            update = {"labour_paid": "N/A", "labour_pay_date": "N/A"}
-        else:
-            update = {"emb_labour_paid": "N/A", "emb_labour_date": "N/A"}
-        result = await db.items.update_one({"id": item_id}, {"$set": update})
-        if result.modified_count > 0:
-            updated += 1
-    return {"message": f"{updated} items marked as unpaid"}
+    from pymongo import UpdateOne
+    if req.labour_type == "tailoring":
+        update = {"labour_paid": "N/A", "labour_pay_date": "N/A"}
+    else:
+        update = {"emb_labour_paid": "N/A", "emb_labour_date": "N/A"}
+    bulk_ops = [UpdateOne({"id": item_id}, {"$set": update}) for item_id in req.item_ids]
+    result = await db.items.bulk_write(bulk_ops, ordered=False)
+    return {"message": f"{result.modified_count} items marked as unpaid"}
 
 # ==========================================
 # ADVANCES

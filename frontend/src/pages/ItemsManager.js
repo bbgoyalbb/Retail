@@ -147,6 +147,7 @@ export default function ItemsManager() {
   const [allItems, setAllItems] = useState([]);
   const [advances, setAdvances] = useState([]);
   const [nameFilter, setNameFilter] = useState("");
+  const [debouncedNameFilter, setDebouncedNameFilter] = useState("");
   const [orderFilter, setOrderFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [expanded, setExpanded] = useState({});
@@ -203,13 +204,19 @@ export default function ItemsManager() {
   const [reSettlePrompt, setReSettlePrompt] = useState(null);  // { ref, customer, sections[] }
   const [showSettlementPanel, setShowSettlementPanel] = useState(false);
 
+  // Debounce name filter — fire API only 400ms after user stops typing
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedNameFilter(nameFilter), 400);
+    return () => clearTimeout(t);
+  }, [nameFilter]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { limit: 2000, summary: true };
-      if (nameFilter)  params.name     = nameFilter;
-      if (dateFilter)  params.date     = dateFilter;
-      if (orderFilter) params.order_no = orderFilter;
+      const params = { limit: 500, summary: true };
+      if (debouncedNameFilter) params.name     = debouncedNameFilter;
+      if (dateFilter)          params.date     = dateFilter;
+      if (orderFilter)         params.order_no = orderFilter;
       const [itemsRes, advancesRes] = await Promise.all([
         getItems(params),
         getAdvances()
@@ -222,7 +229,7 @@ export default function ItemsManager() {
     } finally {
       setLoading(false);
     }
-  }, [nameFilter, dateFilter, orderFilter]);
+  }, [debouncedNameFilter, dateFilter, orderFilter]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

@@ -90,59 +90,62 @@ async def get_jobwork(
 
 @router.post("/jobwork/move")
 async def move_jobwork(req: StatusUpdateRequest, current_user: dict = Depends(get_current_user_dep)):
-    updated = 0
-    for item_id in req.item_ids:
-        update_fields = {}
-        if req.new_status in ["Pending", "Stitched", "Delivered"]:
-            update_fields["tailoring_status"] = req.new_status
-        elif req.new_status in ["Required", "In Progress", "Finished"]:
-            update_fields["embroidery_status"] = req.new_status
-            if req.karigar:
-                update_fields["karigar"] = req.karigar
-
-        result = await db.items.update_one({"id": item_id}, {"$set": update_fields})
-        if result.modified_count > 0:
-            updated += 1
-
-    return {"message": f"{updated} items moved to {req.new_status}"}
+    from pymongo import UpdateOne
+    update_fields = {}
+    if req.new_status in ["Pending", "Stitched", "Delivered"]:
+        update_fields["tailoring_status"] = req.new_status
+    elif req.new_status in ["Required", "In Progress", "Finished"]:
+        update_fields["embroidery_status"] = req.new_status
+        if req.karigar:
+            update_fields["karigar"] = req.karigar
+    if not update_fields:
+        return {"message": "0 items moved"}
+    bulk_ops = [UpdateOne({"id": item_id}, {"$set": update_fields}) for item_id in req.item_ids]
+    result = await db.items.bulk_write(bulk_ops, ordered=False)
+    return {"message": f"{result.modified_count} items moved to {req.new_status}"}
 
 @router.post("/jobwork/move-back")
 async def move_jobwork_back(req: MoveBackRequest, current_user: dict = Depends(get_current_user_dep)):
+    from pymongo import UpdateOne
     TAILORING_PREV = {"Stitched": "Pending", "Delivered": "Stitched"}
     EMB_PREV = {"In Progress": "Required", "Finished": "In Progress"}
-    updated = 0
-    for item_id in req.item_ids:
-        if req.current_status in TAILORING_PREV:
-            update_fields = {"tailoring_status": TAILORING_PREV[req.current_status]}
-        elif req.current_status in EMB_PREV:
-            update_fields = {"embroidery_status": EMB_PREV[req.current_status]}
-        else:
-            continue
-        result = await db.items.update_one({"id": item_id}, {"$set": update_fields})
-        if result.modified_count > 0:
-            updated += 1
-    return {"message": f"{updated} items moved back"}
+    if req.current_status in TAILORING_PREV:
+        update_fields = {"tailoring_status": TAILORING_PREV[req.current_status]}
+    elif req.current_status in EMB_PREV:
+        update_fields = {"embroidery_status": EMB_PREV[req.current_status]}
+    else:
+        return {"message": "0 items moved back"}
+    bulk_ops = [UpdateOne({"id": item_id}, {"$set": update_fields}) for item_id in req.item_ids]
+    result = await db.items.bulk_write(bulk_ops, ordered=False)
+    return {"message": f"{result.modified_count} items moved back"}
 
 @router.post("/jobwork/move-emb")
 async def move_embroidery(req: EmbMoveRequest, current_user: dict = Depends(get_current_user_dep)):
-    updated = 0
+    from pymongo import UpdateOne
+    needs_amounts = req.emb_customer_amount is not None and req.emb_customer_amount > 0
+    if needs_amounts:
+        # Batch-fetch all items once instead of one find_one per item
+        existing_items = await db.items.find(
+            {"id": {"$in": req.item_ids}}, {"_id": 0, "id": 1, "embroidery_received": 1, "embroidery_pay_mode": 1}
+        ).to_list(len(req.item_ids))
+        item_map = {i["id"]: i for i in existing_items}
+    bulk_ops = []
     for item_id in req.item_ids:
         update_fields = {"embroidery_status": req.new_status}
         if req.emb_labour_amount is not None and req.emb_labour_amount > 0:
             update_fields["emb_labour_amount"] = req.emb_labour_amount
-        if req.emb_customer_amount is not None and req.emb_customer_amount > 0:
-            existing_emb_item = await db.items.find_one({"id": item_id}, {"_id": 0})
-            existing_emb_received = float((existing_emb_item or {}).get("embroidery_received", 0))
-            existing_emb_mode = (existing_emb_item or {}).get("embroidery_pay_mode", "Pending")
+        if needs_amounts:
+            existing = item_map.get(item_id, {})
+            existing_emb_received = float(existing.get("embroidery_received", 0))
+            existing_emb_mode = existing.get("embroidery_pay_mode", "Pending")
             emb_pending = round(req.emb_customer_amount - existing_emb_received, 2)
             emb_mode = existing_emb_mode if str(existing_emb_mode).startswith("Settled") else ("Pending" if existing_emb_received <= 0 else existing_emb_mode)
             update_fields["embroidery_amount"] = req.emb_customer_amount
             update_fields["embroidery_pending"] = emb_pending
             update_fields["embroidery_pay_mode"] = emb_mode
-        result = await db.items.update_one({"id": item_id}, {"$set": update_fields})
-        if result.modified_count > 0:
-            updated += 1
-    return {"message": f"{updated} embroidery items updated"}
+        bulk_ops.append(UpdateOne({"id": item_id}, {"$set": update_fields}))
+    result = await db.items.bulk_write(bulk_ops, ordered=False)
+    return {"message": f"{result.modified_count} embroidery items updated"}
 
 @router.post("/jobwork/edit-emb")
 async def edit_embroidery(req: EmbEditRequest, current_user: dict = Depends(get_current_user_dep)):
@@ -167,9 +170,12 @@ async def edit_embroidery(req: EmbEditRequest, current_user: dict = Depends(get_
 
 @router.get("/jobwork/filters")
 async def get_jobwork_filters(current_user: dict = Depends(get_current_user_dep)):
-    order_nos = await db.items.distinct("order_no", {"order_no": {"$ne": "N/A"}})
-    dates = await db.items.distinct("date")
-    delivery_dates = await db.items.distinct("delivery_date", {"delivery_date": {"$ne": "N/A"}})
+    import asyncio
+    order_nos, dates, delivery_dates = await asyncio.gather(
+        db.items.distinct("order_no", {"order_no": {"$ne": "N/A"}}),
+        db.items.distinct("date"),
+        db.items.distinct("delivery_date", {"delivery_date": {"$ne": "N/A"}}),
+    )
     return {
         "order_nos": sorted([o for o in order_nos if o]),
         "dates": sorted([d for d in dates if d], reverse=True),
