@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from "react";
-import { getCustomers, getRefs, getItems, addAddons, getSettings } from "@/api";
+import { getCustomers, getRefs, getItems, addAddons, getSettings, invalidateItemsCache } from "@/api";
 import { PlusCircle, CheckCircle } from "@phosphor-icons/react";
 
 const DEFAULT_ADDON_ITEMS = ["Bow", "Tie", "Cufflinks", "Stall", "Buttons", "Saffa", "Dye", "Malla", "Kalangi"];
@@ -58,8 +58,15 @@ export default function AddOns() {
       });
       setMessage({ type: "success", text: `Add-ons saved! Total: ₹${res.data.addon_amount}` });
       setAddons(addonItems.map(name => ({ name, checked: false, price: "" })));
-      // Refresh articles
-      getItems({ name: selectedCustomer, ref: selectedRef }).then(res => setArticles(res.data.items));
+      // Invalidate cache so the refresh fetches fresh data from DB
+      invalidateItemsCache();
+      getItems({ name: selectedCustomer, ref: selectedRef }).then(r => {
+        const fresh = r.data.items || [];
+        setArticles(fresh);
+        // Keep selectedArticle in sync so "Already added" panel updates instantly
+        const updated = fresh.find(a => a.id === selectedArticle?.id);
+        if (updated) setSelectedArticle(updated);
+      });
     } catch (err) {
       setMessage({ type: "error", text: "Failed to save add-ons" });
     }
