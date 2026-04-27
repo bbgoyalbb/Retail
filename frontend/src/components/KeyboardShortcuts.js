@@ -8,7 +8,7 @@ const SHORTCUTS = [
   { keys: "Ctrl + 1",   desc: "Dashboard" },
   { keys: "Ctrl + 2",   desc: "New Bill" },
   { keys: "Ctrl + 3",   desc: "Tailoring" },
-  { keys: "Ctrl + 4",   desc: "Settlements" },
+  { keys: "Ctrl + 4",   desc: "Manage Orders" },
   { keys: "Ctrl + 5",   desc: "Daybook" },
   { keys: "Ctrl + 6",   desc: "Items" },
   { keys: "Ctrl + 7",   desc: "Order Status" },
@@ -41,7 +41,7 @@ export function KeyboardShortcuts() {
 
       if ((e.ctrlKey || e.metaKey) && e.key >= "1" && e.key <= "9") {
         e.preventDefault();
-        const map = { "1": "/", "2": "/new-bill", "3": "/tailoring", "4": "/settlements", "5": "/daybook", "6": "/items", "7": "/order-status", "8": "/search", "9": "/settings" };
+        const map = { "1": "/", "2": "/new-bill", "3": "/tailoring", "4": "/items", "5": "/daybook", "6": "/order-status", "7": "/search", "8": "/settings" };
         if (map[e.key]) navigate(map[e.key]);
       }
     };

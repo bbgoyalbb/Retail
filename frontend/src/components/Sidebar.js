@@ -11,7 +11,7 @@ import {
 
   House, Receipt, Scissors, PlusCircle, Kanban,
 
-  CurrencyDollar, BookOpen, UsersThree,
+  BookOpen, UsersThree,
 
   MagnifyingGlass, Table, ChartBar, Database, Gear, ClipboardText,
 
@@ -29,7 +29,6 @@ const NAV_ITEMS = [
   { key: "addons", label: "Add-ons", icon: PlusCircle, path: "/addons" },
   { key: "jobwork", label: "Job Work", icon: Kanban, path: "/jobwork" },
   { key: "section-fin", type: "section", label: "Finances", managerOnly: true },
-  { key: "settlements", label: "Settlements", icon: CurrencyDollar, path: "/settlements", managerOnly: true },
   { key: "daybook", label: "Daybook", icon: BookOpen, path: "/daybook", managerOnly: true },
   { key: "labour", label: "Labour Payments", icon: UsersThree, path: "/labour", managerOnly: true },
   { key: "section-mgmt", type: "section", label: "Manage" },

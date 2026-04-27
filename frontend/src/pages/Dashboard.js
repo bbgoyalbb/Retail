@@ -183,7 +183,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "New Bill", icon: Receipt, path: "/new-bill", color: "var(--brand)" },
-          { label: "Settlements", icon: CurrencyDollar, path: "/settlements", color: "var(--success)" },
+          { label: "Manage Orders", icon: CurrencyDollar, path: "/items", color: "var(--success)" },
           { label: "Reports", icon: ChartBar, path: "/reports", color: "var(--info)" },
           { label: "Daybook", icon: BookOpen, path: "/daybook", color: "var(--warning)" },
         ].map(({ label, icon: Icon, path, color }) => (

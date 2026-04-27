@@ -16,7 +16,6 @@ const PAGE_TITLES = {
   "/tailoring": "Tailoring Orders",
   "/addons": "Add-ons",
   "/jobwork": "Job Work",
-  "/settlements": "Settlements",
   "/daybook": "Daybook",
   "/labour": "Labour Payments",
   "/items": "Manage Orders",
@@ -35,7 +34,6 @@ const NewBill       = lazy(() => import("@/pages/NewBill"));
 const TailoringOrders = lazy(() => import("@/pages/TailoringOrders"));
 const AddOns        = lazy(() => import("@/pages/AddOns"));
 const JobWork       = lazy(() => import("@/pages/JobWork"));
-const Settlements   = lazy(() => import("@/pages/Settlements"));
 const Daybook       = lazy(() => import("@/pages/Daybook"));
 const LabourPayments = lazy(() => import("@/pages/LabourPayments"));
 const ItemsManager  = lazy(() => import("@/pages/ItemsManager"));
@@ -152,7 +150,6 @@ function AppShell() {
                 <Route path="/search" element={<SearchPage />} />
 
                 {/* Manager + Admin */}
-                <Route path="/settlements" element={<RequireRole roles={["admin","manager"]} path="/settlements"><Settlements /></RequireRole>} />
                 <Route path="/daybook" element={<RequireRole roles={["admin","manager"]} path="/daybook"><Daybook /></RequireRole>} />
                 <Route path="/labour" element={<RequireRole roles={["admin","manager"]} path="/labour"><LabourPayments /></RequireRole>} />
                 <Route path="/items" element={<RequireRole roles={["admin","manager"]} path="/items"><ItemsManager /></RequireRole>} />

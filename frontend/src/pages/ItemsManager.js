@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { getItems, getItem, getAdvances, updateItem, deleteItem, createItem, updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache, exportExcelUrl, getSettings } from "@/api";
 import { fmt } from "@/lib/fmt";
-import { PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle, Funnel, DownloadSimple } from "@phosphor-icons/react";
+import { PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle, Funnel, DownloadSimple, CurrencyDollar } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
 import SettlementPanel from "@/components/SettlementPanel";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -149,7 +149,11 @@ export default function ItemsManager() {
   const [nameFilter, setNameFilter] = useState("");
   const [debouncedNameFilter, setDebouncedNameFilter] = useState("");
   const [orderFilter, setOrderFilter] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
+  // Settled/Unsettled tab: "all" | "unsettled" | "settled"
+  const [settleTab, setSettleTab] = useState("all");
+  // Multi-select for payment
+  const [selectedRefs, setSelectedRefs] = useState(new Set());
+  const [settlementOrders, setSettlementOrders] = useState(null); // null = closed
   const [expanded, setExpanded] = useState({});
   const [message, setMessage] = useState(null);
   const [sortKey, setSortKey] = useState("date");
@@ -215,7 +219,6 @@ export default function ItemsManager() {
     try {
       const params = { limit: 500, summary: true };
       if (debouncedNameFilter) params.name     = debouncedNameFilter;
-      if (dateFilter)          params.date     = dateFilter;
       if (orderFilter)         params.order_no = orderFilter;
       const [itemsRes, advancesRes] = await Promise.all([
         getItems(params),
@@ -229,7 +232,7 @@ export default function ItemsManager() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedNameFilter, dateFilter, orderFilter]);
+  }, [debouncedNameFilter, orderFilter]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -600,7 +603,6 @@ export default function ItemsManager() {
   // ==========================================
   // FILTERING & GROUPING
   // ==========================================
-  const uniqueDates = [...new Set(allItems.map(i => i.date).filter(Boolean))].sort().reverse();
   const filteredCustomers = [...new Set(allItems.map(i => i.name).filter(Boolean))].sort();
   const filteredItems = allItems;
 
@@ -627,7 +629,14 @@ export default function ItemsManager() {
     if (grouped[adv.ref]) grouped[adv.ref].totals.advance += adv.amount || 0;
   });
 
-  const refs = Object.values(grouped).sort((a, b) => {
+  // Apply settled/unsettled tab filter
+  const tabFilteredRefs = Object.values(grouped).filter(g => {
+    if (settleTab === "unsettled") return Math.round(g.totals.pending) !== 0 || g.totals.total === 0;
+    if (settleTab === "settled")   return Math.round(g.totals.pending) === 0 && g.totals.total > 0;
+    return true;
+  });
+
+  const refs = tabFilteredRefs.sort((a, b) => {
     let va = a[sortKey] ?? "";
     let vb = b[sortKey] ?? "";
     const dateRx = /^\d{4}-\d{2}-\d{2}$/;
@@ -642,7 +651,29 @@ export default function ItemsManager() {
     return sortDir === "desc" ? -cmp : cmp;
   });
 
-  const orderNos = [...new Set(filteredItems.map(i => i.order_no).filter(o => o && o !== "N/A"))].sort();
+  const orderNos    = [...new Set(filteredItems.map(i => i.order_no).filter(o => o && o !== "N/A"))].sort();
+  const allRefKeys   = refs.map(g => g.ref);
+  const allSelected  = allRefKeys.length > 0 && allRefKeys.every(r => selectedRefs.has(r));
+  const someSelected = allRefKeys.some(r => selectedRefs.has(r));
+
+  const toggleSelectRef = (ref) => setSelectedRefs(prev => {
+    const next = new Set(prev);
+    next.has(ref) ? next.delete(ref) : next.add(ref);
+    return next;
+  });
+  const toggleSelectAll = () => {
+    if (allSelected) setSelectedRefs(new Set());
+    else setSelectedRefs(new Set(allRefKeys));
+  };
+  const openSettlement = (orders) => {
+    setSettlementOrders(orders);
+  };
+  const openSelectionSettlement = () => {
+    const orders = refs
+      .filter(g => selectedRefs.has(g.ref))
+      .map(g => ({ ref: g.ref, name: g.name }));
+    if (orders.length) openSettlement(orders);
+  };
   const toggleExpand = (ref) => setExpanded(prev => ({ ...prev, [ref]: !prev[ref] }));
   const handleSort = (key) => {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -670,22 +701,41 @@ export default function ItemsManager() {
         </div>
       )}
 
+      {/* ── Settled / Unsettled Tabs ── */}
+      <div className="flex items-center gap-1 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-1 w-fit">
+        {[{k:"all",l:"All"},{k:"unsettled",l:"Pending"},{k:"settled",l:"Settled"}].map(t => (
+          <button
+            key={t.k}
+            onClick={() => { setSettleTab(t.k); setSelectedRefs(new Set()); }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-sm transition-all ${
+              settleTab === t.k
+                ? "bg-[var(--brand)] text-white shadow-sm"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg)]"
+            }`}
+          >{t.l}</button>
+        ))}
+      </div>
+
       {/* Filters */}
       <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-3 rounded-sm flex flex-wrap gap-3 items-center">
-        <div className="flex items-center gap-2">
-          <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Date</label>
-          <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]">
-            <option value="">All Dates</option>
-            {uniqueDates.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
+        {/* Customer text search */}
+        <div className="relative flex items-center">
+          <input
+            ref={customerFilterRef}
+            data-testid="orders-customer-filter"
+            type="text"
+            value={nameFilter}
+            onChange={e => setNameFilter(e.target.value)}
+            placeholder="Search customer… (Ctrl+F)"
+            className="pl-2.5 pr-7 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)] w-52"
+          />
+          {nameFilter && (
+            <button onClick={() => setNameFilter("")} className="absolute right-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+              <X size={12} />
+            </button>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Customer</label>
-          <select ref={customerFilterRef} data-testid="orders-customer-filter" value={nameFilter} onChange={e => setNameFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]">
-            <option value="">All Customers</option>
-            {filteredCustomers.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
+
         <div className="flex items-center gap-2">
           <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Order No</label>
           <select data-testid="orders-order-filter" value={orderFilter} onChange={e => setOrderFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]">
@@ -989,8 +1039,8 @@ export default function ItemsManager() {
               <span className="text-xs text-[var(--text-secondary)]">{mismatchPrompt.refs.length} order(s) affected</span>
               <div className="flex gap-2">
                 <button onClick={() => setMismatchPrompt(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)]">Fix later</button>
-                <button onClick={() => { setMismatchPrompt(null); window.location.href = `/settlements?refs=${encodeURIComponent(mismatchPrompt.refs.join(","))}`; }} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">
-                  Go to Settlement →
+                <button onClick={() => { const orders = mismatchPrompt.refs.map(r => { const g = refs.find(x => x.ref === r); return { ref: r, name: g?.name || "" }; }); setMismatchPrompt(null); setSettlementOrders(orders); }} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">
+                  Settle Now →
                 </button>
               </div>
             </div>
@@ -999,7 +1049,7 @@ export default function ItemsManager() {
       )}
 
       {/* Re-Settle Prompt Modal */}
-      {reSettlePrompt && !showSettlementPanel && (
+      {reSettlePrompt && !settlementOrders && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setReSettlePrompt(null)}>
           <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <h3 className="font-heading text-lg font-medium mb-1 text-[var(--warning)]">Settled amounts have changed</h3>
@@ -1018,7 +1068,7 @@ export default function ItemsManager() {
             </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setReSettlePrompt(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">Skip for now</button>
-              <button onClick={() => setShowSettlementPanel(true)} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] flex items-center gap-2">
+              <button onClick={() => { setSettlementOrders([{ ref: reSettlePrompt.ref, name: reSettlePrompt.customer }]); setReSettlePrompt(null); }} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] flex items-center gap-2">
                 Settle Now →
               </button>
             </div>
@@ -1026,14 +1076,6 @@ export default function ItemsManager() {
         </div>
       )}
 
-      {/* Inline Settlement Panel (opens after re-settle prompt) */}
-      {reSettlePrompt && showSettlementPanel && (
-        <SettlementPanel
-          billRef={reSettlePrompt.ref}
-          customer={reSettlePrompt.customer}
-          onClose={() => { setShowSettlementPanel(false); setReSettlePrompt(null); loadData(); }}
-        />
-      )}
 
       {/* ==========================================
           MAIN TABLE
@@ -1043,8 +1085,18 @@ export default function ItemsManager() {
         {/* Desktop Header — uses GRID_COLS */}
         <div
           className="hidden sm:grid bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-3 py-2 items-center text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]"
-          style={{ gridTemplateColumns: GRID_COLS }}
+          style={{ gridTemplateColumns: `20px ${GRID_COLS}` }}
         >
+          {/* Select-all checkbox */}
+          <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+              onChange={toggleSelectAll}
+              className="w-3.5 h-3.5 accent-[var(--brand)] cursor-pointer"
+            />
+          </div>
           <span />
           <button onClick={() => handleSort("date")}   className="text-left hover:text-[var(--brand)] transition-colors">Date{sortIndicator("date")}</button>
           <button onClick={() => handleSort("ref")}    className="text-left hover:text-[var(--brand)] transition-colors">Ref{sortIndicator("ref")}</button>
@@ -1099,15 +1151,19 @@ export default function ItemsManager() {
                   <div className="flex-1 border-t border-[var(--border-subtle)]" />
                 </div>
               )}
-            <div className={`bg-[var(--surface)] border rounded-sm overflow-hidden transition-colors ${isCancelled ? "border-[var(--border-strong)] opacity-75" : "border-[var(--border-subtle)]"}`}>
+            <div className={`bg-[var(--surface)] border rounded-sm overflow-hidden transition-all ${selectedRefs.has(group.ref) ? "border-[var(--brand)] ring-1 ring-[var(--brand)]/20" : isCancelled ? "border-[var(--border-strong)] opacity-75" : "border-[var(--border-subtle)]"}`}>
 
               {/* Collapsed row — clickable */}
               <div
-                className="cursor-pointer hover:bg-[#C86B4D04] transition-colors"
+                className={`cursor-pointer transition-colors ${selectedRefs.has(group.ref) ? "bg-[#C86B4D06]" : "hover:bg-[#C86B4D04]"}`}
                 onClick={() => toggleExpand(group.ref)}
               >
                 {/* ---- MOBILE LAYOUT ---- */}
                 <div className="flex sm:hidden items-start gap-2 px-3 py-3">
+                  {/* Mobile checkbox */}
+                  <div className="flex-shrink-0 mt-0.5" onClick={e => { e.stopPropagation(); toggleSelectRef(group.ref); }}>
+                    <input type="checkbox" checked={selectedRefs.has(group.ref)} onChange={() => {}} className="w-4 h-4 accent-[var(--brand)] cursor-pointer" />
+                  </div>
                   <span className="mt-0.5 text-[var(--text-secondary)] flex-shrink-0">
                     {expanded[group.ref] ? <CaretDown size={14} /> : <CaretRight size={14} />}
                   </span>
@@ -1136,6 +1192,9 @@ export default function ItemsManager() {
                   </div>
                   {/* Mobile action buttons */}
                   <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                    {!isSettled && !isCancelled && (
+                      <button onClick={() => openSettlement([{ ref: group.ref, name: group.name }])} className="p-1.5 text-[var(--success)] hover:bg-[#455D4A10] rounded-sm" title="Collect Payment"><CurrencyDollar size={14} /></button>
+                    )}
                     <button onClick={() => { setEditItems(group.items); setEditMode("order"); setShowSectionSelector(true); }} className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm" title="Edit"><PencilSimple size={14} /></button>
                     <button onClick={() => setCancelConfirm(group)} className="p-1.5 text-[var(--warning)] hover:bg-[#D4984210] rounded-sm" title="Cancel Order"><X size={14} /></button>
                     <button onClick={() => { setDelConfirm(group); setDelMode("order"); }} className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm" title="Delete"><Trash size={14} /></button>
@@ -1146,8 +1205,12 @@ export default function ItemsManager() {
                 {/* ---- DESKTOP LAYOUT — uses same GRID_COLS as header ---- */}
                 <div
                   className="hidden sm:grid items-center px-3 py-2.5"
-                  style={{ gridTemplateColumns: GRID_COLS }}
+                  style={{ gridTemplateColumns: `20px ${GRID_COLS}` }}
                 >
+                  {/* Row checkbox */}
+                  <div className="flex items-center justify-center" onClick={e => { e.stopPropagation(); toggleSelectRef(group.ref); }}>
+                    <input type="checkbox" checked={selectedRefs.has(group.ref)} onChange={() => {}} className="w-3.5 h-3.5 accent-[var(--brand)] cursor-pointer" />
+                  </div>
                   {/* Caret */}
                   <span className="text-[var(--text-secondary)] flex-shrink-0">
                     {expanded[group.ref] ? <CaretDown size={13} /> : <CaretRight size={13} />}
@@ -1202,6 +1265,9 @@ export default function ItemsManager() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-0.5 justify-end" onClick={e => e.stopPropagation()}>
+                    {!isSettled && !isCancelled && (
+                      <button onClick={() => openSettlement([{ ref: group.ref, name: group.name }])} className="p-1.5 text-[var(--success)] hover:bg-[#455D4A10] rounded-sm transition-colors" title="Collect Payment"><CurrencyDollar size={13} /></button>
+                    )}
                     <button onClick={() => { setEditItems(group.items); setEditMode("order"); setShowSectionSelector(true); }} className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm transition-colors" title="Edit Order"><PencilSimple size={13} /></button>
                     <button onClick={() => setCancelConfirm(group)} className="p-1.5 text-[var(--warning)] hover:bg-[#D4984210] rounded-sm transition-colors" title="Cancel Order"><X size={13} /></button>
                     <button onClick={() => { setDelConfirm(group); setDelMode("order"); }} className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm transition-colors" title="Delete Order"><Trash size={13} /></button>
@@ -1296,6 +1362,41 @@ export default function ItemsManager() {
       </div>
 
       {invoiceRef && <InvoiceModal billRef={invoiceRef} onClose={() => setInvoiceRef(null)} />}
+
+      {/* Settlement overlay */}
+      {settlementOrders && (
+        <SettlementPanel
+          orders={settlementOrders}
+          onClose={() => setSettlementOrders(null)}
+          onSuccess={() => { invalidateItemsCache(); setSelectedRefs(new Set()); loadData(); }}
+        />
+      )}
+
+      {/* ── Floating selection action bar ── */}
+      {someSelected && !settlementOrders && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-[var(--surface)] border border-[var(--border-strong)] rounded-full shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <span className="text-sm font-medium text-[var(--text-primary)] whitespace-nowrap">
+            {selectedRefs.size} order{selectedRefs.size !== 1 ? "s" : ""} selected
+          </span>
+          <span className="text-[var(--border-strong)]">·</span>
+          <span className="font-mono text-sm text-[var(--warning)]">
+            ₹{fmt(refs.filter(g => selectedRefs.has(g.ref)).reduce((s, g) => s + g.totals.pending, 0))}
+          </span>
+          <span className="text-[var(--border-strong)]">·</span>
+          <button
+            onClick={openSelectionSettlement}
+            className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium bg-[var(--brand)] text-white rounded-full hover:bg-[var(--brand-hover)] transition-colors"
+          >
+            <CurrencyDollar size={15} weight="bold" /> Collect Payment
+          </button>
+          <button
+            onClick={() => setSelectedRefs(new Set())}
+            className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg)] rounded-full transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
