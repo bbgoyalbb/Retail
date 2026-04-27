@@ -221,6 +221,19 @@ export default function ItemsManager() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Settled = every section with amount > 0 has pay_mode starting with "Settled"
+  const isOrderSettled = (group) => {
+    return group.items.every(item => {
+      const checks = [
+        [item.fabric_amount,     item.fabric_pay_mode],
+        [item.tailoring_amount,  item.tailoring_pay_mode],
+        [item.embroidery_amount, item.embroidery_pay_mode],
+        [item.addon_amount,      item.addon_pay_mode],
+      ];
+      return checks.every(([amt, mode]) => !amt || Number(amt) === 0 || String(mode || "").startsWith("Settled"));
+    });
+  };
+
   // Group by ref
   const grouped = useMemo(() => {
     const g = {};
