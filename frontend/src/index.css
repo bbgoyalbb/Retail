@@ -89,6 +89,10 @@ html {
   background: var(--text-secondary);
 }
 
+/* Hide scrollbar but keep scroll functionality */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* Better focus rings — keyboard-only, not mouse */
 :focus-visible {
   outline: 2px solid var(--brand);

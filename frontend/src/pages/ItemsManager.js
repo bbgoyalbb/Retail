@@ -1,18 +1,23 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { getItems, getItem, getAdvances, updateItem, deleteItem, createItem, updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache, invalidateAdvancesCache, exportExcelUrl, getSettings } from "@/api";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import {
+  getItems, getItem, getAdvances, updateItem, deleteItem, createItem,
+  updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache,
+  invalidateAdvancesCache, getSettings,
+} from "@/api";
 import { fmt } from "@/lib/fmt";
-import { PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle, Funnel, DownloadSimple, CurrencyDollar } from "@phosphor-icons/react";
+import {
+  PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle,
+  CurrencyDollar, Scissors, Tag, MagnifyingGlass, SlidersHorizontal,
+} from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
 import SettlementPanel from "@/components/SettlementPanel";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import OrderDetailPane from "@/components/OrderDetailPane";
+import { TailoringOverlay, AddOnOverlay } from "@/components/OrderOverlays";
 
-// ==========================================
-// SECTION CONFIGURATION
-// ==========================================
+// ─── Section config ───────────────────────────────────────────
 const SECTIONS = {
   items: {
-    label: "Items",
-    description: "Basic item details and fabric payment",
+    label: "Items", description: "Basic item details and fabric payment",
     fields: [
       { key: "date", label: "Date", type: "date" },
       { key: "name", label: "Customer Name", type: "text" },
@@ -27,33 +32,31 @@ const SECTIONS = {
       { key: "fabric_pay_date", label: "Fabric Pay Date", type: "date" },
       { key: "fabric_pay_mode", label: "Fabric Pay Mode", type: "text" },
       { key: "tally_fabric", label: "Tally Fabric", type: "checkbox" },
-    ]
+    ],
   },
   tailoring: {
-    label: "Tailoring",
-    description: "Tailoring order and labour details",
+    label: "Tailoring", description: "Tailoring order and labour details",
     fields: [
       { key: "order_no", label: "Order No", type: "text" },
-      { key: "article_type", label: "Article Type", type: "select", options: ["N/A", "Shirt", "Pant", "Gurkha Pant", "Kurta", "Pajama", "Blazer", "Safari Shirt", "Indo", "Sherwani", "Jacket", "W Coat"] },
+      { key: "article_type", label: "Article Type", type: "select", options: ["N/A","Shirt","Pant","Gurkha Pant","Kurta","Pajama","Blazer","Safari Shirt","Indo","Sherwani","Jacket","W Coat"] },
       { key: "delivery_date", label: "Delivery Date", type: "date" },
-      { key: "tailoring_status", label: "Tailoring Status", type: "select", options: ["N/A", "Awaiting Order", "Pending", "Stitched", "Delivered"] },
+      { key: "tailoring_status", label: "Tailoring Status", type: "select", options: ["N/A","Awaiting Order","Pending","Stitched","Delivered"] },
       { key: "tailoring_amount", label: "Tailoring Amount", type: "number" },
       { key: "tailoring_received", label: "Tailoring Received", type: "number" },
       { key: "tailoring_pending", label: "Tailoring Pending", type: "number", computed: true },
       { key: "tailoring_pay_date", label: "Tailoring Pay Date", type: "date" },
       { key: "tailoring_pay_mode", label: "Tailoring Pay Mode", type: "text" },
       { key: "labour_amount", label: "Labour Amount", type: "number" },
-      { key: "labour_paid", label: "Labour Paid", type: "select", options: ["N/A", "Yes"] },
+      { key: "labour_paid", label: "Labour Paid", type: "select", options: ["N/A","Yes"] },
       { key: "labour_pay_date", label: "Labour Pay Date", type: "date" },
-      { key: "labour_payment_mode", label: "Labour Payment Mode", type: "select", options: ["N/A", "Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer"] },
+      { key: "labour_payment_mode", label: "Labour Payment Mode", type: "select", options: ["N/A","Cash","PhonePe","Google Pay [E]","Google Pay [S]","Bank Transfer"] },
       { key: "tally_tailoring", label: "Tally Tailoring", type: "checkbox" },
-    ]
+    ],
   },
   embroidery: {
-    label: "Embroidery",
-    description: "Embroidery and karigar details",
+    label: "Embroidery", description: "Embroidery and karigar details",
     fields: [
-      { key: "embroidery_status", label: "Embroidery Status", type: "select", options: ["N/A", "Not Required", "Required", "In Progress", "Finished"] },
+      { key: "embroidery_status", label: "Embroidery Status", type: "select", options: ["N/A","Not Required","Required","In Progress","Finished"] },
       { key: "karigar", label: "Karigar", type: "text" },
       { key: "embroidery_amount", label: "Embroidery Amount", type: "number" },
       { key: "embroidery_received", label: "Embroidery Received", type: "number" },
@@ -61,15 +64,14 @@ const SECTIONS = {
       { key: "embroidery_pay_date", label: "Embroidery Pay Date", type: "date" },
       { key: "embroidery_pay_mode", label: "Embroidery Pay Mode", type: "text" },
       { key: "emb_labour_amount", label: "Emb. Labour Amount", type: "number" },
-      { key: "emb_labour_paid", label: "Emb. Labour Paid", type: "select", options: ["N/A", "Yes"] },
+      { key: "emb_labour_paid", label: "Emb. Labour Paid", type: "select", options: ["N/A","Yes"] },
       { key: "emb_labour_date", label: "Emb. Labour Date", type: "date" },
-      { key: "emb_labour_payment_mode", label: "Emb. Labour Payment Mode", type: "select", options: ["N/A", "Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer"] },
+      { key: "emb_labour_payment_mode", label: "Emb. Labour Payment Mode", type: "select", options: ["N/A","Cash","PhonePe","Google Pay [E]","Google Pay [S]","Bank Transfer"] },
       { key: "tally_embroidery", label: "Tally Embroidery", type: "checkbox" },
-    ]
+    ],
   },
   addon: {
-    label: "Add-on",
-    description: "Add-on details",
+    label: "Add-on", description: "Add-on accessory details",
     fields: [
       { key: "addon_desc", label: "Add-on Description", type: "text" },
       { key: "addon_amount", label: "Add-on Amount", type: "number" },
@@ -78,11 +80,11 @@ const SECTIONS = {
       { key: "addon_pay_date", label: "Add-on Pay Date", type: "date" },
       { key: "addon_pay_mode", label: "Add-on Pay Mode", type: "text" },
       { key: "tally_addon", label: "Tally Add-on", type: "checkbox" },
-    ]
+    ],
   },
   advances: {
-    label: "Advances",
-    description: "Advance payments for this reference",
+    label: "Advances", description: "Advance payments for this reference",
+    isAdvanceSection: true,
     fields: [
       { key: "date", label: "Date", type: "date" },
       { key: "name", label: "Customer Name", type: "text" },
@@ -91,778 +93,577 @@ const SECTIONS = {
       { key: "mode", label: "Payment Mode", type: "text" },
       { key: "tally", label: "Tally", type: "checkbox" },
     ],
-    isAdvanceSection: true
-  }
+  },
 };
 
-// ==========================================
-// GRID LAYOUT — single source of truth
-// Columns: caret | date | ref | order# | customer | fab | tail | emb | add-on | adv | items | total | rcvd | pending | actions
-// (checkbox 20px is prepended separately in JSX so it stays outside GRID_COLS)
-// ==========================================
-const GRID_COLS = "20px 80px 92px 82px 1fr 68px 56px 56px 56px 48px 32px 76px 68px 82px 136px";
-
-// ==========================================
-// UTILITY FUNCTIONS
-// ==========================================
-const computeFabricAmount = (price, qty, discount) => {
-  const discountedPrice = price - (price * (discount || 0) / 100);
-  return Math.round(discountedPrice * qty);
-};
-
-const computePending = (total, received) => Math.round(total - (received || 0));
-
-
-const FIELD_CLASSES = "w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:border-[var(--brand)] focus:outline-none bg-[var(--surface)] text-[var(--text-primary)]";
+const FC = "w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:border-[var(--brand)] focus:outline-none bg-[var(--surface)] text-[var(--text-primary)]";
 
 const renderFieldInput = (field, itemId, value, onChange) => {
   switch (field.type) {
     case "date":
-      return <input type="date" value={value || ""} onChange={e => onChange(itemId, field.key, e.target.value)} className={FIELD_CLASSES} />;
+      return <input type="date" value={value || ""} onChange={e => onChange(itemId, field.key, e.target.value)} className={FC}/>;
     case "number":
-      return (
-        <input
-          type="number"
-          step={field.step || 1}
-          value={value ?? 0}
-          onChange={e => onChange(itemId, field.key, parseFloat(e.target.value) || 0)}
-          disabled={field.computed}
-          className={`${FIELD_CLASSES} ${field.computed ? "bg-[var(--bg)] text-[var(--text-secondary)] cursor-not-allowed" : ""}`}
-        />
-      );
+      return <input type="number" step={field.step || 1} value={value ?? 0}
+        onChange={e => onChange(itemId, field.key, parseFloat(e.target.value) || 0)}
+        disabled={field.computed}
+        className={`${FC} ${field.computed ? "bg-[var(--bg)] text-[var(--text-secondary)] cursor-not-allowed" : ""}`}/>;
     case "select":
-      return (
-        <select value={value || ""} onChange={e => onChange(itemId, field.key, e.target.value)} className={FIELD_CLASSES}>
-          {field.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-      );
+      return <select value={value || ""} onChange={e => onChange(itemId, field.key, e.target.value)} className={FC}>
+        {field.options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>;
     case "checkbox":
-      return <input type="checkbox" checked={!!value} onChange={e => onChange(itemId, field.key, e.target.checked)} className="w-4 h-4 accent-[var(--brand)]" />;
+      return <input type="checkbox" checked={!!value} onChange={e => onChange(itemId, field.key, e.target.checked)} className="w-4 h-4 accent-[var(--brand)]"/>;
     default:
-      return <input type="text" value={value || ""} onChange={e => onChange(itemId, field.key, e.target.value)} className={FIELD_CLASSES} />;
+      return <input type="text" value={value || ""} onChange={e => onChange(itemId, field.key, e.target.value)} className={FC}/>;
   }
 };
 
+const computeFabric = (price, qty, disc) =>
+  Math.round((price - price * (disc || 0) / 100) * qty);
+const computePending = (total, received) => Math.round(total - (received || 0));
+
+// ─── Status badge ─────────────────────────────────────────────
+const StatusBadge = ({ settled, cancelled, pending }) => {
+  if (cancelled) return (
+    <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-[var(--error)]/10 text-[var(--error)] font-medium">Cancelled</span>
+  );
+  if (settled) return (
+    <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-[#455D4A15] text-[var(--success)] font-medium flex items-center gap-0.5">
+      <CheckCircle size={10} weight="fill"/>Settled
+    </span>
+  );
+  return <span className="text-[10px] font-mono text-[var(--warning)]">₹{fmt(pending)}</span>;
+};
+
+// ─── Main page ────────────────────────────────────────────────
 export default function ItemsManager() {
-  const customerFilterRef = useRef(null);
-  const [allItems, setAllItems] = useState([]);
-  const [advances, setAdvances] = useState([]);
+  const searchRef = useRef(null);
+
+  // Data
+  const [allItems, setAllItems]     = useState([]);
+  const [advances, setAdvances]     = useState([]);
+  const [loading, setLoading]       = useState(false);
+  const [message, setMessage]       = useState(null);
+
+  // Filters
   const [nameFilter, setNameFilter] = useState("");
-  const [debouncedNameFilter, setDebouncedNameFilter] = useState("");
-  const [orderFilter, setOrderFilter] = useState("");
-  // Settled/Unsettled tab: "all" | "unsettled" | "settled"
-  const [settleTab, setSettleTab] = useState("all");
-  // Multi-select for payment
+  const [debouncedName, setDebouncedName] = useState("");
+  const [settleTab, setSettleTab]   = useState("unsettled");
+  const [sortDir, setSortDir]       = useState("desc");
+
+  // Panel state
+  const [sidebarOpen, setSidebarOpen]   = useState(false);
   const [selectedRefs, setSelectedRefs] = useState(new Set());
-  const [settlementOrders, setSettlementOrders] = useState(null); // null = closed
-  const [expanded, setExpanded] = useState({});
-  const [message, setMessage] = useState(null);
-  const [sortKey, setSortKey] = useState("date");
-  const [sortDir, setSortDir] = useState("desc");
-  const [loading, setLoading] = useState(false);
+  const [detailOpen, setDetailOpen]     = useState(false); // mobile toggle
 
-  // Column visibility state (persisted to localStorage)
-  const [visibleColumns, setVisibleColumns] = useState(() => {
-    try {
-      const saved = localStorage.getItem("itemsmanager_columns");
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return {
-      barcode: true, price: true, qty: true, discount: true, fabric_amount: true,
-      article_type: true, order_no: true, delivery_date: true, tailoring_amount: true,
-      embroidery_amount: true, addon_desc: true,
-    };
-  });
+  // Overlays
+  const [settlementOrders, setSettlementOrders] = useState(null);
+  const [invoiceRef, setInvoiceRef]             = useState(null);
+  const [tailoringGroup, setTailoringGroup]     = useState(null);
+  const [addonGroup, setAddonGroup]             = useState(null);
 
-  // Edit modal states
+  // Edit modal
+  const [selectedSection, setSelectedSection]     = useState(null);
   const [showSectionSelector, setShowSectionSelector] = useState(false);
-  const [selectedSection, setSelectedSection] = useState(null);
-  const [editMode, setEditMode] = useState(null);
-  const [editItems, setEditItems] = useState([]);
-  const [editData, setEditData] = useState({});
-  const [originalData, setOriginalData] = useState({});
-  const [newItemIds, setNewItemIds] = useState([]);
-  const [cancelConfirm, setCancelConfirm] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode]                   = useState(null);
+  const [editItems, setEditItems]                 = useState([]);
+  const [editData, setEditData]                   = useState({});
+  const [originalData, setOriginalData]           = useState({});
+  const [newItemIds, setNewItemIds]               = useState([]);
+  const [saving, setSaving]                       = useState(false);
+  const [advanceData, setAdvanceData]             = useState({});
+  const [origAdvData, setOrigAdvData]             = useState({});
+  const [newAdvances, setNewAdvances]             = useState([]);
+  const [deletedAdvances, setDeletedAdvances]     = useState([]);
+  const [tailoringRates, setTailoringRates]       = useState({});
 
-  // Advances editing state
-  const [advanceData, setAdvanceData] = useState({});
-  const [originalAdvanceData, setOriginalAdvanceData] = useState({});
-  const [refAdvances, setRefAdvances] = useState([]);
-  const [newAdvances, setNewAdvances] = useState([]);
-  const [deletedAdvances, setDeletedAdvances] = useState([]);
+  // Confirms
+  const [delConfirm, setDelConfirm]         = useState(null);
+  const [delMode, setDelMode]               = useState(null);
+  const [cancelConfirm, setCancelConfirm]   = useState(null);
+  const [mismatchPrompt, setMismatchPrompt] = useState(null);
+  const [reSettlePrompt, setReSettlePrompt] = useState(null);
 
-  // Tailoring rates from settings (for auto-recalc on article_type change)
-  const [tailoringRates, setTailoringRates] = useState({});
+  // Settings
   useEffect(() => {
-    getSettings().then(res => {
-      const rates = res?.data?.tailoring_rates || {};
-      setTailoringRates(rates);
-    }).catch(() => {});
+    getSettings().then(res => setTailoringRates(res?.data?.tailoring_rates || {})).catch(() => {});
   }, []);
 
-  // Delete confirmation
-  const [delConfirm, setDelConfirm] = useState(null);
-  const [delMode, setDelMode] = useState(null);
-  const [invoiceRef, setInvoiceRef] = useState(null);
-  const [mismatchPrompt, setMismatchPrompt] = useState(null);
-  const [reSettlePrompt, setReSettlePrompt] = useState(null);  // { ref, customer, sections[] }
-  const [showSettlementPanel, setShowSettlementPanel] = useState(false);
-
-  // Debounce name filter — fire API only 400ms after user stops typing
+  // Debounce search
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedNameFilter(nameFilter), 400);
+    const t = setTimeout(() => setDebouncedName(nameFilter), 400);
     return () => clearTimeout(t);
   }, [nameFilter]);
 
+  // Ctrl+F
+  useEffect(() => {
+    const h = e => { if ((e.ctrlKey || e.metaKey) && e.key === "f") { e.preventDefault(); searchRef.current?.focus(); } };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  // Load data
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const params = { limit: 500, summary: true };
-      if (debouncedNameFilter) params.name     = debouncedNameFilter;
-      if (orderFilter)         params.order_no = orderFilter;
-      const [itemsRes, advancesRes] = await Promise.all([
-        getItems(params),
-        getAdvances()
-      ]);
+      if (debouncedName) params.name = debouncedName;
+      const [itemsRes, advRes] = await Promise.all([getItems(params), getAdvances()]);
       setAllItems(itemsRes.data.items || []);
-      setAdvances(advancesRes.data || []);
+      setAdvances(advRes.data || []);
     } catch {
-      setMessage({ type: "error", text: "Failed to load data. Please try again." });
+      setMessage({ type: "error", text: "Failed to load data" });
       setTimeout(() => setMessage(null), 4000);
     } finally {
       setLoading(false);
     }
-  }, [debouncedNameFilter, orderFilter]);
+  }, [debouncedName]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Ctrl+F focuses customer filter
-  useEffect(() => {
-    const handler = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        if (customerFilterRef.current) { e.preventDefault(); customerFilterRef.current.focus(); }
+  // Group by ref
+  const grouped = useMemo(() => {
+    const g = {};
+    allItems.forEach(item => {
+      if (!g[item.ref]) g[item.ref] = {
+        ref: item.ref, name: item.name, date: item.date, items: [],
+        totals: { fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0, total: 0, received: 0, pending: 0 },
+      };
+      const gr = g[item.ref];
+      gr.items.push(item);
+      gr.totals.fabric      += item.fabric_amount || 0;
+      gr.totals.tailoring   += item.tailoring_amount || 0;
+      gr.totals.embroidery  += item.embroidery_amount || 0;
+      gr.totals.addon       += item.addon_amount || 0;
+      gr.totals.total       += (item.fabric_amount || 0) + (item.tailoring_amount || 0) + (item.embroidery_amount || 0) + (item.addon_amount || 0);
+      gr.totals.received    += (item.fabric_received || 0) + (item.tailoring_received || 0) + (item.embroidery_received || 0) + (item.addon_received || 0);
+      if (!String(item.fabric_pay_mode || "").startsWith("Settled"))     gr.totals.pending += item.fabric_pending || 0;
+      if (!String(item.tailoring_pay_mode || "").startsWith("Settled"))  gr.totals.pending += item.tailoring_pending || 0;
+      if (!String(item.embroidery_pay_mode || "").startsWith("Settled")) gr.totals.pending += item.embroidery_pending || 0;
+      if (!String(item.addon_pay_mode || "").startsWith("Settled"))      gr.totals.pending += item.addon_pending || 0;
+    });
+    advances.forEach(adv => { if (g[adv.ref]) g[adv.ref].totals.advance += adv.amount || 0; });
+    return g;
+  }, [allItems, advances]);
+
+  const refs = useMemo(() => {
+    const all = Object.values(grouped);
+    const filtered = all.filter(g => {
+      if (settleTab === "unsettled") return !isOrderSettled(g);
+      if (settleTab === "settled")   return isOrderSettled(g) && g.totals.total > 0;
+      if (settleTab === "awaiting")  return g.items.some(i => i.tailoring_status === "Awaiting Order");
+      return true;
+    });
+    return filtered.sort((a, b) => {
+      const cmp = String(a.date || "").localeCompare(String(b.date || ""));
+      return sortDir === "desc" ? -cmp : cmp;
+    });
+  }, [grouped, settleTab, sortDir]);
+
+  const selectedGroups = useMemo(() => refs.filter(g => selectedRefs.has(g.ref)), [refs, selectedRefs]);
+
+  // Select / deselect
+  const selectRef = (ref, multi = false) => {
+    setSelectedRefs(prev => {
+      if (multi) {
+        const next = new Set(prev);
+        next.has(ref) ? next.delete(ref) : next.add(ref);
+        return next;
       }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
+      if (prev.size === 1 && prev.has(ref)) return new Set();
+      return new Set([ref]);
+    });
+    setDetailOpen(true);
+  };
 
-  useEffect(() => {
-    try { localStorage.setItem("itemsmanager_columns", JSON.stringify(visibleColumns)); } catch {}
-  }, [visibleColumns]);
-
-  const toggleColumn = (colKey) => setVisibleColumns(prev => ({ ...prev, [colKey]: !prev[colKey] }));
-
-  // ==========================================
-  // EDIT HANDLERS
-  // ==========================================
+  // ─── Edit handlers ────────────────────────────────────────
   const startEdit = async (sectionKey, items, mode = "item") => {
     setSelectedSection(sectionKey);
     setEditMode(mode);
     const itemList = Array.isArray(items) ? items : [items];
-    setEditItems(itemList);
-
-    // Fetch full item data for each item — the grid loads with summary=true which
-    // omits many fields (pay dates, labour fields, tally flags). Without full data,
-    // those fields show blank in the edit modal even though the DB has values.
-    const fullItems = await Promise.all(
-      itemList.map(item => getItem(item.id).then(r => r.data).catch(() => item))
-    );
-
-    const initialData = {};
-    const origData = {};
-    fullItems.forEach(item => {
-      initialData[item.id] = { ...item };
-      origData[item.id] = { ...item };
-    });
-    setEditItems(fullItems);
-    setEditData(initialData);
-    setOriginalData(origData);
-
+    const full = await Promise.all(itemList.map(i => getItem(i.id).then(r => r.data).catch(() => i)));
+    const init = {}, orig = {};
+    full.forEach(item => { init[item.id] = { ...item }; orig[item.id] = { ...item }; });
+    setEditItems(full); setEditData(init); setOriginalData(orig);
     if (sectionKey === "advances" && itemList.length > 0) {
-      const ref = itemList[0].ref;
       try {
-        const res = await getAdvances({ ref });
-        const advList = res.data || [];
-        setRefAdvances(advList);
-        const advInitial = {};
-        const advOrig = {};
-        advList.forEach(adv => {
-          advInitial[adv.id] = { ...adv };
-          advOrig[adv.id] = { ...adv };
-        });
-        setAdvanceData(advInitial);
-        setOriginalAdvanceData(advOrig);
-        setNewAdvances([]);
-        setDeletedAdvances([]);
-      } catch {
-        setRefAdvances([]);
-      }
+        const res = await getAdvances({ ref: itemList[0].ref });
+        const list = res.data || [];
+        const ai = {}, ao = {};
+        list.forEach(a => { ai[a.id] = { ...a }; ao[a.id] = { ...a }; });
+        setAdvanceData(ai); setOrigAdvData(ao); setNewAdvances([]); setDeletedAdvances([]);
+      } catch { setAdvanceData({}); setOrigAdvData({}); }
     }
     setShowSectionSelector(false);
   };
 
-  const handleAdvanceChange = (advanceId, fieldKey, value) => {
-    setAdvanceData(prev => ({ ...prev, [advanceId]: { ...prev[advanceId], [fieldKey]: value } }));
-  };
-
-  const handleNewAdvanceChange = (index, fieldKey, value) => {
-    setNewAdvances(prev => { const u = [...prev]; u[index] = { ...u[index], [fieldKey]: value }; return u; });
-  };
-
-  const addNewAdvance = () => {
-    const ref = editItems[0]?.ref || "";
-    const name = editItems[0]?.name || "";
-    setNewAdvances(prev => [...prev, {
-      id: `new_${Date.now()}`,
-      date: new Date().toISOString().split("T")[0],
-      name, ref, amount: 0, mode: "Cash", tally: false
-    }]);
-  };
-
-  const removeNewAdvance = (index) => setNewAdvances(prev => prev.filter((_, i) => i !== index));
-
-  const markAdvanceForDelete = (advanceId) => {
-    setDeletedAdvances(prev => [...prev, advanceId]);
-    setAdvanceData(prev => { const u = { ...prev }; delete u[advanceId]; return u; });
-  };
-
-  const handleFieldChange = (itemId, fieldKey, value) => {
+  const handleFieldChange = (itemId, key, value) => {
     setEditData(prev => {
-      const updated = { ...prev, [itemId]: { ...prev[itemId], [fieldKey]: value } };
-      const item = updated[itemId];
-
-      // ── Fabric ────────────────────────────────────────────────────────────
-      // price / qty / discount → recalculate fabric_amount
-      if (["price", "qty", "discount"].includes(fieldKey)) {
-        updated[itemId].fabric_amount = computeFabricAmount(
-          parseFloat(item.price) || 0, parseFloat(item.qty) || 0, parseFloat(item.discount) || 0
-        );
+      const u = { ...prev, [itemId]: { ...prev[itemId], [key]: value } };
+      const it = u[itemId];
+      if (["price","qty","discount"].includes(key))
+        it.fabric_amount = computeFabric(parseFloat(it.price)||0, parseFloat(it.qty)||0, parseFloat(it.discount)||0);
+      if (["fabric_amount","fabric_received","price","qty","discount"].includes(key))
+        it.fabric_pending = computePending(parseFloat(it.fabric_amount)||0, parseFloat(it.fabric_received)||0);
+      if (key === "article_type" && tailoringRates[value]) {
+        it.tailoring_amount = parseFloat(tailoringRates[value].tailoring) || 0;
+        it.labour_amount    = parseFloat(tailoringRates[value].labour)    || 0;
       }
-      // fabric_amount or fabric_received → recalculate fabric_pending
-      if (["fabric_received", "fabric_amount", "price", "qty", "discount"].includes(fieldKey)) {
-        updated[itemId].fabric_pending = computePending(
-          parseFloat(updated[itemId].fabric_amount) || 0, parseFloat(updated[itemId].fabric_received) || 0
-        );
-      }
-
-      // ── Tailoring ─────────────────────────────────────────────────────────
-      // article_type → look up rate, set tailoring_amount + labour_amount, then fall through to pending recalc
-      if (fieldKey === "article_type") {
-        const rateData = tailoringRates[value];
-        if (rateData) {
-          updated[itemId].tailoring_amount = parseFloat(rateData.tailoring) || 0;
-          updated[itemId].labour_amount    = parseFloat(rateData.labour)    || 0;
-        }
-      }
-      // tailoring_amount or tailoring_received (or article_type cascade above) → recalculate tailoring_pending
-      if (["tailoring_amount", "tailoring_received", "article_type"].includes(fieldKey)) {
-        updated[itemId].tailoring_pending = computePending(
-          parseFloat(updated[itemId].tailoring_amount) || 0, parseFloat(updated[itemId].tailoring_received) || 0
-        );
-      }
-
-      // ── Embroidery ────────────────────────────────────────────────────────
-      // embroidery_amount or embroidery_received → recalculate embroidery_pending
-      if (["embroidery_amount", "embroidery_received"].includes(fieldKey)) {
-        updated[itemId].embroidery_pending = computePending(
-          parseFloat(updated[itemId].embroidery_amount) || 0, parseFloat(updated[itemId].embroidery_received) || 0
-        );
-      }
-      // emb_labour_amount or emb_labour_paid changes — no pending field, but
-      // default emb_labour_date to today when emb_labour_paid flips to "Yes"
-      if (fieldKey === "emb_labour_paid" && value === "Yes" && !updated[itemId].emb_labour_date) {
-        updated[itemId].emb_labour_date = new Date().toISOString().split("T")[0];
-      }
-
-      // ── Add-on ────────────────────────────────────────────────────────────
-      // addon_amount or addon_received → recalculate addon_pending
-      if (["addon_amount", "addon_received"].includes(fieldKey)) {
-        updated[itemId].addon_pending = computePending(
-          parseFloat(updated[itemId].addon_amount) || 0, parseFloat(updated[itemId].addon_received) || 0
-        );
-      }
-
-      // ── Labour (tailoring) ────────────────────────────────────────────────
-      // default labour_pay_date to today when labour_paid flips to "Yes"
-      if (fieldKey === "labour_paid" && value === "Yes" && !updated[itemId].labour_pay_date) {
-        updated[itemId].labour_pay_date = new Date().toISOString().split("T")[0];
-      }
-
-      return updated;
+      if (["tailoring_amount","tailoring_received","article_type"].includes(key))
+        it.tailoring_pending = computePending(parseFloat(it.tailoring_amount)||0, parseFloat(it.tailoring_received)||0);
+      if (["embroidery_amount","embroidery_received"].includes(key))
+        it.embroidery_pending = computePending(parseFloat(it.embroidery_amount)||0, parseFloat(it.embroidery_received)||0);
+      if (["addon_amount","addon_received"].includes(key))
+        it.addon_pending = computePending(parseFloat(it.addon_amount)||0, parseFloat(it.addon_received)||0);
+      if (key === "labour_paid" && value === "Yes" && !it.labour_pay_date)
+        it.labour_pay_date = new Date().toISOString().split("T")[0];
+      if (key === "emb_labour_paid" && value === "Yes" && !it.emb_labour_date)
+        it.emb_labour_date = new Date().toISOString().split("T")[0];
+      return u;
     });
   };
 
-  // Detect sections that were already Settled but whose _amount has now changed
-  const detectSettledAmountChanges = (original, current) => {
+  const handleAdvChange    = (id, k, v) => setAdvanceData(p => ({ ...p, [id]: { ...p[id], [k]: v } }));
+  const handleNewAdvChange = (idx, k, v) => setNewAdvances(p => { const u=[...p]; u[idx]={...u[idx],[k]:v}; return u; });
+  const addNewAdvance      = () => setNewAdvances(p => [...p, { id: `new_${Date.now()}`, date: new Date().toISOString().split("T")[0], name: editItems[0]?.name||"", ref: editItems[0]?.ref||"", amount: 0, mode: "Cash", tally: false }]);
+  const removeNewAdvance   = idx => setNewAdvances(p => p.filter((_,i) => i !== idx));
+  const markAdvDelete      = id => { setDeletedAdvances(p=>[...p,id]); setAdvanceData(p=>{const u={...p};delete u[id];return u;}); };
+
+  const addNewItem = () => {
+    const tempId = `new_${Date.now()}_${Math.random().toString(36).substr(2,9)}`;
+    const ref = editItems[0]?.ref || "", name = editItems[0]?.name || "", date = editItems[0]?.date || new Date().toISOString().split("T")[0];
+    const ni = { id:tempId,ref,name,date,barcode:"",price:0,qty:0,discount:0,fabric_amount:0,fabric_received:0,fabric_pending:0,fabric_pay_date:"",fabric_pay_mode:"N/A",tailoring_status:"N/A",article_type:"N/A",order_no:"N/A",delivery_date:"N/A",tailoring_amount:0,tailoring_received:0,tailoring_pending:0,tailoring_pay_date:"",tailoring_pay_mode:"N/A",embroidery_status:"N/A",karigar:"N/A",embroidery_amount:0,embroidery_received:0,embroidery_pending:0,embroidery_pay_date:"",embroidery_pay_mode:"N/A",addon_desc:"N/A",addon_amount:0,addon_received:0,addon_pending:0,addon_pay_date:"",addon_pay_mode:"N/A",labour_amount:0,labour_paid:"N/A",labour_pay_date:"",labour_payment_mode:"N/A",emb_labour_amount:0,emb_labour_paid:"N/A",emb_labour_date:"",emb_labour_payment_mode:"N/A",tally_fabric:false,tally_tailoring:false,tally_embroidery:false,tally_addon:false };
+    setEditItems(p=>[...p,ni]); setEditData(p=>({...p,[tempId]:{...ni}})); setOriginalData(p=>({...p,[tempId]:{...ni}})); setNewItemIds(p=>[...p,tempId]);
+  };
+
+  const detectSettledChanges = (orig, cur) => {
     const changed = [];
-    const check = (amountKey, modeKey, label) => {
-      const mode = String(original[modeKey] || "");
-      if (!mode.startsWith("Settled")) return;
-      const oldAmt = parseFloat(original[amountKey]) || 0;
-      const newAmt = parseFloat(current[amountKey]) || 0;
-      if (Math.abs(oldAmt - newAmt) > 0.01) changed.push({ label, oldAmt, newAmt });
+    const chk = (ak, mk, label) => {
+      if (!String(orig[mk]||"").startsWith("Settled")) return;
+      const o = parseFloat(orig[ak])||0, n = parseFloat(cur[ak])||0;
+      if (Math.abs(o-n) > 0.01) changed.push({ label, oldAmt:o, newAmt:n });
     };
-    check("fabric_amount",     "fabric_pay_mode",     "Fabric");
-    check("tailoring_amount",  "tailoring_pay_mode",  "Tailoring");
-    check("embroidery_amount", "embroidery_pay_mode",  "Embroidery");
-    check("addon_amount",      "addon_pay_mode",       "Add-on");
+    chk("fabric_amount","fabric_pay_mode","Fabric"); chk("tailoring_amount","tailoring_pay_mode","Tailoring");
+    chk("embroidery_amount","embroidery_pay_mode","Embroidery"); chk("addon_amount","addon_pay_mode","Add-on");
     return changed;
   };
 
-  const detectMismatches = (itemId, original, current) => {
-    const mismatches = [];
-    const checkMismatch = (amountKey, receivedKey, modeKey, label) => {
-      const originalAmount = parseFloat(original[amountKey]) || 0;
-      const newAmount = parseFloat(current[amountKey]) || 0;
-      const received = parseFloat(original[receivedKey]) || 0;
-      const mode = String(current[modeKey] || original[modeKey] || "");
-      if (mode.startsWith("Settled")) return;
-      if (newAmount < originalAmount && newAmount < received) {
-        mismatches.push({ itemId, ref: original.ref, type: label, oldAmount: originalAmount, newAmount, received, overage: received - newAmount });
-      }
+  const detectMismatches = (orig, cur) => {
+    const mm = [];
+    const chk = (ak, rk, mk, label) => {
+      const oa=parseFloat(orig[ak])||0, na=parseFloat(cur[ak])||0, r=parseFloat(orig[rk])||0;
+      if (String(cur[mk]||orig[mk]||"").startsWith("Settled")) return;
+      if (na < oa && na < r) mm.push({ ref:orig.ref,type:label,oldAmount:oa,newAmount:na,received:r,overage:r-na });
     };
-    checkMismatch("fabric_amount", "fabric_received", "fabric_pay_mode", "Fabric");
-    checkMismatch("tailoring_amount", "tailoring_received", "tailoring_pay_mode", "Tailoring");
-    checkMismatch("embroidery_amount", "embroidery_received", "embroidery_pay_mode", "Embroidery");
-    checkMismatch("addon_amount", "addon_received", "addon_pay_mode", "Add-on");
-    return mismatches;
+    chk("fabric_amount","fabric_received","fabric_pay_mode","Fabric");
+    chk("tailoring_amount","tailoring_received","tailoring_pay_mode","Tailoring");
+    chk("embroidery_amount","embroidery_received","embroidery_pay_mode","Embroidery");
+    chk("addon_amount","addon_received","addon_pay_mode","Add-on");
+    return mm;
   };
 
   const saveEdits = async () => {
     setSaving(true);
-    const isAdvanceSection = selectedSection === "advances";
-
-    if (isAdvanceSection) {
-      let advSuccess = 0, advFailed = 0;
-      for (const advanceId of deletedAdvances) {
-        try { await deleteAdvance(advanceId); advSuccess++; } catch { advFailed++; }
-      }
-      for (const [advanceId, data] of Object.entries(advanceData)) {
+    // Advances
+    if (selectedSection === "advances") {
+      let ok=0, fail=0;
+      for (const id of deletedAdvances) { try { await deleteAdvance(id); ok++; } catch { fail++; } }
+      for (const [id, data] of Object.entries(advanceData)) {
         try {
-          const original = originalAdvanceData[advanceId];
-          const changedFields = {};
-          Object.keys(data).forEach(key => {
-            if (JSON.stringify(data[key]) !== JSON.stringify(original[key])) changedFields[key] = data[key];
-          });
-          if (Object.keys(changedFields).length > 0) { await updateAdvance(advanceId, changedFields); advSuccess++; }
-        } catch { advFailed++; }
+          const orig=origAdvData[id]; const ch={};
+          Object.keys(data).forEach(k=>{ if(JSON.stringify(data[k])!==JSON.stringify(orig?.[k])) ch[k]=data[k]; });
+          if (Object.keys(ch).length) await updateAdvance(id, ch); ok++;
+        } catch { fail++; }
       }
-      for (const newAdv of newAdvances) {
-        try { const { id, ...data } = newAdv; await createAdvance(data); advSuccess++; } catch { advFailed++; }
-      }
-      setSaving(false);
-      setSelectedSection(null);
-      setAdvanceData({}); setOriginalAdvanceData({}); setNewAdvances([]); setDeletedAdvances([]); setRefAdvances([]); setEditItems([]);
-      setMessage({ type: advFailed === 0 ? "success" : "error", text: advFailed === 0 ? "Advances saved successfully" : `${advFailed} operation(s) failed, ${advSuccess} succeeded` });
-      setTimeout(() => setMessage(null), 3000);
-      invalidateItemsCache(); invalidateAdvancesCache();
-      loadData();
+      for (const a of newAdvances) { try { const {id,...d}=a; await createAdvance(d); ok++; } catch { fail++; } }
+      setSaving(false); setSelectedSection(null);
+      setAdvanceData({}); setOrigAdvData({}); setNewAdvances([]); setDeletedAdvances([]); setEditItems([]);
+      setMessage({ type: fail===0?"success":"error", text: fail===0?`Advances saved`:`${fail} operation(s) failed` });
+      setTimeout(()=>setMessage(null),3000);
+      invalidateItemsCache(); invalidateAdvancesCache(); loadData();
       return;
     }
-
-    const itemIds = Object.keys(editData);
-    let success = 0, failed = 0;
-    const allMismatches = [];
-    const affectedRefs = new Set();
-    let reSettleRef = null;
-    let reSettleCustomer = null;
-    let reSettleSections = [];
-
-    for (const itemId of itemIds) {
-      if (newItemIds.includes(itemId)) continue;
+    // Items
+    let ok=0, fail=0, allMM=[], affRefs=new Set(), reRef=null, reCust=null, reSecs=[];
+    for (const id of Object.keys(editData)) {
+      if (newItemIds.includes(id)) continue;
       try {
-        const original = originalData[itemId];
-        const current = editData[itemId];
-        const changedFields = {};
-        Object.keys(current).forEach(key => {
-          if (JSON.stringify(current[key]) !== JSON.stringify(original[key])) changedFields[key] = current[key];
-        });
-        const mismatches = detectMismatches(itemId, original, current);
-        if (mismatches.length > 0) { allMismatches.push(...mismatches); affectedRefs.add(original.ref); }
-        // Detect settled sections whose amounts changed — prompt re-settle after save
-        const settledChanges = detectSettledAmountChanges(original, current);
-        if (settledChanges.length > 0) {
-          reSettleRef = original.ref;
-          reSettleCustomer = original.name;
-          reSettleSections = [...reSettleSections, ...settledChanges];
-        }
-        if (Object.keys(changedFields).length > 0) { await updateItem(itemId, changedFields); success++; }
-      } catch { failed++; }
+        const orig=originalData[id], cur=editData[id]; const ch={};
+        Object.keys(cur).forEach(k=>{ if(JSON.stringify(cur[k])!==JSON.stringify(orig[k])) ch[k]=cur[k]; });
+        const mm=detectMismatches(orig,cur); if(mm.length){allMM.push(...mm);affRefs.add(orig.ref);}
+        const sc=detectSettledChanges(orig,cur); if(sc.length){reRef=orig.ref;reCust=orig.name;reSecs=[...reSecs,...sc];}
+        if (Object.keys(ch).length) await updateItem(id, ch); ok++;
+      } catch { fail++; }
     }
-
-    for (const itemId of newItemIds) {
-      try { const itemData = editData[itemId]; if (itemData) { await createItem(itemData); success++; } }
-      catch (err) { console.error("Failed to create item:", err); failed++; }
-    }
-
-    setSaving(false);
-    setSelectedSection(null); setEditData({}); setOriginalData({}); setEditItems([]); setNewItemIds([]);
-
-    if (failed === 0) {
-      if (allMismatches.length > 0) {
-        setMismatchPrompt({ refs: Array.from(affectedRefs), mismatches: allMismatches });
-      } else if (reSettleRef) {
-        // Show re-settle prompt — amounts on already-settled sections have changed
-        setReSettlePrompt({ ref: reSettleRef, customer: reSettleCustomer, sections: reSettleSections });
-        setMessage({ type: "success", text: `${success} item(s) saved` });
-        setTimeout(() => setMessage(null), 2000);
-      } else {
-        setMessage({ type: "success", text: `${success} item(s) saved successfully` });
-        setTimeout(() => setMessage(null), 3000);
-      }
-    } else {
-      setMessage({ type: "error", text: `${failed} operation(s) failed, ${success} succeeded` });
-      setTimeout(() => setMessage(null), 3000);
-    }
-    invalidateItemsCache();
-    loadData();
+    for (const id of newItemIds) { try { if(editData[id]) await createItem(editData[id]); ok++; } catch { fail++; } }
+    setSaving(false); setSelectedSection(null); setEditData({}); setOriginalData({}); setEditItems([]); setNewItemIds([]);
+    if (fail === 0) {
+      if (allMM.length) setMismatchPrompt({ refs: Array.from(affRefs), mismatches: allMM });
+      else if (reRef) { setReSettlePrompt({ ref:reRef,customer:reCust,sections:reSecs }); setMessage({ type:"success",text:`${ok} item(s) saved`}); setTimeout(()=>setMessage(null),2000); }
+      else { setMessage({ type:"success",text:`${ok} item(s) saved`}); setTimeout(()=>setMessage(null),3000); }
+    } else { setMessage({ type:"error",text:`${fail} failed, ${ok} saved`}); setTimeout(()=>setMessage(null),3000); }
+    invalidateItemsCache(); loadData();
   };
 
   const cancelEdit = () => {
     setSelectedSection(null); setEditData({}); setOriginalData({}); setEditItems([]); setNewItemIds([]); setShowSectionSelector(false);
-    setAdvanceData({}); setOriginalAdvanceData({}); setNewAdvances([]); setDeletedAdvances([]);
-  };
-
-  const addNewItem = () => {
-    const tempId = `new_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const ref = editItems[0]?.ref || "";
-    const name = editItems[0]?.name || "";
-    const date = editItems[0]?.date || new Date().toISOString().split("T")[0];
-    const newItem = {
-      id: tempId, ref, name, date, barcode: "", price: 0, qty: 0, discount: 0,
-      fabric_amount: 0, fabric_received: 0, fabric_pending: 0, fabric_pay_date: "", fabric_pay_mode: "N/A",
-      tailoring_status: "N/A", article_type: "N/A", order_no: "N/A", delivery_date: "N/A",
-      tailoring_amount: 0, tailoring_received: 0, tailoring_pending: 0, tailoring_pay_date: "", tailoring_pay_mode: "N/A",
-      embroidery_status: "N/A", karigar: "N/A", embroidery_amount: 0, embroidery_received: 0, embroidery_pending: 0,
-      embroidery_pay_date: "", embroidery_pay_mode: "N/A", addon_desc: "N/A", addon_amount: 0,
-      addon_received: 0, addon_pending: 0, addon_pay_date: "", addon_pay_mode: "N/A",
-      labour_amount: 0, labour_paid: "N/A", labour_pay_date: "", labour_payment_mode: "N/A",
-      emb_labour_amount: 0, emb_labour_paid: "N/A", emb_labour_date: "", emb_labour_payment_mode: "N/A",
-      tally_fabric: false, tally_tailoring: false, tally_embroidery: false, tally_addon: false,
-    };
-    setEditItems(prev => [...prev, newItem]);
-    setEditData(prev => ({ ...prev, [tempId]: { ...newItem } }));
-    setOriginalData(prev => ({ ...prev, [tempId]: { ...newItem } }));
-    setNewItemIds(prev => [...prev, tempId]);
+    setAdvanceData({}); setOrigAdvData({}); setNewAdvances([]); setDeletedAdvances([]);
   };
 
   const handleDelete = async () => {
     if (!delConfirm) return;
     try {
-      if (delMode === "order") {
-        for (const id of delConfirm.items.map(i => i.id)) await deleteItem(id);
-        setMessage({ type: "success", text: `Order ${delConfirm.ref} deleted (${delConfirm.items.length} items)` });
-      } else {
-        await deleteItem(delConfirm.id);
-        setMessage({ type: "success", text: "Item deleted" });
-      }
-      setDelConfirm(null);
-      invalidateItemsCache();
-      loadData();
-    } catch {
-      setMessage({ type: "error", text: "Failed to delete" });
-    }
-    setTimeout(() => setMessage(null), 3000);
+      if (delMode === "order") { for (const id of delConfirm.items.map(i=>i.id)) await deleteItem(id); }
+      else await deleteItem(delConfirm.id);
+      setMessage({ type:"success", text: delMode==="order"?`Order ${delConfirm.ref} deleted`:"Item deleted" });
+    } catch { setMessage({ type:"error", text:"Failed to delete" }); }
+    setDelConfirm(null); invalidateItemsCache(); loadData();
+    setTimeout(()=>setMessage(null),3000);
   };
 
   const handleCancelOrder = async (group) => {
-    const zeroFields = {
-      cancelled: true,
-      cancelled_at: new Date().toISOString(),
-      cancelled_ref: group.ref,
-      price: 0, qty: 0, discount: 0,
-      // Fabric
-      fabric_amount: 0, fabric_received: 0, fabric_pending: 0, fabric_pay_mode: "N/A", tally_fabric: false,
-      // Tailoring
-      tailoring_amount: 0, tailoring_received: 0, tailoring_pending: 0, tailoring_pay_mode: "N/A",
-      tailoring_status: "N/A", article_type: "N/A", order_no: "N/A", delivery_date: "N/A",
-      labour_amount: 0, labour_paid: "N/A", tally_tailoring: false,
-      // Embroidery
-      embroidery_amount: 0, embroidery_received: 0, embroidery_pending: 0, embroidery_pay_mode: "N/A",
-      embroidery_status: "N/A", karigar: "N/A",
-      emb_labour_amount: 0, emb_labour_paid: "N/A", tally_embroidery: false,
-      // Add-on
-      addon_amount: 0, addon_received: 0, addon_pending: 0, addon_pay_mode: "N/A",
-      addon_desc: "N/A", tally_addon: false,
-    };
-    let success = 0;
-    for (const item of group.items) {
-      try {
-        await updateItem(item.id, zeroFields);
-        success++;
-      } catch {}
-    }
-    setMessage({ type: success === group.items.length ? "success" : "error", text: success === group.items.length ? `Order ${group.ref} cancelled — all amounts zeroed out` : `${group.items.length - success} items failed to cancel` });
-    setTimeout(() => setMessage(null), 3000);
-    setCancelConfirm(null);
-    invalidateItemsCache();
-    loadData();
+    const zero = { cancelled:true,cancelled_at:new Date().toISOString(),price:0,qty:0,discount:0,fabric_amount:0,fabric_received:0,fabric_pending:0,fabric_pay_mode:"N/A",tally_fabric:false,tailoring_amount:0,tailoring_received:0,tailoring_pending:0,tailoring_pay_mode:"N/A",tailoring_status:"N/A",article_type:"N/A",order_no:"N/A",delivery_date:"N/A",labour_amount:0,labour_paid:"N/A",tally_tailoring:false,embroidery_amount:0,embroidery_received:0,embroidery_pending:0,embroidery_pay_mode:"N/A",embroidery_status:"N/A",karigar:"N/A",emb_labour_amount:0,emb_labour_paid:"N/A",tally_embroidery:false,addon_amount:0,addon_received:0,addon_pending:0,addon_pay_mode:"N/A",addon_desc:"N/A",tally_addon:false };
+    let ok = 0;
+    for (const item of group.items) { try { await updateItem(item.id, zero); ok++; } catch {} }
+    setMessage({ type: ok===group.items.length?"success":"error", text: ok===group.items.length?`Order ${group.ref} cancelled`:`${group.items.length-ok} items failed` });
+    setTimeout(()=>setMessage(null),3000);
+    setCancelConfirm(null); invalidateItemsCache(); loadData();
   };
 
-  // ==========================================
-  // FILTERING & GROUPING
-  // ==========================================
-  const filteredCustomers = [...new Set(allItems.map(i => i.name).filter(Boolean))].sort();
-  const filteredItems = allItems;
-
-  const grouped = {};
-  filteredItems.forEach(item => {
-    const ref = item.ref;
-    if (!grouped[ref]) grouped[ref] = {
-      ref, name: item.name, date: item.date, items: [],
-      totals: { fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0, total: 0, received: 0, pending: 0 }
-    };
-    grouped[ref].items.push(item);
-    grouped[ref].totals.fabric += item.fabric_amount || 0;
-    grouped[ref].totals.tailoring += item.tailoring_amount || 0;
-    grouped[ref].totals.embroidery += item.embroidery_amount || 0;
-    grouped[ref].totals.addon += item.addon_amount || 0;
-    grouped[ref].totals.total += (item.fabric_amount || 0) + (item.tailoring_amount || 0) + (item.embroidery_amount || 0) + (item.addon_amount || 0);
-    grouped[ref].totals.received += (item.fabric_received || 0) + (item.tailoring_received || 0) + (item.embroidery_received || 0) + (item.addon_received || 0);
-    if (!String(item.fabric_pay_mode || "").startsWith("Settled"))     grouped[ref].totals.pending += (item.fabric_pending || 0);
-    if (!String(item.tailoring_pay_mode || "").startsWith("Settled"))  grouped[ref].totals.pending += (item.tailoring_pending || 0);
-    if (!String(item.embroidery_pay_mode || "").startsWith("Settled")) grouped[ref].totals.pending += (item.embroidery_pending || 0);
-    if (!String(item.addon_pay_mode || "").startsWith("Settled"))      grouped[ref].totals.pending += (item.addon_pending || 0);
-  });
-  advances.forEach(adv => {
-    if (grouped[adv.ref]) grouped[adv.ref].totals.advance += adv.amount || 0;
-  });
-
-  // Apply settled/unsettled tab filter
-  const tabFilteredRefs = Object.values(grouped).filter(g => {
-    if (settleTab === "unsettled") return Math.round(g.totals.pending) !== 0 || g.totals.total === 0;
-    if (settleTab === "settled")   return Math.round(g.totals.pending) === 0 && g.totals.total > 0;
-    return true;
-  });
-
-  const refs = tabFilteredRefs.sort((a, b) => {
-    let va = a[sortKey] ?? "";
-    let vb = b[sortKey] ?? "";
-    const dateRx = /^\d{4}-\d{2}-\d{2}$/;
-    if (dateRx.test(String(va)) && dateRx.test(String(vb))) {
-      const cmp = String(va).localeCompare(String(vb));
-      return sortDir === "desc" ? -cmp : cmp;
-    }
-    if (typeof va === "number" && typeof vb === "number") {
-      return sortDir === "desc" ? vb - va : va - vb;
-    }
-    const cmp = String(va).localeCompare(String(vb));
-    return sortDir === "desc" ? -cmp : cmp;
-  });
-
-  const orderNos    = [...new Set(filteredItems.map(i => i.order_no).filter(o => o && o !== "N/A"))].sort();
-  const allRefKeys   = refs.map(g => g.ref);
-  const allSelected  = allRefKeys.length > 0 && allRefKeys.every(r => selectedRefs.has(r));
-  const someSelected = allRefKeys.some(r => selectedRefs.has(r));
-
-  const toggleSelectRef = (ref) => setSelectedRefs(prev => {
-    const next = new Set(prev);
-    next.has(ref) ? next.delete(ref) : next.add(ref);
-    return next;
-  });
-  const toggleSelectAll = () => {
-    if (allSelected) setSelectedRefs(new Set());
-    else setSelectedRefs(new Set(allRefKeys));
-  };
-  const openSettlement = (orders) => {
-    setSettlementOrders(orders);
-  };
-  const openSelectionSettlement = () => {
-    const orders = refs
-      .filter(g => selectedRefs.has(g.ref))
-      .map(g => ({ ref: g.ref, name: g.name }));
-    if (orders.length) openSettlement(orders);
-  };
-  const toggleExpand = (ref) => setExpanded(prev => ({ ...prev, [ref]: !prev[ref] }));
-  const handleSort = (key) => {
-    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortKey(key); setSortDir("desc"); }
+  const handleCancelItem = async (item) => {
+    const zero = { cancelled:true,cancelled_at:new Date().toISOString(),price:0,qty:0,discount:0,fabric_amount:0,fabric_received:0,fabric_pending:0,fabric_pay_mode:"N/A",tally_fabric:false,tailoring_amount:0,tailoring_received:0,tailoring_pending:0,tailoring_pay_mode:"N/A",tailoring_status:"N/A",article_type:"N/A",order_no:"N/A",delivery_date:"N/A",labour_amount:0,labour_paid:"N/A",tally_tailoring:false,embroidery_amount:0,embroidery_received:0,embroidery_pending:0,embroidery_pay_mode:"N/A",embroidery_status:"N/A",karigar:"N/A",emb_labour_amount:0,emb_labour_paid:"N/A",tally_embroidery:false,addon_amount:0,addon_received:0,addon_pending:0,addon_pay_mode:"N/A",addon_desc:"N/A",tally_addon:false };
+    try { await updateItem(item.id, zero); setMessage({ type:"success", text:`Article ${item.barcode} cancelled` }); }
+    catch { setMessage({ type:"error", text:"Failed to cancel article" }); }
+    setTimeout(()=>setMessage(null),3000);
+    invalidateItemsCache(); loadData();
   };
 
-  const _sectionForEdit = selectedSection ? SECTIONS[selectedSection] : null;
-  const _isAdvanceEdit = _sectionForEdit?.isAdvanceSection;
+  const _sf = selectedSection ? SECTIONS[selectedSection] : null;
+  const _isAdv = _sf?.isAdvanceSection;
 
-  // Sort indicator helper
-  const sortIndicator = (key) => sortKey === key ? (sortDir === "asc" ? " ↑" : " ↓") : "";
-
+  // ─── Render ───────────────────────────────────────────────
   return (
-    <div data-testid="items-manager-page" className="space-y-5">
-      {/* Page Header */}
-      <div>
-        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Manage Orders</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">View, edit and manage all orders grouped by reference</p>
+    <div data-testid="items-manager-page" className="flex flex-col h-[calc(100vh-4rem)] -m-4 sm:-m-6 lg:-m-8 overflow-hidden">
+
+      {/* ── TOP BAR ── */}
+      <div className="flex-shrink-0 flex items-center gap-2 px-3 sm:px-4 py-2 bg-[var(--surface)] border-b border-[var(--border-subtle)]">
+        {/* Left: sidebar toggle + title */}
+        <button onClick={() => setSidebarOpen(o => !o)} title="Toggle sidebar"
+          className="p-1.5 rounded-sm hover:bg-[var(--bg)] text-[var(--text-secondary)] flex-shrink-0 hidden lg:flex">
+          <SlidersHorizontal size={15}/>
+        </button>
+        <h1 className="font-heading text-sm font-semibold hidden md:block whitespace-nowrap text-[var(--text-primary)] mr-1">Orders</h1>
+
+        {/* Tabs + sort grouped together */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-0.5 bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm p-0.5 overflow-x-auto no-scrollbar">
+            {[{k:"unsettled",l:"Pending"},{k:"awaiting",l:"Awaiting"},{k:"settled",l:"Settled"},{k:"all",l:"All"}].map(t => (
+              <button key={t.k} onClick={() => { setSettleTab(t.k); setSelectedRefs(new Set()); }}
+                className={`px-2.5 py-1 text-xs font-medium rounded-sm transition-all whitespace-nowrap flex-shrink-0 ${settleTab===t.k?"bg-[var(--brand)] text-white shadow-sm":"text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)]"}`}>
+                {t.l}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => setSortDir(d => d==="desc"?"asc":"desc")}
+            className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] transition-colors flex-shrink-0" title={`Sort by date ${sortDir==="desc"?"oldest first":"newest first"}`}>
+            {sortDir==="desc" ? <CaretDown size={13}/> : <CaretRight size={13} className="-rotate-90"/>}
+          </button>
+        </div>
+
+        {/* Search — fills remaining space */}
+        <div className="relative flex-1 min-w-0">
+          <MagnifyingGlass size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] pointer-events-none"/>
+          <input ref={searchRef} type="text" value={nameFilter} onChange={e => setNameFilter(e.target.value)}
+            placeholder="Search customer…"
+            className="w-full pl-7 pr-6 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]"/>
+          {nameFilter && <button onClick={() => setNameFilter("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><X size={11}/></button>}
+        </div>
+
+        {message && (
+          <div className={`text-xs px-2.5 py-1.5 rounded-sm border flex-shrink-0 ${message.type==="success"?"bg-[#455D4A10] border-[var(--success)] text-[var(--success)]":"bg-[#9E473D10] border-[var(--error)] text-[var(--error)]"}`}>
+            {message.text}
+          </div>
+        )}
       </div>
 
-      {/* Message Banner */}
-      {message && (
-        <div className={`p-3 border rounded-sm text-sm ${message.type === "success" ? "bg-[#455D4A10] border-[var(--success)] text-[var(--success)]" : "bg-[#9E473D10] border-[var(--error)] text-[var(--error)]"}`}>
-          {message.text}
+      {/* ── BODY ── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+
+        {/* Sidebar */}
+        {sidebarOpen && (
+          <div className="hidden lg:flex flex-col w-52 flex-shrink-0 border-r border-[var(--border-subtle)] bg-[var(--bg)] overflow-y-auto">
+            <div className="p-3 space-y-4">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] mb-2">Summary</p>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs"><span className="text-[var(--text-secondary)]">Showing</span><span className="font-mono">{refs.length} refs</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-[var(--text-secondary)]">Total pending</span><span className="font-mono text-[var(--warning)]">₹{fmt(refs.reduce((s,g)=>s+Math.max(0,g.totals.pending),0))}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-[var(--text-secondary)]">Total value</span><span className="font-mono">₹{fmt(refs.reduce((s,g)=>s+g.totals.total,0))}</span></div>
+                </div>
+              </div>
+              {selectedRefs.size > 0 && (
+                <div className="pt-2 border-t border-[var(--border-subtle)]">
+                  <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] mb-2">Selected ({selectedRefs.size})</p>
+                  <div className="flex justify-between text-xs"><span className="text-[var(--text-secondary)]">Pending</span><span className="font-mono text-[var(--warning)]">₹{fmt(selectedGroups.reduce((s,g)=>s+Math.max(0,g.totals.pending),0))}</span></div>
+                  <button onClick={() => setSelectedRefs(new Set())} className="mt-2 text-[10px] text-[var(--brand)] hover:underline">Clear selection</button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Order list */}
+        <div className={`flex flex-col border-r border-[var(--border-subtle)] bg-[var(--surface)] overflow-hidden flex-shrink-0
+          ${detailOpen ? "hidden sm:flex sm:flex-1" : "flex w-full sm:flex-1"}` }>
+
+          <div className="flex-shrink-0 px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg)] flex items-center justify-between">
+            <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">
+              Orders <span className="font-mono ml-1">{refs.length}</span>
+            </p>
+            {selectedRefs.size > 0 && (
+              <button onClick={() => setSelectedRefs(new Set())} className="text-[10px] text-[var(--brand)] hover:underline">{selectedRefs.size} selected · clear</button>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {loading && Array.from({length:5}).map((_,i)=>(
+              <div key={i} className="h-16 border-b border-[var(--border-subtle)] animate-pulse bg-[var(--bg)]/50"/>
+            ))}
+
+            {!loading && refs.length === 0 && (
+              <div className="py-14 px-4 text-center text-sm text-[var(--text-secondary)]">
+                {nameFilter ? "No orders match your search" : `No ${settleTab==="unsettled"?"pending":settleTab==="settled"?"settled":settleTab==="awaiting"?"awaiting tailoring":""} orders`}
+              </div>
+            )}
+
+            {!loading && (() => {
+              let lastDate = null;
+              return refs.map(group => {
+                const isCancelled = group.items.some(i => i.cancelled);
+                const isSelected  = selectedRefs.has(group.ref);
+                const orderNos    = [...new Set(group.items.map(i=>i.order_no).filter(o=>o&&o!=="N/A"))];
+                const showDiv     = group.date !== lastDate;
+                lastDate = group.date;
+
+                return (
+                  <React.Fragment key={group.ref}>
+                    {showDiv && (
+                      <div className="px-3 py-1.5 bg-[var(--bg)] border-b border-[var(--border-subtle)] sticky top-0 z-10">
+                        <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-[var(--text-secondary)]">{group.date || "—"}</p>
+                      </div>
+                    )}
+                    <div
+                      className={`border-b border-[var(--border-subtle)] cursor-pointer transition-colors group/row
+                        ${isSelected ? "bg-[#C86B4D08] border-l-2 border-l-[var(--brand)]" : "hover:bg-[#C86B4D03] border-l-2 border-l-transparent"}`}
+                      onClick={e => selectRef(group.ref, e.ctrlKey || e.metaKey || e.shiftKey)}
+                    >
+                      <div className="flex items-center gap-2 px-2 py-2">
+                        {/* Date — left fixed */}
+                        <span className="font-mono text-[10px] text-[var(--text-secondary)] flex-shrink-0 w-16 text-center">{group.date || "—"}</span>
+                        {/* Name + ref — fills remaining */}
+                        <p className={`text-xs font-medium truncate flex-1 min-w-0 ${isCancelled ? "line-through text-[var(--text-secondary)]" : ""}`}>
+                          {group.name}
+                          <span className="font-mono text-[10px] text-[var(--brand)] ml-1.5">{group.ref}</span>
+                          {orderNos.length > 0 && <span className="text-[10px] text-[var(--text-secondary)] ml-1">#{orderNos[0]}</span>}
+                        </p>
+                        {/* Actions — right */}
+                        <div className="flex items-center gap-0 flex-shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                          <button onClick={() => setTailoringGroup(group)} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E15] rounded-sm" title="Assign Tailoring"><Scissors size={11}/></button>
+                          <button onClick={() => setAddonGroup(group)} className="p-1 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm" title="Add Add-on"><Tag size={11}/></button>
+                          <button onClick={() => setInvoiceRef(group.ref)} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm" title="Invoice"><Printer size={11}/></button>
+                        </div>
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              });
+            })()}
+          </div>
+        </div>
+
+        {/* Detail pane */}
+        <div className={`flex-shrink-0 bg-[var(--surface)] overflow-hidden w-full sm:w-72 lg:w-[30vw] h-full flex flex-col ${detailOpen ? "flex" : "hidden sm:flex"}`}>
+          <OrderDetailPane
+            selectedGroups={selectedGroups}
+            advances={advances}
+            onEdit={(section, items, mode) => startEdit(section, items, mode)}
+            onPay={() => setSettlementOrders(selectedGroups.map(g => ({ ref: g.ref, name: g.name })))}
+            onClose={() => setDetailOpen(false)}
+            onCancelItem={(item) => handleCancelItem(item)}
+            onDeleteItem={(item) => { setDelConfirm(item); setDelMode("item"); }}
+            onTailoring={(group) => setTailoringGroup(group)}
+            onAddon={(group) => setAddonGroup(group)}
+            onInvoice={(ref) => setInvoiceRef(ref)}
+          />
+        </div>
+      </div>
+
+      {/* Mobile: back to list */}
+      {detailOpen && (
+        <div className="sm:hidden fixed bottom-4 left-4 z-40">
+          <button onClick={() => setDetailOpen(false)}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--surface)] border border-[var(--border-strong)] rounded-full shadow-lg">
+            <CaretRight size={14} className="rotate-180"/> Orders
+          </button>
         </div>
       )}
 
-      {/* ── Settled / Unsettled Tabs ── */}
-      <div className="flex items-center gap-1 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-1 w-fit">
-        {[{k:"all",l:"All"},{k:"unsettled",l:"Pending"},{k:"settled",l:"Settled"}].map(t => (
-          <button
-            key={t.k}
-            onClick={() => { setSettleTab(t.k); setSelectedRefs(new Set()); }}
-            className={`px-3 py-1.5 text-xs font-medium rounded-sm transition-all ${
-              settleTab === t.k
-                ? "bg-[var(--brand)] text-white shadow-sm"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg)]"
-            }`}
-          >{t.l}</button>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-3 rounded-sm flex flex-wrap gap-3 items-center">
-        {/* Customer text search */}
-        <div className="relative flex items-center">
-          <input
-            ref={customerFilterRef}
-            data-testid="orders-customer-filter"
-            type="text"
-            value={nameFilter}
-            onChange={e => setNameFilter(e.target.value)}
-            placeholder="Search customer… (Ctrl+F)"
-            className="pl-2.5 pr-7 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)] w-52"
-          />
-          {nameFilter && (
-            <button onClick={() => setNameFilter("")} className="absolute right-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-              <X size={12} />
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Order No</label>
-          <select data-testid="orders-order-filter" value={orderFilter} onChange={e => setOrderFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]">
-            <option value="">All Order Nos</option>
-            {orderNos.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
-        </div>
-
-        <span className="ml-auto text-xs text-[var(--text-secondary)]">{refs.length} refs · {filteredItems.length} items</span>
-
-        <a href={exportExcelUrl()} target="_blank" rel="noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:text-[var(--brand)] transition-colors">
-          <DownloadSimple size={13} /> Export
-        </a>
-
-        {/* Column Visibility Toggle */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:text-[var(--brand)] transition-colors">
-              <Funnel size={13} /> Columns
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-52 p-3 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm shadow-lg z-50">
-            <h4 className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)] mb-2">Show / Hide Columns</h4>
-            <div className="space-y-1">
-              {[
-                { key: "barcode", label: "Barcode" },
-                { key: "price", label: "Price" },
-                { key: "qty", label: "Qty" },
-                { key: "discount", label: "Discount %" },
-                { key: "fabric_amount", label: "Fabric Amt" },
-                { key: "article_type", label: "Article Type" },
-                { key: "order_no", label: "Order #" },
-                { key: "delivery_date", label: "Delivery Date" },
-                { key: "tailoring_amount", label: "Tailoring Amt" },
-                { key: "embroidery_amount", label: "Emb. Amt" },
-                { key: "addon_desc", label: "Add-on" },
-              ].map(col => (
-                <label key={col.key} className="flex items-center gap-2 cursor-pointer hover:bg-[var(--bg)] px-1 py-0.5 rounded-sm">
-                  <input type="checkbox" checked={visibleColumns[col.key]} onChange={() => toggleColumn(col.key)} className="w-3.5 h-3.5 accent-[var(--brand)]" />
-                  <span className="text-xs text-[var(--text-primary)]">{col.label}</span>
-                </label>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      {/* ==========================================
-          SECTION SELECTOR MODAL
-      ========================================== */}
+      {/* ════ SECTION SELECTOR MODAL ════ */}
       {showSectionSelector && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-[var(--surface)] rounded-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
-            <div className="p-5 border-b border-[var(--border-subtle)]">
-              <h2 className="font-heading text-xl font-medium">Select Section to Edit</h2>
-              <p className="text-sm text-[var(--text-secondary)] mt-1">
-                {editMode === "order" ? `Editing order with ${editItems.length} items` : "Editing single item"}
-              </p>
+            <div className="p-5 border-b border-[var(--border-subtle)] flex items-center justify-between">
+              <div>
+                <h2 className="font-heading text-xl font-medium">Select Section to Edit</h2>
+                <p className="text-sm text-[var(--text-secondary)] mt-1">{editMode==="order"?`${editItems.length} items`:"1 item"}</p>
+              </div>
+              <button onClick={() => { setShowSectionSelector(false); setEditItems([]); }} className="p-1.5 hover:bg-[var(--bg)] rounded-sm text-[var(--text-secondary)]"><X size={16}/></button>
             </div>
             <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {Object.entries(SECTIONS).map(([key, section]) => (
-                <button key={key} onClick={() => startEdit(key, editItems, editMode)} className="p-4 border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:bg-[#C86B4D08] text-left transition-colors group">
+                <button key={key} onClick={() => startEdit(key, editItems, editMode)}
+                  className="p-4 border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:bg-[#C86B4D08] text-left transition-colors group">
                   <h3 className="font-medium text-[var(--brand)] group-hover:text-[var(--brand-hover)]">{section.label}</h3>
                   <p className="text-xs text-[var(--text-secondary)] mt-1">{section.description}</p>
-                  <p className="text-xs text-[var(--text-secondary)] mt-2 font-mono">{section.fields.length} fields</p>
                 </button>
               ))}
-            </div>
-            <div className="p-4 border-t border-[var(--border-subtle)] flex justify-end">
-              <button onClick={() => { setShowSectionSelector(false); setEditItems([]); }} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ==========================================
-          SECTION EDIT MODAL
-      ========================================== */}
-      {selectedSection && _sectionForEdit && (
+      {/* ════ SECTION EDIT MODAL ════ */}
+      {selectedSection && _sf && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-[var(--surface)] rounded-sm max-w-[96vw] w-full max-h-[92vh] flex flex-col shadow-xl">
-            {/* Modal Header */}
             <div className="px-5 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between flex-shrink-0">
               <div>
-                <h2 className="font-heading text-lg font-medium">{_sectionForEdit.label}</h2>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                  {editMode === "order" ? `${editItems.length} items` : "1 item"} · {_sectionForEdit.description}
-                </p>
+                <h2 className="font-heading text-lg font-medium">{_sf.label}</h2>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">{editMode==="order"?`${editItems.length} items`:"1 item"} · {_sf.description}</p>
               </div>
-              <button onClick={cancelEdit} className="p-1.5 hover:bg-[var(--bg)] rounded-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"><X size={18} /></button>
+              <button onClick={cancelEdit} className="p-1.5 hover:bg-[var(--bg)] rounded-sm text-[var(--text-secondary)]"><X size={18}/></button>
             </div>
 
-            {/* Modal Body */}
             <div className="flex-1 overflow-auto p-4">
-              {_isAdvanceEdit ? (
+              {_isAdv ? (
                 <div className="overflow-x-auto">
                   <div className="mb-3 flex items-center justify-between">
-                    <span className="text-xs text-[var(--text-secondary)]">
-                      Advances for: <span className="font-mono font-medium text-[var(--text-primary)]">{editItems[0]?.ref}</span>
-                    </span>
-                    <button onClick={addNewAdvance} className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[var(--success)] text-white rounded-sm hover:opacity-90 transition-opacity">
-                      <Plus size={12} /> Add Advance
-                    </button>
+                    <span className="text-xs text-[var(--text-secondary)]">Advances for: <span className="font-mono font-medium">{editItems[0]?.ref}</span></span>
+                    <button onClick={addNewAdvance} className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[var(--success)] text-white rounded-sm hover:opacity-90"><Plus size={12}/> Add Advance</button>
                   </div>
                   {Object.keys(advanceData).length > 0 && (
                     <div className="mb-4">
-                      <p className="text-xs font-semibold text-[var(--text-secondary)] mb-2">Existing Advances</p>
-                      <table className="w-full border border-[var(--border-subtle)] rounded-sm overflow-hidden">
-                        <thead className="bg-[var(--bg)]">
-                          <tr>
-                            {_sectionForEdit.fields.map(f => (
-                              <th key={f.key} className="px-3 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">{f.label}</th>
-                            ))}
-                            <th className="px-3 py-2 text-center text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-14">Del</th>
-                          </tr>
-                        </thead>
+                      <p className="text-xs font-semibold text-[var(--text-secondary)] mb-2">Existing</p>
+                      <table className="w-full border border-[var(--border-subtle)] rounded-sm overflow-hidden text-xs">
+                        <thead className="bg-[var(--bg)]"><tr>
+                          {_sf.fields.map(f => <th key={f.key} className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">{f.label}</th>)}
+                          <th className="px-3 py-2 w-14 border-b border-[var(--border-subtle)] text-center">Del</th>
+                        </tr></thead>
                         <tbody>
-                          {Object.entries(advanceData).map(([advId, adv]) => (
-                            <tr key={advId} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D04]">
-                              {_sectionForEdit.fields.map(f => (
-                                <td key={f.key} className="px-2 py-2">{renderFieldInput(f, advId, adv[f.key], handleAdvanceChange)}</td>
-                              ))}
-                              <td className="px-2 py-2 text-center">
-                                <button onClick={() => markAdvanceForDelete(advId)} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"><Trash size={13} /></button>
-                              </td>
+                          {Object.entries(advanceData).map(([id, adv]) => (
+                            <tr key={id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D04]">
+                              {_sf.fields.map(f => <td key={f.key} className="px-2 py-2">{renderFieldInput(f, id, adv[f.key], handleAdvChange)}</td>)}
+                              <td className="px-2 py-2 text-center"><button onClick={() => markAdvDelete(id)} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"><Trash size={13}/></button></td>
                             </tr>
                           ))}
                         </tbody>
@@ -871,27 +672,17 @@ export default function ItemsManager() {
                   )}
                   {newAdvances.length > 0 && (
                     <div className="mb-4">
-                      <p className="text-xs font-semibold text-[var(--success)] mb-2">New Advances (to be created)</p>
-                      <table className="w-full border border-[var(--border-subtle)] rounded-sm overflow-hidden">
-                        <thead className="bg-[#455D4A08]">
-                          <tr>
-                            {_sectionForEdit.fields.map(f => (
-                              <th key={f.key} className="px-3 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">{f.label}</th>
-                            ))}
-                            <th className="px-3 py-2 w-14 border-b border-[var(--border-subtle)]"></th>
-                          </tr>
-                        </thead>
+                      <p className="text-xs font-semibold text-[var(--success)] mb-2">New (to be created)</p>
+                      <table className="w-full border border-[var(--border-subtle)] rounded-sm overflow-hidden text-xs">
+                        <thead className="bg-[#455D4A08]"><tr>
+                          {_sf.fields.map(f => <th key={f.key} className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">{f.label}</th>)}
+                          <th className="px-3 py-2 w-14 border-b border-[var(--border-subtle)]"></th>
+                        </tr></thead>
                         <tbody>
                           {newAdvances.map((adv, idx) => (
                             <tr key={adv.id} className="border-b border-[var(--border-subtle)] last:border-0 bg-[#455D4A05]">
-                              {_sectionForEdit.fields.map(f => (
-                                <td key={f.key} className="px-2 py-2">
-                                  {renderFieldInput(f, idx, adv[f.key], (i, k, v) => handleNewAdvanceChange(i, k, v))}
-                                </td>
-                              ))}
-                              <td className="px-2 py-2 text-center">
-                                <button onClick={() => removeNewAdvance(idx)} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"><X size={13} /></button>
-                              </td>
+                              {_sf.fields.map(f => <td key={f.key} className="px-2 py-2">{renderFieldInput(f, idx, adv[f.key], handleNewAdvChange)}</td>)}
+                              <td className="px-2 py-2 text-center"><button onClick={() => removeNewAdvance(idx)} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"><X size={13}/></button></td>
                             </tr>
                           ))}
                         </tbody>
@@ -911,35 +702,29 @@ export default function ItemsManager() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  {_sectionForEdit?.label === "Items" && editMode === "order" && (
+                  {_sf?.label === "Items" && editMode === "order" && (
                     <div className="mb-3 flex items-center justify-between">
-                      <span className="text-xs text-[var(--text-secondary)]">
-                        Editing {editItems.length} items for: <span className="font-mono font-medium text-[var(--text-primary)]">{editItems[0]?.ref}</span>
-                      </span>
-                      <button onClick={addNewItem} className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[var(--success)] text-white rounded-sm hover:opacity-90 transition-opacity">
-                        <Plus size={12} /> Add Item
-                      </button>
+                      <span className="text-xs text-[var(--text-secondary)]">Editing {editItems.length} items · <span className="font-mono font-medium">{editItems[0]?.ref}</span></span>
+                      <button onClick={addNewItem} className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[var(--success)] text-white rounded-sm hover:opacity-90"><Plus size={12}/> Add Item</button>
                     </div>
                   )}
-                  <table className="w-full border border-[var(--border-subtle)] rounded-sm overflow-hidden">
-                    <thead className="bg-[var(--bg)] sticky top-0 z-10">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-16">#</th>
-                        {_sectionForEdit.fields.map(f => (
-                          <th key={f.key} className="px-3 py-2 text-left text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] min-w-[100px]">
-                            {f.label}{f.computed && <span className="ml-1 text-[var(--info)] normal-case">(auto)</span>}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
+                  <table className="w-full border border-[var(--border-subtle)] rounded-sm overflow-hidden text-xs">
+                    <thead className="bg-[var(--bg)] sticky top-0 z-10"><tr>
+                      <th className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-16">#</th>
+                      {_sf.fields.map(f => (
+                        <th key={f.key} className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] min-w-[90px]">
+                          {f.label}{f.computed && <span className="ml-1 text-[var(--info)] font-normal normal-case">(auto)</span>}
+                        </th>
+                      ))}
+                    </tr></thead>
                     <tbody>
                       {editItems.map((item, idx) => (
                         <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D04]">
                           <td className="px-3 py-2 align-top">
-                            <div className="text-xs font-mono text-[var(--brand)] font-medium">#{idx + 1}</div>
+                            <div className="font-mono text-[var(--brand)] font-medium">#{idx+1}</div>
                             <div className="text-[10px] text-[var(--text-secondary)] truncate max-w-[60px] mt-0.5">{item.barcode}</div>
                           </td>
-                          {_sectionForEdit.fields.map(f => (
+                          {_sf.fields.map(f => (
                             <td key={f.key} className="px-2 py-2 align-top">
                               {renderFieldInput(f, item.id, editData[item.id]?.[f.key], handleFieldChange)}
                             </td>
@@ -952,15 +737,14 @@ export default function ItemsManager() {
               )}
             </div>
 
-            {/* Modal Footer */}
             <div className="px-5 py-4 border-t border-[var(--border-subtle)] flex justify-between items-center flex-shrink-0 bg-[var(--bg)]">
-              <button onClick={() => setShowSectionSelector(true)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)] transition-colors">
+              <button onClick={() => setShowSectionSelector(true)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)]">
                 ← Change Section
               </button>
               <div className="flex gap-2">
-                <button onClick={cancelEdit} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)] transition-colors">Cancel</button>
-                <button onClick={saveEdits} disabled={saving} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 flex items-center gap-2 transition-colors">
-                  {saving ? "Saving…" : <><Check size={14} /> Save Changes</>}
+                <button onClick={cancelEdit} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)]">Cancel</button>
+                <button onClick={saveEdits} disabled={saving} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 flex items-center gap-2">
+                  {saving ? "Saving…" : <><Check size={14}/> Save Changes</>}
                 </button>
               </div>
             </div>
@@ -968,14 +752,14 @@ export default function ItemsManager() {
         </div>
       )}
 
-      {/* Delete Confirm Modal */}
+      {/* ════ DELETE CONFIRM ════ */}
       {delConfirm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setDelConfirm(null)}>
           <div data-testid="delete-confirm-modal" className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm w-full shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="font-heading text-lg font-medium mb-2">Delete {delMode === "order" ? "Order" : "Item"}?</h3>
+            <h3 className="font-heading text-lg font-medium mb-2">Delete {delMode==="order"?"Order":"Item"}?</h3>
             <p className="text-sm text-[var(--text-secondary)] mb-5">
-              {delMode === "order"
-                ? <><span className="font-mono font-medium text-[var(--text-primary)]">{delConfirm.ref}</span> — {delConfirm.items?.length || 0} items will be permanently deleted.</>
+              {delMode==="order"
+                ? <><span className="font-mono font-medium">{delConfirm.ref}</span> — {delConfirm.items?.length||0} items will be permanently deleted.</>
                 : <>Item <span className="font-mono">{delConfirm.barcode}</span> will be permanently deleted.</>}
             </p>
             <div className="flex gap-2 justify-end">
@@ -986,13 +770,13 @@ export default function ItemsManager() {
         </div>
       )}
 
-      {/* Cancel Order Modal */}
+      {/* ════ CANCEL CONFIRM ════ */}
       {cancelConfirm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setCancelConfirm(null)}>
           <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm w-full shadow-xl" onClick={e => e.stopPropagation()}>
             <h3 className="font-heading text-lg font-medium mb-2 text-[var(--warning)]">Cancel Order?</h3>
             <p className="text-sm text-[var(--text-secondary)] mb-5">
-              <span className="font-mono font-medium text-[var(--text-primary)]">{cancelConfirm.ref}</span> — {cancelConfirm.items?.length || 0} items will be marked cancelled and <strong>all amounts zeroed to ₹0</strong>. The record stays visible in ItemsManager with a CANCELLED badge but will not affect any pending balances, reports, or settlements.
+              <span className="font-mono font-medium">{cancelConfirm.ref}</span> — {cancelConfirm.items?.length||0} items will be marked cancelled and all amounts zeroed.
             </p>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setCancelConfirm(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">Back</button>
@@ -1002,7 +786,7 @@ export default function ItemsManager() {
         </div>
       )}
 
-      {/* Amount Mismatch Modal */}
+      {/* ════ MISMATCH PROMPT ════ */}
       {mismatchPrompt && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-[var(--surface)] rounded-sm max-w-lg w-full max-h-[80vh] flex flex-col shadow-xl">
@@ -1012,16 +796,14 @@ export default function ItemsManager() {
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               <table className="w-full text-xs">
-                <thead className="bg-[var(--bg)] sticky top-0">
-                  <tr>
-                    <th className="px-2 py-2 text-left text-[var(--text-secondary)]">Ref</th>
-                    <th className="px-2 py-2 text-left text-[var(--text-secondary)]">Type</th>
-                    <th className="px-2 py-2 text-right text-[var(--text-secondary)]">Old</th>
-                    <th className="px-2 py-2 text-right text-[var(--text-secondary)]">New</th>
-                    <th className="px-2 py-2 text-right text-[var(--text-secondary)]">Rcvd</th>
-                    <th className="px-2 py-2 text-right text-[var(--error)]">Over</th>
-                  </tr>
-                </thead>
+                <thead className="bg-[var(--bg)] sticky top-0"><tr>
+                  <th className="px-2 py-2 text-left text-[var(--text-secondary)]">Ref</th>
+                  <th className="px-2 py-2 text-left text-[var(--text-secondary)]">Type</th>
+                  <th className="px-2 py-2 text-right text-[var(--text-secondary)]">Old</th>
+                  <th className="px-2 py-2 text-right text-[var(--text-secondary)]">New</th>
+                  <th className="px-2 py-2 text-right text-[var(--text-secondary)]">Rcvd</th>
+                  <th className="px-2 py-2 text-right text-[var(--error)]">Over</th>
+                </tr></thead>
                 <tbody>
                   {mismatchPrompt.mismatches.map((m, i) => (
                     <tr key={i} className="border-b border-[var(--border-subtle)]">
@@ -1037,334 +819,39 @@ export default function ItemsManager() {
               </table>
             </div>
             <div className="p-4 border-t border-[var(--border-subtle)] flex justify-between items-center flex-shrink-0 bg-[var(--bg)]">
-              <span className="text-xs text-[var(--text-secondary)]">{mismatchPrompt.refs.length} order(s) affected</span>
-              <div className="flex gap-2">
-                <button onClick={() => setMismatchPrompt(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)]">Fix later</button>
-                <button onClick={() => { const orders = mismatchPrompt.refs.map(r => { const g = refs.find(x => x.ref === r); return { ref: r, name: g?.name || "" }; }); setMismatchPrompt(null); setSettlementOrders(orders); }} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">
-                  Settle Now →
-                </button>
-              </div>
+              <button onClick={() => setMismatchPrompt(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)]">Fix later</button>
+              <button onClick={() => { const orders=mismatchPrompt.refs.map(r=>{const g=refs.find(x=>x.ref===r);return{ref:r,name:g?.name||""};});setMismatchPrompt(null);setSettlementOrders(orders);}} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">Settle Now →</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Re-Settle Prompt Modal */}
+      {/* ════ RE-SETTLE PROMPT ════ */}
       {reSettlePrompt && !settlementOrders && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setReSettlePrompt(null)}>
           <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="font-heading text-lg font-medium mb-1 text-[var(--warning)]">Settled amounts have changed</h3>
-            <p className="text-sm text-[var(--text-secondary)] mb-4">
-              The following sections were previously settled but their amounts have been updated. Would you like to re-settle now?
-            </p>
+            <h3 className="font-heading text-lg font-medium mb-1 text-[var(--warning)]">Settled amounts changed</h3>
+            <p className="text-sm text-[var(--text-secondary)] mb-4">These sections were previously settled but amounts have been updated.</p>
             <div className="mb-5 space-y-1.5">
               {reSettlePrompt.sections.map((s, i) => (
                 <div key={i} className="flex items-center justify-between px-3 py-2 bg-[var(--bg)] rounded-sm text-sm">
-                  <span className="font-medium text-[var(--text-primary)]">{s.label}</span>
-                  <span className="font-mono text-xs text-[var(--text-secondary)]">
-                    ₹{fmt(s.oldAmt)} → <span className="text-[var(--brand)] font-medium">₹{fmt(s.newAmt)}</span>
-                  </span>
+                  <span className="font-medium">{s.label}</span>
+                  <span className="font-mono text-xs text-[var(--text-secondary)]">₹{fmt(s.oldAmt)} → <span className="text-[var(--brand)] font-medium">₹{fmt(s.newAmt)}</span></span>
                 </div>
               ))}
             </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setReSettlePrompt(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">Skip for now</button>
-              <button onClick={() => { setSettlementOrders([{ ref: reSettlePrompt.ref, name: reSettlePrompt.customer }]); setReSettlePrompt(null); }} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] flex items-center gap-2">
-                Settle Now →
-              </button>
+              <button onClick={() => { setSettlementOrders([{ref:reSettlePrompt.ref,name:reSettlePrompt.customer}]); setReSettlePrompt(null); }} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">Settle Now →</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ════ INVOICE ════ */}
+      {invoiceRef && <InvoiceModal billRef={invoiceRef} onClose={() => setInvoiceRef(null)}/>}
 
-      {/* ==========================================
-          MAIN TABLE
-      ========================================== */}
-      <div className="space-y-1.5">
-
-        {/* Desktop Header — uses GRID_COLS */}
-        <div
-          className="hidden sm:grid bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-3 py-2 items-center text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]"
-          style={{ gridTemplateColumns: `20px ${GRID_COLS}` }}
-        >
-          {/* Select-all checkbox */}
-          <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
-            <input
-              type="checkbox"
-              checked={allSelected}
-              ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
-              onChange={toggleSelectAll}
-              className="w-3.5 h-3.5 accent-[var(--brand)] cursor-pointer"
-            />
-          </div>
-          <span />
-          <button onClick={() => handleSort("date")}   className="text-left hover:text-[var(--brand)] transition-colors">Date{sortIndicator("date")}</button>
-          <button onClick={() => handleSort("ref")}    className="text-left hover:text-[var(--brand)] transition-colors">Ref{sortIndicator("ref")}</button>
-          <button onClick={() => handleSort("order_no")} className="text-left hover:text-[var(--brand)] transition-colors truncate">Order#{sortIndicator("order_no")}</button>
-          <button onClick={() => handleSort("name")}   className="text-left hover:text-[var(--brand)] transition-colors">Customer{sortIndicator("name")}</button>
-          <span className="text-right">Fabric</span>
-          <span className="text-right">Tail.</span>
-          <span className="text-right">Emb.</span>
-          <span className="text-right">Add-on</span>
-          <span className="text-right">Adv.</span>
-          <span className="text-center">Qty</span>
-          <span className="text-right">Total</span>
-          <span className="text-right">Rcvd</span>
-          <span className="text-right">Pending</span>
-          <span />
-        </div>
-
-        {/* Loading skeletons */}
-        {loading && (
-          <>
-            {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="h-11 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm animate-pulse" />
-            ))}
-          </>
-        )}
-
-        {/* Empty state */}
-        {!loading && refs.length === 0 && (
-          <div className="py-16 text-center text-sm text-[var(--text-secondary)] border border-dashed border-[var(--border-strong)] rounded-sm">
-            No orders found. Adjust the filters above.
-          </div>
-        )}
-
-        {/* Reference rows */}
-        {!loading && (() => {
-          let lastDate = null;
-          return refs.map(group => {
-            const isCancelled = group.items.some(i => i.cancelled);
-            const isSettled = Math.round(group.totals.pending) === 0 && group.totals.total > 0;
-            const showDateDivider = group.date !== lastDate;
-            lastDate = group.date;
-          const hasTailoringOrder = group.items.some(i => i.order_no && i.order_no !== "N/A");
-          const tailoringOrderNo = hasTailoringOrder
-            ? group.items.find(i => i.order_no && i.order_no !== "N/A")?.order_no
-            : "-";
-
-          return (
-            <React.Fragment key={group.ref}>
-              {showDateDivider && (
-                <div className="flex items-center gap-3 pt-2 pb-1">
-                  <span className="text-[10px] uppercase tracking-[0.18em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">{group.date || "—"}</span>
-                  <div className="flex-1 border-t border-[var(--border-subtle)]" />
-                </div>
-              )}
-            <div className={`bg-[var(--surface)] border rounded-sm overflow-hidden transition-all ${selectedRefs.has(group.ref) ? "border-[var(--brand)] ring-1 ring-[var(--brand)]/20" : isCancelled ? "border-[var(--border-strong)] opacity-75" : "border-[var(--border-subtle)]"}`}>
-
-              {/* Collapsed row — clickable */}
-              <div
-                className={`cursor-pointer transition-colors ${selectedRefs.has(group.ref) ? "bg-[#C86B4D06]" : "hover:bg-[#C86B4D04]"}`}
-                onClick={() => toggleExpand(group.ref)}
-              >
-                {/* ---- MOBILE LAYOUT ---- */}
-                <div className="flex sm:hidden items-start gap-2 px-3 py-3">
-                  {/* Mobile checkbox */}
-                  <div className="flex-shrink-0 mt-0.5" onClick={e => { e.stopPropagation(); toggleSelectRef(group.ref); }}>
-                    <input type="checkbox" checked={selectedRefs.has(group.ref)} onChange={() => {}} className="w-4 h-4 accent-[var(--brand)] cursor-pointer" />
-                  </div>
-                  <span className="mt-0.5 text-[var(--text-secondary)] flex-shrink-0">
-                    {expanded[group.ref] ? <CaretDown size={14} /> : <CaretRight size={14} />}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`font-mono text-xs text-[var(--brand)] font-medium ${isCancelled ? "line-through" : ""}`}>{group.ref}</span>
-                      <span className="text-[10px] text-[var(--text-secondary)]">{group.date}</span>
-                      {isCancelled && <span className="text-[10px] px-1.5 py-0.5 bg-[var(--error)]/10 text-[var(--error)] rounded-sm font-medium">CANCELLED</span>}
-                    </div>
-                    <div className={`text-sm font-medium truncate mt-0.5 ${isCancelled ? "line-through" : ""}`}>{group.name}</div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-                      {group.totals.fabric > 0    && <span className="text-[10px] text-[var(--text-secondary)]">Fab: <span className="font-mono text-[var(--text-primary)]">{fmt(group.totals.fabric)}</span></span>}
-                      {group.totals.tailoring > 0 && <span className="text-[10px] text-[var(--text-secondary)]">Tail: <span className="font-mono text-[var(--text-primary)]">{fmt(group.totals.tailoring)}</span></span>}
-                      {group.totals.embroidery > 0 && <span className="text-[10px] text-[var(--text-secondary)]">Emb: <span className="font-mono text-[var(--text-primary)]">{fmt(group.totals.embroidery)}</span></span>}
-                      {group.totals.addon > 0     && <span className="text-[10px] text-[var(--text-secondary)]">Add-on: <span className="font-mono text-[var(--text-primary)]">{fmt(group.totals.addon)}</span></span>}
-                      <span className="text-[10px] text-[var(--text-secondary)]">{group.items.length} items</span>
-                    </div>
-                    <div className="flex gap-3 mt-1 pt-1 border-t border-[var(--border-subtle)]">
-                      <span className="text-[10px] text-[var(--text-secondary)]">Total: <span className="font-mono font-medium text-[var(--text-primary)]">₹{fmt(group.totals.total)}</span></span>
-                      <span className="text-[10px] text-[var(--text-secondary)]">Rcvd: <span className="font-mono text-[var(--success)]">₹{fmt(group.totals.received)}</span></span>
-                      {isSettled
-                        ? <span className="text-[10px] text-[var(--success)] flex items-center gap-0.5"><CheckCircle size={11} weight="fill" />Settled</span>
-                        : <span className="text-[10px] text-[var(--text-secondary)]">Pend: <span className={`font-mono ${group.totals.pending < 0 ? "text-[var(--error)]" : "text-[var(--warning)]"}`}>₹{fmt(group.totals.pending)}</span></span>
-                      }
-                    </div>
-                  </div>
-                  {/* Mobile action buttons */}
-                  <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                    {!isSettled && !isCancelled && (
-                      <button onClick={() => openSettlement([{ ref: group.ref, name: group.name }])} className="p-1.5 text-[var(--success)] hover:bg-[#455D4A10] rounded-sm" title="Collect Payment"><CurrencyDollar size={14} /></button>
-                    )}
-                    <button onClick={() => { setEditItems(group.items); setEditMode("order"); setShowSectionSelector(true); }} className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm" title="Edit"><PencilSimple size={14} /></button>
-                    <button onClick={() => setCancelConfirm(group)} className="p-1.5 text-[var(--warning)] hover:bg-[#D4984210] rounded-sm" title="Cancel Order"><X size={14} /></button>
-                    <button onClick={() => { setDelConfirm(group); setDelMode("order"); }} className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm" title="Delete"><Trash size={14} /></button>
-                    <button onClick={e => { e.stopPropagation(); setInvoiceRef(group.ref); }} className="p-1.5 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm" title="Invoice"><Printer size={14} /></button>
-                  </div>
-                </div>
-
-                {/* ---- DESKTOP LAYOUT — uses same GRID_COLS as header ---- */}
-                <div
-                  className="hidden sm:grid items-center px-3 py-2.5"
-                  style={{ gridTemplateColumns: `20px ${GRID_COLS}` }}
-                >
-                  {/* Row checkbox */}
-                  <div className="flex items-center justify-center" onClick={e => { e.stopPropagation(); toggleSelectRef(group.ref); }}>
-                    <input type="checkbox" checked={selectedRefs.has(group.ref)} onChange={() => {}} className="w-3.5 h-3.5 accent-[var(--brand)] cursor-pointer" />
-                  </div>
-                  {/* Caret */}
-                  <span className="text-[var(--text-secondary)] flex-shrink-0">
-                    {expanded[group.ref] ? <CaretDown size={13} /> : <CaretRight size={13} />}
-                  </span>
-
-                  {/* Date */}
-                  <span className={`font-mono text-xs ${isCancelled ? "line-through text-[var(--text-secondary)]" : ""}`}>{group.date}</span>
-
-                  {/* Ref */}
-                  <span className={`font-mono text-xs text-[var(--brand)] font-medium ${isCancelled ? "line-through" : ""}`}>{group.ref}</span>
-
-                  {/* Order# */}
-                  <span className={`font-mono text-xs truncate ${isCancelled ? "line-through text-[var(--text-secondary)]" : ""}`}>{tailoringOrderNo}</span>
-
-                  {/* Customer */}
-                  <span className={`text-sm font-medium truncate pr-2 ${isCancelled ? "line-through text-[var(--text-secondary)]" : ""}`}>
-                    {group.name}
-                    {isCancelled && <span className="ml-2 text-[10px] font-normal text-[var(--error)] not-italic no-underline">[CANCELLED]</span>}
-                  </span>
-
-                  {/* Fabric */}
-                  <span className="font-mono text-xs text-right">{group.totals.fabric > 0 ? fmt(group.totals.fabric) : <span className="text-[var(--border-strong)]">—</span>}</span>
-
-                  {/* Tailoring */}
-                  <span className="font-mono text-xs text-right">{group.totals.tailoring > 0 ? fmt(group.totals.tailoring) : <span className="text-[var(--border-strong)]">—</span>}</span>
-
-                  {/* Embroidery */}
-                  <span className="font-mono text-xs text-right">{group.totals.embroidery > 0 ? fmt(group.totals.embroidery) : <span className="text-[var(--border-strong)]">—</span>}</span>
-
-                  {/* Add-on */}
-                  <span className="font-mono text-xs text-right">{group.totals.addon > 0 ? fmt(group.totals.addon) : <span className="text-[var(--border-strong)]">—</span>}</span>
-
-                  {/* Advance */}
-                  <span className="font-mono text-xs text-right">{group.totals.advance > 0 ? fmt(group.totals.advance) : <span className="text-[var(--border-strong)]">—</span>}</span>
-
-                  {/* Item count */}
-                  <span className="font-mono text-xs text-center">{group.items.length}</span>
-
-                  {/* Total */}
-                  <span className="font-mono text-xs text-right font-medium">{fmt(group.totals.total)}</span>
-
-                  {/* Received */}
-                  <span className="font-mono text-xs text-right text-[var(--success)]">{fmt(group.totals.received)}</span>
-
-                  {/* Pending */}
-                  <span className={`font-mono text-xs text-right flex items-center justify-end gap-1 ${isSettled ? "text-[var(--success)]" : group.totals.pending < 0 ? "text-[var(--error)]" : "text-[var(--warning)]"}`}>
-                    {isSettled
-                      ? <><CheckCircle size={12} weight="fill" className="flex-shrink-0" /><span>Settled</span></>
-                      : fmt(group.totals.pending)
-                    }
-                  </span>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-0.5 justify-end" onClick={e => e.stopPropagation()}>
-                    {!isSettled && !isCancelled && (
-                      <button onClick={() => openSettlement([{ ref: group.ref, name: group.name }])} className="p-1.5 text-[var(--success)] hover:bg-[#455D4A10] rounded-sm transition-colors" title="Collect Payment"><CurrencyDollar size={13} /></button>
-                    )}
-                    <button onClick={() => { setEditItems(group.items); setEditMode("order"); setShowSectionSelector(true); }} className="p-1.5 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm transition-colors" title="Edit Order"><PencilSimple size={13} /></button>
-                    <button onClick={() => setCancelConfirm(group)} className="p-1.5 text-[var(--warning)] hover:bg-[#D4984210] rounded-sm transition-colors" title="Cancel Order"><X size={13} /></button>
-                    <button onClick={() => { setDelConfirm(group); setDelMode("order"); }} className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm transition-colors" title="Delete Order"><Trash size={13} /></button>
-                    <button onClick={e => { e.stopPropagation(); setInvoiceRef(group.ref); }} className="p-1.5 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm transition-colors" title="Invoice"><Printer size={13} /></button>
-                  </div>
-                </div>
-              </div>
-
-              {/* ==========================================
-                  EXPANDED DETAIL ROWS
-              ========================================== */}
-              {expanded[group.ref] && (
-                <div className="border-t border-[var(--border-subtle)]">
-
-                  {/* Mobile: card per item */}
-                  <div className="sm:hidden divide-y divide-[var(--border-subtle)]">
-                    {group.items.map((item, idx) => (
-                      <div key={item.id} className="p-3 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-xs text-[var(--brand)] font-medium">#{idx + 1} {item.barcode}</span>
-                          <div className="flex gap-1">
-                            <button onClick={() => { setEditItems([item]); setEditMode("item"); setShowSectionSelector(true); }} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm"><PencilSimple size={13} /></button>
-                            <button onClick={() => { setDelConfirm(item); setDelMode("item"); }} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"><Trash size={13} /></button>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
-                          <span className="text-[var(--text-secondary)]">Article: <span className="text-[var(--text-primary)]">{item.article_type !== "N/A" ? item.article_type : "-"}</span></span>
-                          <span className="text-[var(--text-secondary)]">Fabric: <span className="font-mono font-medium">₹{fmt(item.fabric_amount)}</span></span>
-                          <span className="text-[var(--text-secondary)]">Price: <span className="font-mono">₹{fmt(item.price)} × {item.qty}</span></span>
-                          {item.discount > 0 && <span className="text-[var(--text-secondary)]">Disc: <span className="font-mono">{item.discount}%</span></span>}
-                          {item.order_no !== "N/A" && <span className="text-[var(--text-secondary)]">Order#: <span className="font-mono">{item.order_no}</span></span>}
-                          {item.delivery_date !== "N/A" && <span className="text-[var(--text-secondary)]">Delivery: <span className="font-mono">{item.delivery_date}</span></span>}
-                          {item.tailoring_amount > 0 && <span className="text-[var(--text-secondary)]">Tailoring: <span className="font-mono">₹{fmt(item.tailoring_amount)}</span></span>}
-                          {item.embroidery_amount > 0 && <span className="text-[var(--text-secondary)]">Emb: <span className="font-mono">₹{fmt(item.embroidery_amount)}</span></span>}
-                          {item.addon_desc && item.addon_desc !== "N/A" && <span className="text-[var(--text-secondary)]">Add-on: <span className="text-[var(--text-primary)]">{item.addon_desc}</span></span>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Desktop: full table with column visibility */}
-                  <div className="hidden sm:block overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-[var(--bg)] border-b border-[var(--border-subtle)]">
-                          {visibleColumns.barcode          && <th className="text-left px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Barcode</th>}
-                          {visibleColumns.price            && <th className="text-right px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Price</th>}
-                          {visibleColumns.qty              && <th className="text-right px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Qty</th>}
-                          {visibleColumns.discount         && <th className="text-right px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Disc%</th>}
-                          {visibleColumns.fabric_amount    && <th className="text-right px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Fabric Amt</th>}
-                          {visibleColumns.article_type     && <th className="text-left px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Article</th>}
-                          {visibleColumns.order_no         && <th className="text-left px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Order#</th>}
-                          {visibleColumns.delivery_date    && <th className="text-left px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Delivery</th>}
-                          {visibleColumns.tailoring_amount && <th className="text-right px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Tail. Amt</th>}
-                          {visibleColumns.embroidery_amount && <th className="text-right px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Emb. Amt</th>}
-                          {visibleColumns.addon_desc       && <th className="text-left px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Add-on</th>}
-                          <th className="text-left px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {group.items.map(item => (
-                          <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D04] transition-colors">
-                            {visibleColumns.barcode          && <td className="px-3 py-2 text-xs font-mono max-w-[100px] truncate">{item.barcode || "—"}</td>}
-                            {visibleColumns.price            && <td className="px-3 py-2 font-mono text-xs text-right">₹{fmt(item.price)}</td>}
-                            {visibleColumns.qty              && <td className="px-3 py-2 font-mono text-xs text-right">{item.qty}</td>}
-                            {visibleColumns.discount         && <td className="px-3 py-2 font-mono text-xs text-right">{item.discount ? `${item.discount}%` : "—"}</td>}
-                            {visibleColumns.fabric_amount    && <td className="px-3 py-2 font-mono text-xs text-right font-medium">₹{fmt(item.fabric_amount)}</td>}
-                            {visibleColumns.article_type     && <td className="px-3 py-2 text-xs">{item.article_type !== "N/A" ? item.article_type : "—"}</td>}
-                            {visibleColumns.order_no         && <td className="px-3 py-2 font-mono text-xs">{item.order_no !== "N/A" ? item.order_no : "—"}</td>}
-                            {visibleColumns.delivery_date    && <td className="px-3 py-2 font-mono text-xs">{item.delivery_date !== "N/A" ? item.delivery_date : "—"}</td>}
-                            {visibleColumns.tailoring_amount && <td className="px-3 py-2 font-mono text-xs text-right">{item.tailoring_amount ? `₹${fmt(item.tailoring_amount)}` : "—"}</td>}
-                            {visibleColumns.embroidery_amount && <td className="px-3 py-2 font-mono text-xs text-right">{item.embroidery_amount ? `₹${fmt(item.embroidery_amount)}` : "—"}</td>}
-                            {visibleColumns.addon_desc       && <td className="px-3 py-2 text-xs max-w-[80px] truncate">{item.addon_desc !== "N/A" ? item.addon_desc : "—"}</td>}
-                            <td className="px-3 py-2">
-                              <div className="flex items-center gap-0.5">
-                                <button onClick={() => { setEditItems([item]); setEditMode("item"); setShowSectionSelector(true); }} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E10] rounded-sm" title="Edit Item"><PencilSimple size={13} /></button>
-                                <button onClick={() => { setDelConfirm(item); setDelMode("item"); }} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm" title="Delete Item"><Trash size={13} /></button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          </React.Fragment>
-          );
-        });
-        })()}
-      </div>
-
-      {invoiceRef && <InvoiceModal billRef={invoiceRef} onClose={() => setInvoiceRef(null)} />}
-
-      {/* Settlement overlay */}
+      {/* ════ SETTLEMENT ════ */}
       {settlementOrders && (
         <SettlementPanel
           orders={settlementOrders}
@@ -1373,30 +860,22 @@ export default function ItemsManager() {
         />
       )}
 
-      {/* ── Floating selection action bar ── */}
-      {someSelected && !settlementOrders && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-[var(--surface)] border border-[var(--border-strong)] rounded-full shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200">
-          <span className="text-sm font-medium text-[var(--text-primary)] whitespace-nowrap">
-            {selectedRefs.size} order{selectedRefs.size !== 1 ? "s" : ""} selected
-          </span>
-          <span className="text-[var(--border-strong)]">·</span>
-          <span className="font-mono text-sm text-[var(--warning)]">
-            ₹{fmt(refs.filter(g => selectedRefs.has(g.ref)).reduce((s, g) => s + g.totals.pending, 0))}
-          </span>
-          <span className="text-[var(--border-strong)]">·</span>
-          <button
-            onClick={openSelectionSettlement}
-            className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium bg-[var(--brand)] text-white rounded-full hover:bg-[var(--brand-hover)] transition-colors"
-          >
-            <CurrencyDollar size={15} weight="bold" /> Collect Payment
-          </button>
-          <button
-            onClick={() => setSelectedRefs(new Set())}
-            className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg)] rounded-full transition-colors"
-          >
-            <X size={14} />
-          </button>
-        </div>
+      {/* ════ TAILORING OVERLAY ════ */}
+      {tailoringGroup && (
+        <TailoringOverlay
+          group={tailoringGroup}
+          onClose={() => setTailoringGroup(null)}
+          onSuccess={() => { invalidateItemsCache(); loadData(); }}
+        />
+      )}
+
+      {/* ════ ADD-ON OVERLAY ════ */}
+      {addonGroup && (
+        <AddOnOverlay
+          group={addonGroup}
+          onClose={() => setAddonGroup(null)}
+          onSuccess={() => loadData()}
+        />
       )}
     </div>
   );
