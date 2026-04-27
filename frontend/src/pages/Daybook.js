@@ -15,7 +15,7 @@ function SortableHeader({ label, sortKey, currentKey, dir, onSort }) {
 
 // Category tally button component
 function TallyButton({ isTallied, onClick, hasAmount, label, loading }) {
-  if (!hasAmount) return <span className="w-6 h-6 sm:w-6 sm:h-6 w-11 h-11 inline-block" />;
+  if (!hasAmount) return <span className="w-11 h-11 md:w-6 md:h-6 inline-block flex-shrink-0" />;
   return (
     <button
       onClick={onClick}

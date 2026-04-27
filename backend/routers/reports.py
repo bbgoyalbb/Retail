@@ -18,7 +18,7 @@ import io
 router = APIRouter()
 
 @router.get("/invoice")
-async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = Query(default="standard", alias="format"), current_user: dict = Depends(get_current_user_dep)):
+async def generate_invoice(request: Request, ref_id: str = Query(..., alias="ref"), format: str = Query(default="standard", alias="format"), current_user: dict = Depends(get_current_user_dep)):
     from fastapi.responses import HTMLResponse
 
     items = await db.items.find({"ref": ref_id}, {"_id": 0}).to_list(100)
@@ -409,7 +409,11 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
 
     logo_tag = ""
     if firm_logo:
-        logo_src = firm_logo if firm_logo.startswith("http") else firm_logo
+        if firm_logo.startswith("http"):
+            logo_src = firm_logo
+        else:
+            base_url = str(request.base_url).rstrip("/")
+            logo_src = f"{base_url}{firm_logo}" if firm_logo.startswith("/") else firm_logo
         logo_tag = f'<img src="{logo_src}" class="hdr-logo" alt="logo" />'
 
     html = f"""<!DOCTYPE html>

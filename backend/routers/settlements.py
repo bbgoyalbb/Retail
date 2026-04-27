@@ -129,17 +129,17 @@ async def process_settlement(req: SettlementRequest, current_user: dict = Depend
         await db.advances.insert_one(adv)
 
     if advance_to_use > 0:
-            adjustment = {
-                "id": str(uuid.uuid4()),
-                "date": req.payment_date,
-                "name": req.customer_name,
-                "ref": req.ref,
-                "amount": -advance_to_use,
-                "mode": "Adjusted",
-                "tally": False,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await db.advances.insert_one(adjustment)
+        adjustment = {
+            "id": str(uuid.uuid4()),
+            "date": req.payment_date,
+            "name": req.customer_name,
+            "ref": req.ref,
+            "amount": -advance_to_use,
+            "mode": "Adjusted",
+            "tally": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.advances.insert_one(adjustment)
 
     return {"message": "Settlement processed successfully"}
 
