@@ -16,6 +16,29 @@ from .models import ItemCreateRequest, ItemUpdateRequest
 
 router = APIRouter()
 
+async def _reset_counter_for_date(bill_date: str):
+    """After a deletion, reset the counter to the current max seq in DB for that date.
+    This allows the next bill on that date to reuse the freed slot if it was the last one."""
+    if not bill_date:
+        return
+    remaining_refs = await db.items.distinct("ref", {"date": bill_date})
+    max_seq = 0
+    for r in remaining_refs:
+        try:
+            max_seq = max(max_seq, int(r.split("/")[0]))
+        except (ValueError, IndexError):
+            pass
+    counter_key = f"bill_seq_{bill_date}"
+    if max_seq > 0:
+        await db.counters.update_one(
+            {"_id": counter_key},
+            {"$set": {"seq": max_seq}},
+            upsert=True,
+        )
+    else:
+        # All bills for this date were deleted — remove the counter entirely
+        await db.counters.delete_one({"_id": counter_key})
+
 @router.put("/items/{item_id}")
 async def update_item(item_id: str, req: ItemUpdateRequest, current_user: dict = Depends(get_current_user_dep)):
     item = await db.items.find_one({"id": item_id})
@@ -48,6 +71,8 @@ async def delete_item(item_id: str, current_user: dict = Depends(get_current_use
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Item not found")
     await audit_log(db, "delete", current_user, "item", item_id, {"barcode": item.get("barcode") if item else None})
+    if item:
+        await _reset_counter_for_date(item.get("date"))
     return {"message": "Item deleted"}
 
 
@@ -121,11 +146,20 @@ async def bulk_delete_items(
     # Restrict to admin/manager only
     if current_user.get("role") not in ["admin", "manager"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
+    # Collect affected dates BEFORE deletion so we can reset counters after
+    affected_items = await db.items.find({"id": {"$in": item_ids}}, {"_id": 0, "date": 1}).to_list(500)
+    affected_dates = {i["date"] for i in affected_items if i.get("date")}
+
     # Audit log the bulk delete
     await audit_log(db, "bulk_delete", current_user, "items", f"count:{len(item_ids)}", {"count": len(item_ids)})
-    
+
     result = await db.items.delete_many({"id": {"$in": item_ids}})
+
+    # Reset counters for all affected dates
+    for d in affected_dates:
+        await _reset_counter_for_date(d)
+
     return {"message": f"{result.deleted_count} items deleted"}
 
 # ==========================================
