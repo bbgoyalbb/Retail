@@ -366,14 +366,43 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
         date_suffix = "000000"
 
     counter_key = f"bill_seq_{req.date}"
+
+    # Seed the counter from the actual DB max if this counter doc is missing.
+    # This handles back-dated bills where no counter doc exists yet, preventing
+    # collision with refs already created for that date (e.g. via Excel import).
+    existing_counter = await db.counters.find_one({"_id": counter_key})
+    if not existing_counter:
+        # Find highest existing seq for this date suffix in items collection
+        existing_refs = await db.items.distinct("ref", {"date": req.date})
+        max_seq = 0
+        for r in existing_refs:
+            try:
+                max_seq = max(max_seq, int(r.split("/")[0]))
+            except (ValueError, IndexError):
+                pass
+        if max_seq > 0:
+            # Pre-seed the counter so next increment starts after the existing max
+            await db.counters.insert_one({"_id": counter_key, "seq": max_seq})
+
     counter_doc = await db.counters.find_one_and_update(
         {"_id": counter_key},
         {"$inc": {"seq": 1}},
         upsert=True,
-        return_document=True  # Return document after update
+        return_document=True
     )
     seq = counter_doc.get("seq", 1) if counter_doc else 1
     ref = f"{seq:02d}/{date_suffix}"
+
+    # Safety check: if ref still collides (race condition), keep incrementing
+    while await db.items.find_one({"ref": ref}):
+        counter_doc = await db.counters.find_one_and_update(
+            {"_id": counter_key},
+            {"$inc": {"seq": 1}},
+            upsert=True,
+            return_document=True
+        )
+        seq = counter_doc.get("seq", 1) if counter_doc else seq + 1
+        ref = f"{seq:02d}/{date_suffix}"
     modes_str = ", ".join(req.payment_modes) if req.payment_modes else "Cash"
     tailoring_status = "Awaiting Order" if req.needs_tailoring else "N/A"
 
