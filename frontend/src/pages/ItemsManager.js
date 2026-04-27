@@ -317,43 +317,65 @@ export default function ItemsManager() {
   const handleFieldChange = (itemId, fieldKey, value) => {
     setEditData(prev => {
       const updated = { ...prev, [itemId]: { ...prev[itemId], [fieldKey]: value } };
-      if (fieldKey === "article_type") {
-        const rateData = tailoringRates[value];
-        if (rateData) {
-          const tail_amt = parseFloat(rateData.tailoring) || 0;
-          const labour_amt = parseFloat(rateData.labour) || 0;
-          const already_received = parseFloat(updated[itemId].tailoring_received) || 0;
-          updated[itemId].tailoring_amount = tail_amt;
-          updated[itemId].labour_amount = labour_amt;
-          updated[itemId].tailoring_pending = Math.max(0, tail_amt - already_received);
-        }
-      }
       const item = updated[itemId];
+
+      // ── Fabric ────────────────────────────────────────────────────────────
+      // price / qty / discount → recalculate fabric_amount
       if (["price", "qty", "discount"].includes(fieldKey)) {
         updated[itemId].fabric_amount = computeFabricAmount(
           parseFloat(item.price) || 0, parseFloat(item.qty) || 0, parseFloat(item.discount) || 0
         );
       }
+      // fabric_amount or fabric_received → recalculate fabric_pending
       if (["fabric_received", "fabric_amount", "price", "qty", "discount"].includes(fieldKey)) {
         updated[itemId].fabric_pending = computePending(
           parseFloat(updated[itemId].fabric_amount) || 0, parseFloat(updated[itemId].fabric_received) || 0
         );
       }
-      if (fieldKey === "tailoring_received" || fieldKey === "tailoring_amount") {
+
+      // ── Tailoring ─────────────────────────────────────────────────────────
+      // article_type → look up rate, set tailoring_amount + labour_amount, then fall through to pending recalc
+      if (fieldKey === "article_type") {
+        const rateData = tailoringRates[value];
+        if (rateData) {
+          updated[itemId].tailoring_amount = parseFloat(rateData.tailoring) || 0;
+          updated[itemId].labour_amount    = parseFloat(rateData.labour)    || 0;
+        }
+      }
+      // tailoring_amount or tailoring_received (or article_type cascade above) → recalculate tailoring_pending
+      if (["tailoring_amount", "tailoring_received", "article_type"].includes(fieldKey)) {
         updated[itemId].tailoring_pending = computePending(
           parseFloat(updated[itemId].tailoring_amount) || 0, parseFloat(updated[itemId].tailoring_received) || 0
         );
       }
-      if (fieldKey === "embroidery_received" || fieldKey === "embroidery_amount") {
+
+      // ── Embroidery ────────────────────────────────────────────────────────
+      // embroidery_amount or embroidery_received → recalculate embroidery_pending
+      if (["embroidery_amount", "embroidery_received"].includes(fieldKey)) {
         updated[itemId].embroidery_pending = computePending(
           parseFloat(updated[itemId].embroidery_amount) || 0, parseFloat(updated[itemId].embroidery_received) || 0
         );
       }
-      if (fieldKey === "addon_received" || fieldKey === "addon_amount") {
+      // emb_labour_amount or emb_labour_paid changes — no pending field, but
+      // default emb_labour_date to today when emb_labour_paid flips to "Yes"
+      if (fieldKey === "emb_labour_paid" && value === "Yes" && !updated[itemId].emb_labour_date) {
+        updated[itemId].emb_labour_date = new Date().toISOString().split("T")[0];
+      }
+
+      // ── Add-on ────────────────────────────────────────────────────────────
+      // addon_amount or addon_received → recalculate addon_pending
+      if (["addon_amount", "addon_received"].includes(fieldKey)) {
         updated[itemId].addon_pending = computePending(
           parseFloat(updated[itemId].addon_amount) || 0, parseFloat(updated[itemId].addon_received) || 0
         );
       }
+
+      // ── Labour (tailoring) ────────────────────────────────────────────────
+      // default labour_pay_date to today when labour_paid flips to "Yes"
+      if (fieldKey === "labour_paid" && value === "Yes" && !updated[itemId].labour_pay_date) {
+        updated[itemId].labour_pay_date = new Date().toISOString().split("T")[0];
+      }
+
       return updated;
     });
   };
