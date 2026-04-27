@@ -93,8 +93,6 @@ class SplitItem(BaseModel):
 
 class SplitTailoringRequest(BaseModel):
     item_id: str
-    order_no: str
-    delivery_date: str
     splits: List[SplitItem]
 
 @router.post("/tailoring/split")
@@ -137,9 +135,7 @@ async def split_and_assign(req: SplitTailoringRequest, current_user: dict = Depe
                 "fabric_amount": split_fabric_amt,
                 "fabric_pending": split_fabric_amt if item.get("fabric_pay_mode") == "Pending" else item.get("fabric_pending", 0),
                 "article_type": split.article_type,
-                "tailoring_status": "Pending",
-                "order_no": req.order_no,
-                "delivery_date": req.delivery_date,
+                "tailoring_status": "Awaiting Order",
                 "tailoring_amount": tail_amt,
                 "tailoring_pending": tail_pending,
                 "tailoring_pay_mode": tail_mode,
@@ -165,9 +161,9 @@ async def split_and_assign(req: SplitTailoringRequest, current_user: dict = Depe
                 new_item["fabric_pending"] = split_fabric_amt
                 new_item["fabric_received"] = 0
             new_item["article_type"] = split.article_type
-            new_item["tailoring_status"] = "Pending"
-            new_item["order_no"] = req.order_no
-            new_item["delivery_date"] = req.delivery_date
+            new_item["tailoring_status"] = "Awaiting Order"
+            new_item["order_no"] = ""
+            new_item["delivery_date"] = ""
             new_item["tailoring_amount"] = tail_amt
             new_item["labour_amount"] = labour_amt
             new_item["tailoring_pending"] = tail_amt
@@ -180,7 +176,7 @@ async def split_and_assign(req: SplitTailoringRequest, current_user: dict = Depe
 
         created += 1
 
-    return {"message": f"Item split into {created} pieces for order {req.order_no}"}
+    return {"message": f"Item split into {created} pieces. Fill in order details to assign."}
 
 # ==========================================
 # ADDONS

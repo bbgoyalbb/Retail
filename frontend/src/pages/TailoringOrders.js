@@ -100,14 +100,9 @@ export default function TailoringOrders() {
   };
 
   const handleSplitConfirm = async (splits) => {
-    const parentAssignment = assignments.find(a => a.item_id === splitItem.item_id);
-    // Use item's order_no/delivery_date if set, otherwise use placeholder values for split API
-    const itemOrderNo = parentAssignment?.order_no || "TEMP";
-    const itemDeliveryDate = parentAssignment?.delivery_date || new Date().toISOString().split("T")[0];
-    
     try {
-      // Call API to split item in database
-      await splitTailoring({ item_id: splitItem.item_id, order_no: itemOrderNo, delivery_date: itemDeliveryDate, splits });
+      // Call API to split item — items return to Awaiting Order for manual assignment
+      await splitTailoring({ item_id: splitItem.item_id, splits });
       setSplitItem(null);
       
       // Reload the order to get updated items including newly created splits
@@ -136,7 +131,7 @@ export default function TailoringOrders() {
           };
         });
         setAssignments(newAssignments);
-        setMessage({ type: "success", text: `Item split into ${splits.length} pieces. Fill details for all articles before assigning.` });
+        setMessage({ type: "success", text: `Item split into ${splits.length} pieces. Now fill Order No and Delivery Date for each article below.` });
       }
     } catch (err) {
       setMessage({ type: "error", text: err.response?.data?.detail || "Split failed" });
