@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { getItems, getAdvances, updateItem, deleteItem, createItem, updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache, exportExcelUrl, getSettings } from "@/api";
+import { getItems, getItem, getAdvances, updateItem, deleteItem, createItem, updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache, exportExcelUrl, getSettings } from "@/api";
 import { fmt } from "@/lib/fmt";
 import { PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle, Funnel, DownloadSimple } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
@@ -248,12 +248,21 @@ export default function ItemsManager() {
     setEditMode(mode);
     const itemList = Array.isArray(items) ? items : [items];
     setEditItems(itemList);
+
+    // Fetch full item data for each item — the grid loads with summary=true which
+    // omits many fields (pay dates, labour fields, tally flags). Without full data,
+    // those fields show blank in the edit modal even though the DB has values.
+    const fullItems = await Promise.all(
+      itemList.map(item => getItem(item.id).then(r => r.data).catch(() => item))
+    );
+
     const initialData = {};
     const origData = {};
-    itemList.forEach(item => {
+    fullItems.forEach(item => {
       initialData[item.id] = { ...item };
       origData[item.id] = { ...item };
     });
+    setEditItems(fullItems);
     setEditData(initialData);
     setOriginalData(origData);
 
