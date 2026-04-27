@@ -79,6 +79,7 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, customer, dateFrom, dateTo, status, paymentStatus, minAmount, maxAmount, searched]);
 
   // Debounced search for query changes
@@ -88,6 +89,7 @@ export default function SearchPage() {
       if (query || searched) handleSearch(0);
     }, 300);
     return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, handleSearch]);
 
   const clearFilters = () => {

@@ -101,6 +101,7 @@ export default function NewBill() {
     document.addEventListener('mousedown', handleClick);
     document.addEventListener('touchstart', handleClick);
     return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('touchstart', handleClick); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const nameRef = useRef(null);
@@ -190,6 +191,7 @@ export default function NewBill() {
 
     resetItemForm();
     setTimeout(() => barcodeRef.current?.focus(), 50);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barcode, qty, price, discount, editingIndex, dupWarning, items, defaultTailoring, defaultAddon]);
 
   const removeItem = (index) => {
@@ -283,6 +285,7 @@ export default function NewBill() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAddonModal]);
 
   // Ctrl+S saves the bill

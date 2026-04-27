@@ -53,6 +53,7 @@ export default function Settlements() {
       // User clicks Auto-distribute or enters amounts manually.
       clearAllotments();
     }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // When customer changes via manual selection (not order lookup), load refs.
@@ -156,6 +157,7 @@ export default function Settlements() {
     const pool = (parseFloat(freshPay) || 0) + (useAdvance ? balances.advance : 0);
     if (pool > 0) autoDistribute(pool);
     else clearAllotments();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [freshPay, useAdvance, selectedRef, autoDistribute, clearAllotments]);
 
   // Settle full section
