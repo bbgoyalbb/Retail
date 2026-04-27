@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { getItems, getAdvances, updateItem, deleteItem, createItem, updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache, exportExcelUrl } from "@/api";
+import { getItems, getAdvances, updateItem, deleteItem, createItem, updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache, exportExcelUrl, getSettings } from "@/api";
 import { fmt } from "@/lib/fmt";
 import { PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle, Funnel, DownloadSimple } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
@@ -185,6 +185,15 @@ export default function ItemsManager() {
   const [newAdvances, setNewAdvances] = useState([]);
   const [deletedAdvances, setDeletedAdvances] = useState([]);
 
+  // Tailoring rates from settings (for auto-recalc on article_type change)
+  const [tailoringRates, setTailoringRates] = useState({});
+  useEffect(() => {
+    getSettings().then(res => {
+      const rates = res?.data?.tailoring_rates || {};
+      setTailoringRates(rates);
+    }).catch(() => {});
+  }, []);
+
   // Delete confirmation
   const [delConfirm, setDelConfirm] = useState(null);
   const [delMode, setDelMode] = useState(null);
@@ -299,6 +308,17 @@ export default function ItemsManager() {
   const handleFieldChange = (itemId, fieldKey, value) => {
     setEditData(prev => {
       const updated = { ...prev, [itemId]: { ...prev[itemId], [fieldKey]: value } };
+      if (fieldKey === "article_type") {
+        const rateData = tailoringRates[value];
+        if (rateData) {
+          const tail_amt = parseFloat(rateData.tailoring) || 0;
+          const labour_amt = parseFloat(rateData.labour) || 0;
+          const already_received = parseFloat(updated[itemId].tailoring_received) || 0;
+          updated[itemId].tailoring_amount = tail_amt;
+          updated[itemId].labour_amount = labour_amt;
+          updated[itemId].tailoring_pending = Math.max(0, tail_amt - already_received);
+        }
+      }
       const item = updated[itemId];
       if (["price", "qty", "discount"].includes(fieldKey)) {
         updated[itemId].fabric_amount = computeFabricAmount(
