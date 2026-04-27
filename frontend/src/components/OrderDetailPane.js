@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { fmt } from "@/lib/fmt";
-import { PencilSimple, Trash, X, CaretDown, CaretRight, CheckCircle, CurrencyDollar, Package, Scissors, Tag, Wallet, Printer } from "@phosphor-icons/react";
+import { PencilSimple, Trash, X, CaretDown, CaretRight, CheckCircle, CurrencyDollar, Package, Scissors, Tag, Wallet } from "@phosphor-icons/react";
 
 // Sparkle not in all builds — use a simple diamond fallback
 const Sparkle = ({ size, className }) => <span className={className} style={{fontSize:size,lineHeight:1}}>✦</span>;
@@ -26,7 +26,7 @@ export const SectionAccordion = ({ icon: Icon, label, amount, children, onEdit, 
   );
 };
 
-export default function OrderDetailPane({ selectedGroups, advances, onEdit, onPay, onClose, onCancelItem, onDeleteItem, onTailoring, onAddon, onInvoice }) {
+export default function OrderDetailPane({ selectedGroups, advances, onEdit, onPay, onClose, onCancelItem, onDeleteItem }) {
   if (!selectedGroups.length) return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 text-[var(--text-secondary)] p-8 text-center">
       <Package size={36} weight="duotone" className="opacity-20"/>
@@ -63,7 +63,10 @@ export default function OrderDetailPane({ selectedGroups, advances, onEdit, onPa
           const isCancelled = group.items.some(i => i.cancelled);
           const refAdvances = advances.filter(a => a.ref === group.ref);
           const totalAdvance = refAdvances.reduce((s,a) => s + a.amount, 0);
-          const isSettled = Math.round(group.totals.pending) === 0 && group.totals.total > 0;
+          const isSettled = group.totals.total > 0 && group.items.every(item =>
+            [[item.fabric_amount, item.fabric_pay_mode],[item.tailoring_amount, item.tailoring_pay_mode],[item.embroidery_amount, item.embroidery_pay_mode],[item.addon_amount, item.addon_pay_mode]]
+            .every(([amt, mode]) => !amt || Number(amt) === 0 || String(mode || "").startsWith("Settled"))
+          );
 
           return (
             <div key={group.ref} className="space-y-2">

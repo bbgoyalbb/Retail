@@ -604,9 +604,6 @@ export default function ItemsManager() {
             onClose={() => setDetailOpen(false)}
             onCancelItem={(item) => handleCancelItem(item)}
             onDeleteItem={(item) => { setDelConfirm(item); setDelMode("item"); }}
-            onTailoring={(group) => setTailoringGroup(group)}
-            onAddon={(group) => setAddonGroup(group)}
-            onInvoice={(ref) => setInvoiceRef(ref)}
           />
         </div>
       </div>
