@@ -479,7 +479,7 @@ export default function NewBill() {
         <div className="lg:col-span-2 bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
           <h3 className="font-heading text-base font-medium">Customer Info</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="sm:col-span-1">
+            <div className="sm:col-span-1 col-span-1">
               <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Customer Name</label>
               <div ref={nameWrapRef} className="relative">
                 <input ref={nameRef} data-testid="customer-name-input" value={customerName}

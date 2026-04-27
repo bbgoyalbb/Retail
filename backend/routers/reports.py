@@ -319,26 +319,8 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     emb_block, emb_gst, emb_amt_total = make_section("Embroidery", emb_items, "embroidery_amount")
     ao_block, ao_gst, ao_amt_total = make_section("Add-on", ao_items, "addon_amount")
 
-    # Advance section
-    adv_block = ""
-    adv_total = 0.0
-    if advances:
-        adv_rows = ""
-        for a in advances:
-            amt_a = float(a.get("amount", 0))
-            adv_total += amt_a
-            adv_rows += f'<tr><td>{a.get("date","—")}</td><td class="adv-mode">{a.get("mode","—")}</td><td class="r mono">₹{fmt(amt_a)}</td></tr>'
-        adv_block = f"""
-        <div class="sec-block">
-          <div class="sec-head">Advances</div>
-          <table>
-            <thead><tr><th>Date</th><th class="adv-mode-h">Mode</th><th class="r">Amount</th></tr></thead>
-            <tbody>
-              {adv_rows}
-              <tr class="sub-row"><td class="subtd" colspan="2">Total Advances</td><td class="subtd r">₹{fmt(adv_total)}</td></tr>
-            </tbody>
-          </table>
-        </div>"""
+    # Advance net (positive = customer has credit)
+    adv_total = sum(float(a.get("amount", 0)) for a in advances)
 
     # Use raw DB fabric_amount for totals to avoid GST back-calc rounding drift
     fabric_amt_db = sum(float(i.get("fabric_amount", 0)) for i in items)
@@ -393,8 +375,20 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     pay_rows_html += pay_row("Embroidery", emb_amt_total,  emb_rcvd,    emb_pay_date,    emb_pay_mode,    emb_pay_mode)
     pay_rows_html += pay_row("Add-on",     ao_amt_total,   ao_rcvd,     ao_pay_date,     ao_pay_mode,     ao_pay_mode)
 
+    # Advance rows inside Payment Details (negative = reduces balance due)
+    adv_pay_rows = ""
+    if advances:
+        for a in advances:
+            amt_a = float(a.get("amount", 0))
+            if amt_a == 0:
+                continue
+            adv_date = a.get("date", "—") or "—"
+            adv_mode = a.get("mode", "—") or "—"
+            sign = "-" if amt_a > 0 else "+"  # positive advance = credit, show as negative
+            adv_pay_rows += f'<tr class="adv-pay-row"><td>Advance ({adv_mode})</td><td class="r"></td><td class="r adv-credit">{sign}₹{fmt(abs(amt_a))}</td><td class="r">{adv_date}</td><td>{adv_mode}</td><td class="r adv-credit">{sign}₹{fmt(abs(amt_a))}</td></tr>'
+
     total_rcvd_all = fabric_rcvd + tail_rcvd + emb_rcvd + ao_rcvd
-    # Subtotal balance: sum only unsettled sections
+    # Subtotal balance: sum only unsettled sections, then subtract net advance credit
     unsettled_pending = 0.0
     all_settled = True
     for _amt, _rcvd, _mode in [
@@ -408,8 +402,10 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
         if not str(_mode).startswith("Settled"):
             all_settled = False
             unsettled_pending += _amt - _rcvd
-    grand_bal_cls = "bal-ok" if all_settled else "bal-due"
-    grand_bal_str = "✓ Settled" if all_settled else f"₹{fmt(unsettled_pending)}"
+    # Subtract advance credit from balance due
+    net_pending_after_adv = unsettled_pending - adv_total
+    grand_bal_cls = "bal-ok" if (all_settled or net_pending_after_adv <= 0) else "bal-due"
+    grand_bal_str = "✓ Settled" if (all_settled or net_pending_after_adv <= 0) else f"₹{fmt(net_pending_after_adv)}"
 
     logo_tag = ""
     if firm_logo:
@@ -632,9 +628,9 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
   .bal-due {{ color: #8b0000; }}
   .bal-ok  {{ color: #1a5c2a; }}
 
-  /* ── ADVANCES mode cell alignment ── */
-  .adv-mode-h {{ text-align: left; }}
-  .adv-mode   {{ text-align: left; }}
+  /* ── ADVANCES inside payment table ── */
+  .adv-pay-row td {{ background: #f7f7f0 !important; font-style: italic; color: #444; }}
+  .adv-credit {{ color: #1a5c2a; font-family: 'IBM Plex Mono', monospace; }}
 
   /* ── FOOTER ── */
   .inv-footer {{
@@ -744,9 +740,6 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
   <!-- Section: Add-on -->
   {ao_block}
 
-  <!-- Section: Advances -->
-  {adv_block}
-
   <!-- Grand Total -->
   <div class="inv-grand">
     <div class="gt-label">Grand Total</div>
@@ -769,6 +762,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
       </thead>
       <tbody>
         {pay_rows_html}
+        {adv_pay_rows}
         <tr>
           <td>Total</td>
           <td class="r">₹{fmt(grand_total_calc)}</td>
