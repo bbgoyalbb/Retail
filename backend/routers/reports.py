@@ -358,6 +358,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
         bal_cls    = "bal-ok" if is_settled_sec else ("bal-due" if bal > 0 else "")
         return f'<tr><td>{label}</td><td class="r">₹{fmt(amt)}</td><td class="r">{rcvd_str}</td><td class="r">{date_str}</td><td>{mode_str}</td><td class="r {bal_cls}">{bal_str}</td></tr>'
 
+    fabric_amt_db = sum(float(i.get("fabric_amount", 0)) for i in items)  # raw DB value matches received
     fabric_rcvd = sum(float(i.get("fabric_received", 0)) for i in items)
     tail_rcvd   = sum(float(i.get("tailoring_received", 0)) for i in items)
     emb_rcvd    = sum(float(i.get("embroidery_received", 0)) for i in items)
@@ -385,7 +386,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     ao_pend      = sum(float(i.get("addon_pending", 0)) for i in ao_items)
 
     pay_rows_html = ""
-    pay_rows_html += pay_row("Fabric",     fab_amt,        fabric_rcvd, fabric_pay_date, fabric_pay_mode, fabric_pay_mode)
+    pay_rows_html += pay_row("Fabric",     fabric_amt_db,  fabric_rcvd, fabric_pay_date, fabric_pay_mode, fabric_pay_mode)
     pay_rows_html += pay_row("Tailoring",  tail_amt_total, tail_rcvd,   tail_pay_date,   tail_pay_mode,   tail_pay_mode)
     pay_rows_html += pay_row("Embroidery", emb_amt_total,  emb_rcvd,    emb_pay_date,    emb_pay_mode,    emb_pay_mode)
     pay_rows_html += pay_row("Add-on",     ao_amt_total,   ao_rcvd,     ao_pay_date,     ao_pay_mode,     ao_pay_mode)
@@ -395,7 +396,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     unsettled_pending = 0.0
     all_settled = True
     for _amt, _rcvd, _mode in [
-        (fab_amt, fabric_rcvd, fabric_pay_mode),
+        (fabric_amt_db, fabric_rcvd, fabric_pay_mode),
         (tail_amt_total, tail_rcvd, tail_pay_mode),
         (emb_amt_total, emb_rcvd, emb_pay_mode),
         (ao_amt_total, ao_rcvd, ao_pay_mode),
@@ -544,6 +545,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     background: #444;
     padding: 5px 6px;
     white-space: nowrap;
+    text-align: left;
   }}
   .sec-block th:first-child {{ padding-left: 18px; }}
   .sec-block th.r {{ text-align: right; }}
