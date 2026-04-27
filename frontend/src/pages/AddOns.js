@@ -111,7 +111,7 @@ export default function AddOns() {
                   <button
                     key={i}
                     data-testid={`article-${art.id}`}
-                    onClick={() => setSelectedArticle(art)}
+                    onClick={() => { setSelectedArticle(art); setAddons(addonItems.map(name => ({ name, checked: false, price: "" }))); }}
                     className={`w-full text-left px-4 py-3 transition-colors ${selectedArticle?.id === art.id ? 'bg-[#C86B4D10]' : 'hover:bg-[var(--bg)]'}`}
                   >
                     <div className="flex items-center justify-between">
@@ -139,6 +139,17 @@ export default function AddOns() {
           ) : (
             <>
               <p className="text-xs text-[var(--text-secondary)]">Adding to: <span className="font-medium text-[var(--text-primary)]">{selectedArticle.barcode}</span></p>
+
+              {/* Existing add-ons */}
+              {selectedArticle.addon_desc && selectedArticle.addon_desc !== "N/A" && (
+                <div className="bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm p-3">
+                  <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] mb-1.5">Already added</p>
+                  <p className="text-xs text-[var(--text-primary)] leading-relaxed">{selectedArticle.addon_desc}</p>
+                  <p className="text-[10px] font-mono text-[var(--brand)] mt-1">Total: ₹{selectedArticle.addon_amount}</p>
+                </div>
+              )}
+
+              <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Add new</p>
               <div className="space-y-2">
                 {addons.map((addon, i) => (
                   <div key={addon.name} className="flex items-center gap-3">
