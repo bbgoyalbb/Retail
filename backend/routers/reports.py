@@ -634,7 +634,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
 
   /* ── FOOTER ── */
   .inv-footer {{
-    margin-top: auto;
+    margin-top: 12px;
     border-top: 1.5px solid #111;
     padding: 10px 18px 8px;
   }}
@@ -664,7 +664,7 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
   /* ── PRINT ── */
   @media print {{
     body {{ background: #fff; padding: 0; }}
-    .inv {{ width: 100%; min-height: 100vh; border: none; box-shadow: none; }}
+    .inv {{ width: 100%; min-height: unset; border: none; box-shadow: none; }}
     @page {{ size: A5; margin: 8mm 10mm; }}
 
     /* Keep each section block together — avoid splitting across pages */
@@ -674,6 +674,12 @@ async def generate_invoice(ref_id: str = Query(..., alias="ref"), format: str = 
     .inv-footer {{
       break-inside: avoid;
       page-break-inside: avoid;
+    }}
+
+    /* Footer must never be pushed to a new page */
+    .inv-footer {{
+      break-before: avoid;
+      page-break-before: avoid;
     }}
 
     /* If a section is too tall to fit whole, at least keep the header with first row */
