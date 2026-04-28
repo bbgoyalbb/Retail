@@ -459,17 +459,28 @@ export default function ItemsManager() {
     <div data-testid="items-manager-page" className="flex flex-col h-[calc(100vh-4rem)] -m-4 sm:-m-6 lg:-m-8 overflow-hidden">
 
       {/* ── TOP BAR ── */}
-      <div className="flex-shrink-0 flex items-center gap-2 px-3 sm:px-4 py-2 bg-[var(--surface)] border-b border-[var(--border-subtle)]">
-        {/* Left: sidebar toggle + title */}
-        <button onClick={() => setSidebarOpen(o => !o)} title="Toggle sidebar"
-          className="p-1.5 rounded-sm hover:bg-[var(--bg)] text-[var(--text-secondary)] flex-shrink-0 hidden lg:flex">
-          <SlidersHorizontal size={15}/>
-        </button>
-        <h1 className="font-heading text-sm font-semibold hidden md:block whitespace-nowrap text-[var(--text-primary)] mr-1">Orders</h1>
+      <div className="flex-shrink-0 bg-[var(--surface)] border-b border-[var(--border-subtle)]">
+        {/* Row 1: controls left + tabs right */}
+        <div className="flex items-center gap-2 px-3 sm:px-4 py-2">
+          {/* Left: sidebar toggle + sort */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button onClick={() => setSidebarOpen(o => !o)} title="Toggle sidebar"
+              className="p-1.5 rounded-sm hover:bg-[var(--bg)] text-[var(--text-secondary)] hidden lg:flex">
+              <SlidersHorizontal size={15}/>
+            </button>
+            <button onClick={() => setSortDir(d => d==="desc"?"asc":"desc")}
+              className="flex items-center gap-1.5 px-2 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] transition-colors text-xs"
+              title={`Sort by date ${sortDir==="desc"?"oldest first":"newest first"}`}>
+              {sortDir==="desc" ? <CaretDown size={13}/> : <CaretRight size={13} className="-rotate-90"/>}
+              <span className="hidden sm:inline">Sort</span>
+            </button>
+          </div>
 
-        {/* Tabs + sort grouped together */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <div className="flex items-center gap-0.5 bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm p-0.5 overflow-x-auto no-scrollbar">
+          {/* Spacer */}
+          <div className="flex-1"/>
+
+          {/* Right: tabs */}
+          <div className="flex items-center gap-0.5 bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm p-0.5 overflow-x-auto no-scrollbar flex-shrink-0">
             {[{k:"unsettled",l:"Pending"},{k:"awaiting",l:"Awaiting"},{k:"settled",l:"Settled"},{k:"all",l:"All"}].map(t => (
               <button key={t.k} onClick={() => { setSettleTab(t.k); setSelectedRefs(new Set()); }}
                 className={`px-2.5 py-1 text-xs font-medium rounded-sm transition-all whitespace-nowrap flex-shrink-0 ${settleTab===t.k?"bg-[var(--brand)] text-white shadow-sm":"text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)]"}`}>
@@ -477,26 +488,23 @@ export default function ItemsManager() {
               </button>
             ))}
           </div>
-          <button onClick={() => setSortDir(d => d==="desc"?"asc":"desc")}
-            className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] transition-colors flex-shrink-0" title={`Sort by date ${sortDir==="desc"?"oldest first":"newest first"}`}>
-            {sortDir==="desc" ? <CaretDown size={13}/> : <CaretRight size={13} className="-rotate-90"/>}
-          </button>
         </div>
 
-        {/* Search — fills remaining space */}
-        <div className="relative flex-1 min-w-0">
-          <MagnifyingGlass size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] pointer-events-none"/>
-          <input ref={searchRef} type="text" value={nameFilter} onChange={e => setNameFilter(e.target.value)}
-            placeholder="Search customer…"
-            className="w-full pl-7 pr-6 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]"/>
-          {nameFilter && <button onClick={() => setNameFilter("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><X size={11}/></button>}
-        </div>
-
-        {message && (
-          <div className={`text-xs px-2.5 py-1.5 rounded-sm border flex-shrink-0 ${message.type==="success"?"bg-[#455D4A10] border-[var(--success)] text-[var(--success)]":"bg-[#9E473D10] border-[var(--error)] text-[var(--error)]"}`}>
-            {message.text}
+        {/* Row 2: search bar + message — aligned to order list area */}
+        <div className="flex items-center gap-2 px-3 sm:px-4 pb-2">
+          <div className="relative flex-1 min-w-0">
+            <MagnifyingGlass size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] pointer-events-none"/>
+            <input ref={searchRef} type="text" value={nameFilter} onChange={e => setNameFilter(e.target.value)}
+              placeholder="Search customer…"
+              className="w-full pl-7 pr-6 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]"/>
+            {nameFilter && <button onClick={() => setNameFilter("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><X size={11}/></button>}
           </div>
-        )}
+          {message && (
+            <div className={`text-xs px-2.5 py-1.5 rounded-sm border flex-shrink-0 ${message.type==="success"?"bg-[#455D4A10] border-[var(--success)] text-[var(--success)]":"bg-[#9E473D10] border-[var(--error)] text-[var(--error)]"}`}>
+              {message.text}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── BODY ── */}
@@ -570,17 +578,23 @@ export default function ItemsManager() {
                         ${isSelected ? "bg-[#C86B4D08] border-l-2 border-l-[var(--brand)]" : "hover:bg-[#C86B4D03] border-l-2 border-l-transparent"}`}
                       onClick={e => selectRef(group.ref, e.ctrlKey || e.metaKey || e.shiftKey)}
                     >
-                      <div className="flex items-center gap-2 px-2 py-2">
-                        {/* Date — left fixed */}
-                        <span className="font-mono text-[10px] text-[var(--text-secondary)] flex-shrink-0 w-16 text-center">{group.date || "—"}</span>
-                        {/* Name + ref — fills remaining */}
-                        <p className={`text-xs font-medium truncate flex-1 min-w-0 ${isCancelled ? "line-through text-[var(--text-secondary)]" : ""}`}>
+                      <div className="flex items-center gap-1 px-2 py-2">
+                        {/* Date — fixed 68px */}
+                        <span className="font-mono text-[10px] text-[var(--text-secondary)] flex-shrink-0 w-[68px] text-center">{group.date || "—"}</span>
+                        {/* Name — fixed width, truncated */}
+                        <p className={`text-xs font-medium truncate flex-shrink-0 w-[90px] ${isCancelled ? "line-through text-[var(--text-secondary)]" : ""}`}>
                           {group.name}
-                          <span className="font-mono text-[10px] text-[var(--brand)] ml-1.5">{group.ref}</span>
-                          {orderNos.length > 0 && <span className="text-[10px] text-[var(--text-secondary)] ml-1">#{orderNos[0]}</span>}
                         </p>
-                        {/* Actions — right */}
-                        <div className="flex items-center gap-0 flex-shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                        {/* Ref — fixed */}
+                        <span className="font-mono text-[10px] text-[var(--brand)] flex-shrink-0 w-[58px] truncate">{group.ref}</span>
+                        {/* Order no — fixed, fills gap */}
+                        <span className="font-mono text-[10px] text-[var(--text-secondary)] flex-shrink-0 w-[52px] truncate">
+                          {orderNos.length > 0 ? `#${orderNos[0]}` : ""}
+                        </span>
+                        {/* Spacer */}
+                        <div className="flex-1"/>
+                        {/* Actions — always visible */}
+                        <div className="flex items-center gap-0 flex-shrink-0" onClick={e => e.stopPropagation()}>
                           <button onClick={() => setTailoringGroup(group)} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E15] rounded-sm" title="Assign Tailoring"><Scissors size={11}/></button>
                           <button onClick={() => setAddonGroup(group)} className="p-1 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm" title="Add Add-on"><Tag size={11}/></button>
                           <button onClick={() => setInvoiceRef(group.ref)} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm" title="Invoice"><Printer size={11}/></button>
