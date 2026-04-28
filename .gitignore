@@ -69,6 +69,7 @@ chainlit.md
 .chainlit
 .ipynb_checkpoints/
 .ac
+.emergent/
 
 # Deployment
 .vercel
