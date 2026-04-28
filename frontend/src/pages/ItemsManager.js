@@ -527,7 +527,10 @@ export default function ItemsManager() {
 
   // ─── Render ───────────────────────────────────────────────
   return (
-    <div data-testid="items-manager-page" className="flex flex-col h-[calc(100vh-4rem)] -m-4 sm:-m-6 lg:-m-8 overflow-hidden">
+    <div data-testid="items-manager-page" className="flex h-full -m-4 sm:-m-6 lg:-m-8 overflow-hidden">
+
+      {/* ── LEFT COLUMN ── */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
 
       {/* ── TOP BAR ── */}
       <div className="flex-shrink-0 bg-[var(--surface)] border-b border-[var(--border-subtle)]">
@@ -743,18 +746,20 @@ export default function ItemsManager() {
           </div>
         </div>
 
-        {/* Detail pane */}
-        <div className={`flex-shrink-0 bg-[var(--surface)] overflow-hidden w-full sm:w-72 lg:w-[30vw] h-full flex flex-col ${detailOpen ? "flex" : "hidden sm:flex"}`}>
-          <OrderDetailPane
-            selectedGroups={selectedGroups}
-            advances={advances}
-            onEdit={(section, items, mode) => startEdit(section, items, mode)}
-            onPay={() => setSettlementOrders(selectedGroups.map(g => ({ ref: g.ref, name: g.name })))}
-            onClose={() => setDetailOpen(false)}
-            onCancelItem={(item) => handleCancelItem(item)}
-            onDeleteItem={(item) => { setDelConfirm(item); setDelMode("item"); }}
-          />
-        </div>
+      </div>{/* end BODY */}
+      </div>{/* end LEFT COLUMN */}
+
+      {/* Detail pane — full-height sibling column */}
+      <div className={`flex-shrink-0 bg-[var(--surface)] overflow-hidden w-full sm:w-72 lg:w-[30vw] flex flex-col ${detailOpen ? "flex" : "hidden sm:flex"}`}>
+        <OrderDetailPane
+          selectedGroups={selectedGroups}
+          advances={advances}
+          onEdit={(section, items, mode) => startEdit(section, items, mode)}
+          onPay={() => setSettlementOrders(selectedGroups.map(g => ({ ref: g.ref, name: g.name })))}
+          onClose={() => setDetailOpen(false)}
+          onCancelItem={(item) => handleCancelItem(item)}
+          onDeleteItem={(item) => { setDelConfirm(item); setDelMode("item"); }}
+        />
       </div>
 
       {/* Mobile: back to list */}
