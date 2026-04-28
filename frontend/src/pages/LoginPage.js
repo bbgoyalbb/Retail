@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { getPublicSettings } from "@/api";
+import { getPublicSettings, BACKEND_URL } from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import { Scissors, Eye, EyeSlash } from "@phosphor-icons/react";
 
@@ -14,10 +14,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [firmName, setFirmName] = useState("Retail Book");
+  const [firmLogo, setFirmLogo] = useState(null);
   const [showPwd, setShowPwd] = useState(false);
 
   useEffect(() => {
-    getPublicSettings().then(s => { if (s?.firm_name) setFirmName(s.firm_name); }).catch(() => {});
+    getPublicSettings().then(s => {
+      if (s?.firm_name) setFirmName(s.firm_name);
+      if (s?.firm_logo) setFirmLogo(s.firm_logo.startsWith("http") ? s.firm_logo : `${BACKEND_URL}${s.firm_logo}`);
+    }).catch(() => {});
   }, []);
 
   const from = location.state?.from || "/";
@@ -53,8 +57,11 @@ export default function LoginPage() {
         <div className="relative w-full max-w-sm">
           {/* Brand mark */}
           <div className="flex flex-col items-center mb-8">
-            <div className="w-14 h-14 rounded-sm flex items-center justify-center mb-4 shadow-sm" style={{ background: "var(--brand)" }}>
-              <span className="text-white font-serif font-bold text-3xl leading-none">R</span>
+            <div className="w-24 h-24 rounded-sm flex items-center justify-center mb-4 shadow-sm overflow-hidden" style={{ background: firmLogo ? "transparent" : "var(--brand)" }}>
+              {firmLogo
+                ? <img src={firmLogo} alt={firmName} className="w-full h-full object-contain" style={{ borderRadius: "6px" }} />
+                : <span className="text-white font-serif font-bold text-4xl leading-none">{firmName.charAt(0).toUpperCase()}</span>
+              }
             </div>
             <h1 className="font-heading text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
               {firmName}

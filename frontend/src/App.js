@@ -9,6 +9,7 @@ import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { useLocation } from "react-router-dom";
+import { getPublicSettings, BACKEND_URL } from "@/api";
 
 const PAGE_TITLES = {
   "/": "Dashboard",
@@ -98,6 +99,16 @@ function AppShell() {
   });
   const { user, loading } = useAuth();
   const location = useLocation();
+
+  useEffect(() => {
+    getPublicSettings().then(s => {
+      if (!s?.firm_logo) return;
+      const logoUrl = s.firm_logo.startsWith("http") ? s.firm_logo : `${BACKEND_URL}${s.firm_logo}`;
+      let link = document.querySelector("link[rel~='icon']");
+      if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
+      link.href = logoUrl;
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const el = contentRef.current;
