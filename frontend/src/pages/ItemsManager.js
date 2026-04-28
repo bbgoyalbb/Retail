@@ -9,7 +9,7 @@ import { fmt } from "@/lib/fmt";
 import { DatePickerInput } from "@/components/DatePickerInput";
 import {
   PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle,
-  CurrencyDollar, Scissors, Tag, MagnifyingGlass, SlidersHorizontal, Funnel,
+  CurrencyDollar, Scissors, Tag, MagnifyingGlass, Funnel,
 } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
 import SettlementPanel from "@/components/SettlementPanel";
@@ -543,12 +543,8 @@ export default function ItemsManager() {
       <div className="flex-shrink-0 bg-[var(--surface)] border-b border-[var(--border-subtle)]">
         {/* Row 1: controls left + tabs right */}
         <div className="flex items-center gap-2 px-3 sm:px-4 py-2">
-          {/* Left: sidebar toggle + sort */}
+          {/* Left: sort */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            <button onClick={() => setSidebarOpen(o => !o)} title="Toggle sidebar"
-              className="p-1.5 rounded-sm hover:bg-[var(--bg)] text-[var(--text-secondary)] hidden lg:flex">
-              <SlidersHorizontal size={15}/>
-            </button>
             <button onClick={() => setSortDir(d => d==="desc"?"asc":"desc")}
               className="flex items-center gap-1.5 px-2 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] transition-colors text-xs"
               title="Toggle sort order">
@@ -647,45 +643,27 @@ export default function ItemsManager() {
               </div>
             </div>
           </div>
-        )}
+        }
       </div>
 
       {/* ── BODY ── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
-        {/* Sidebar */}
-        {sidebarOpen && (
-          <div className="hidden lg:flex flex-col w-52 flex-shrink-0 border-r border-[var(--border-subtle)] bg-[var(--bg)] overflow-y-auto">
-            <div className="p-3 space-y-4">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] mb-2">Summary</p>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs"><span className="text-[var(--text-secondary)]">Showing</span><span className="font-mono">{refs.length} refs</span></div>
-                  <div className="flex justify-between text-xs"><span className="text-[var(--text-secondary)]">Total pending</span><span className="font-mono text-[var(--warning)]">₹{fmt(refs.reduce((s,g)=>s+Math.max(0,g.totals.pending),0))}</span></div>
-                  <div className="flex justify-between text-xs"><span className="text-[var(--text-secondary)]">Total value</span><span className="font-mono">₹{fmt(refs.reduce((s,g)=>s+g.totals.total,0))}</span></div>
-                </div>
-              </div>
-              {selectedRefs.size > 0 && (
-                <div className="pt-2 border-t border-[var(--border-subtle)]">
-                  <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] mb-2">Selected ({selectedRefs.size})</p>
-                  <div className="flex justify-between text-xs"><span className="text-[var(--text-secondary)]">Pending</span><span className="font-mono text-[var(--warning)]">₹{fmt(selectedGroups.reduce((s,g)=>s+Math.max(0,g.totals.pending),0))}</span></div>
-                  <button onClick={() => setSelectedRefs(new Set())} className="mt-2 text-[10px] text-[var(--brand)] hover:underline">Clear selection</button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Order list */}
         <div className={`flex flex-col border-r border-[var(--border-subtle)] bg-[var(--surface)] overflow-hidden flex-shrink-0
           ${detailOpen ? "hidden sm:flex sm:flex-1" : "flex w-full sm:flex-1"}` }>
 
-          <div className="flex-shrink-0 px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg)] flex items-center justify-between">
-            <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">
+          <div className="flex-shrink-0 px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg)] flex items-center gap-3">
+            <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] flex-shrink-0">
               {isSearchMode ? "Search results" : "Orders"} <span className="font-mono ml-1">{searchLoading ? "…" : refs.length}</span>
             </p>
+            <div className="hidden sm:flex items-center gap-3 ml-2 pl-3 border-l border-[var(--border-subtle)]">
+              <span className="text-[10px] text-[var(--text-secondary)]">Pending <span className="font-mono text-[var(--warning)] ml-1">₹{fmt(refs.reduce((s,g)=>s+Math.max(0,g.totals.pending),0))}</span></span>
+              <span className="text-[10px] text-[var(--text-secondary)]">Value <span className="font-mono ml-1">₹{fmt(refs.reduce((s,g)=>s+g.totals.total,0))}</span></span>
+            </div>
+            <div className="flex-1"/>
             {selectedRefs.size > 0 && (
-              <button onClick={() => setSelectedRefs(new Set())} className="text-[10px] text-[var(--brand)] hover:underline">{selectedRefs.size} selected · clear</button>
+              <button onClick={() => setSelectedRefs(new Set())} className="text-[10px] text-[var(--brand)] hover:underline flex-shrink-0">{selectedRefs.size} selected · clear</button>
             )}
           </div>
 
