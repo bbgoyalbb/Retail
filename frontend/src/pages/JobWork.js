@@ -112,6 +112,11 @@ function StatusColumn({ title, items, color, onMove, moveLabel, onMoveBack, move
                   <span>Date: {item.date}</span>
                   <span>Del: {item.delivery_date}</span>
                 </div>
+                <div className="flex gap-3 text-[10px] text-[var(--text-secondary)] mt-0.5">
+                  {item.barcode && item.barcode !== "N/A" && <span className="font-mono">#{item.barcode}</span>}
+                  {item.price > 0 && <span>₹{item.price}</span>}
+                  {item.qty > 0 && <span>×{item.qty}</span>}
+                </div>
                 {item.karigar && item.karigar !== "N/A" && (
                   <p className="text-[10px] text-[var(--info)] mt-0.5">Karigar: {item.karigar}</p>
                 )}
@@ -165,32 +170,31 @@ export default function JobWork() {
 
   const sortItems = (items) => {
     if (!items) return [];
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     return [...items].sort((a, b) => {
       let va = a[sortKey];
       let vb = b[sortKey];
-      
-      // Handle missing values
-      if (va === undefined || va === null) va = "";
-      if (vb === undefined || vb === null) vb = "";
-      
-      // Check if values are dates (YYYY-MM-DD format)
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      const isDateA = dateRegex.test(String(va));
-      const isDateB = dateRegex.test(String(vb));
-      
-      if (isDateA && isDateB) {
-        // Compare dates using localeCompare for proper sorting
-        const cmp = String(va).localeCompare(String(vb));
+
+      // Normalise missing / N/A — always push to end regardless of direction
+      const emptyA = va === undefined || va === null || va === "" || va === "N/A";
+      const emptyB = vb === undefined || vb === null || vb === "" || vb === "N/A";
+      if (emptyA && emptyB) return 0;
+      if (emptyA) return 1;
+      if (emptyB) return -1;
+
+      // Date comparison (YYYY-MM-DD)
+      if (dateRegex.test(String(va)) && dateRegex.test(String(vb))) {
+        const cmp = new Date(va) - new Date(vb);
         return sortDir === "asc" ? cmp : -cmp;
       }
-      
-      // Check if numeric
+
+      // Numeric
       if (typeof va === "number" && typeof vb === "number") {
         const cmp = va - vb;
         return sortDir === "asc" ? cmp : -cmp;
       }
-      
-      // Default string comparison
+
+      // String
       const cmp = String(va).localeCompare(String(vb));
       return sortDir === "asc" ? cmp : -cmp;
     });
