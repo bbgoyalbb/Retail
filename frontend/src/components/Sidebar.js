@@ -13,7 +13,7 @@ import {
 
   BookOpen, UsersThree,
 
-  MagnifyingGlass, Table, ChartBar, Database, Gear, ClipboardText,
+  Table, ChartBar, Database, Gear, ClipboardText,
 
   CaretDoubleLeft, CaretDoubleRight, Sun, Moon, SignOut, UserCircle, UsersFour, ClockCounterClockwise, Keyboard
 
@@ -32,7 +32,6 @@ const NAV_ITEMS = [
   { key: "section-mgmt", type: "section", label: "Manage" },
   { key: "items", label: "Manage Orders", icon: Table, path: "/items", managerOnly: true },
   { key: "order-status", label: "Order Status", icon: ClipboardText, path: "/order-status" },
-  { key: "search", label: "Search", icon: MagnifyingGlass, path: "/search" },
   { key: "reports", label: "Reports", icon: ChartBar, path: "/reports", managerOnly: true },
   { key: "data", label: "Data Manager", icon: Database, path: "/data", adminOnly: true },
   { key: "settings", label: "Settings", icon: Gear, path: "/settings", adminOnly: true },

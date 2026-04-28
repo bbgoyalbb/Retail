@@ -10,7 +10,6 @@ const ALL_PAGES = [
     { path: "/new-bill", label: "New Bill" },
     { path: "/jobwork", label: "Job Work" },
     { path: "/order-status", label: "Order Status" },
-    { path: "/search", label: "Search" },
   ]},
   { group: "Finances", pages: [
     { path: "/daybook", label: "Daybook" },
@@ -24,9 +23,9 @@ const ALL_PAGES = [
 
 // Role-based page access mapping - pages each role can potentially access
 const ROLE_PAGE_ACCESS = {
-  cashier: ["/", "/new-bill", "/jobwork", "/order-status", "/search"],
-  manager: ["/", "/new-bill", "/jobwork", "/order-status", "/search", "/daybook", "/labour", "/items", "/reports"],
-  admin: ["/", "/new-bill", "/jobwork", "/order-status", "/search", "/daybook", "/labour", "/items", "/reports", "/data", "/settings", "/users", "/audit"],
+  cashier: ["/", "/new-bill", "/jobwork", "/order-status"],
+  manager: ["/", "/new-bill", "/jobwork", "/order-status", "/daybook", "/labour", "/items", "/reports"],
+  admin: ["/", "/new-bill", "/jobwork", "/order-status", "/daybook", "/labour", "/items", "/reports", "/data", "/settings", "/users", "/audit"],
 };
 
 const ROLES = ["admin", "manager", "cashier"];

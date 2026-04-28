@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import {
   getItems, getItem, getAdvances, updateItem, deleteItem, createItem,
   updateAdvance, createAdvance, deleteAdvance, invalidateItemsCache,
-  invalidateAdvancesCache, getSettings,
+  invalidateAdvancesCache, getSettings, searchItems, getCustomers,
 } from "@/api";
 import { fmt } from "@/lib/fmt";
+import { DatePickerInput } from "@/components/DatePickerInput";
 import {
   PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle,
-  CurrencyDollar, Scissors, Tag, MagnifyingGlass, SlidersHorizontal,
+  CurrencyDollar, Scissors, Tag, MagnifyingGlass, SlidersHorizontal, Funnel,
+  FilePdf, CaretLeft,
 } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
 import SettlementPanel from "@/components/SettlementPanel";
@@ -136,8 +139,18 @@ const StatusBadge = ({ settled, cancelled, pending }) => {
 };
 
 // ─── Main page ────────────────────────────────────────────────
+const SEARCH_DATE_PRESETS = [
+  { label: "Today",        from: new Date().toISOString().split("T")[0], to: new Date().toISOString().split("T")[0] },
+  { label: "This Week",   from: new Date(Date.now() - ((new Date().getDay()||7)-1)*86400000).toISOString().split("T")[0], to: new Date().toISOString().split("T")[0] },
+  { label: "This Month",  from: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0], to: new Date().toISOString().split("T")[0] },
+  { label: "Last Month",  from: new Date(new Date().getFullYear(), new Date().getMonth()-1, 1).toISOString().split("T")[0], to: new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().split("T")[0] },
+  { label: "Last 90 Days",from: new Date(Date.now() - 89*86400000).toISOString().split("T")[0], to: new Date().toISOString().split("T")[0] },
+];
+const SEARCH_PER_PAGE = 100;
+
 export default function ItemsManager() {
   const searchRef = useRef(null);
+  const location = useLocation();
 
   // Data
   const [allItems, setAllItems]     = useState([]);
@@ -150,6 +163,22 @@ export default function ItemsManager() {
   const [debouncedName, setDebouncedName] = useState("");
   const [settleTab, setSettleTab]   = useState("unsettled");
   const [sortDir, setSortDir]       = useState("desc");
+
+  // Full search state
+  const [showFilters, setShowFilters]     = useState(false);
+  const [searchDateFrom, setSearchDateFrom] = useState("");
+  const [searchDateTo, setSearchDateTo]   = useState("");
+  const [searchStatus, setSearchStatus]   = useState("All");
+  const [searchPayment, setSearchPayment] = useState("All");
+  const [searchMinAmt, setSearchMinAmt]   = useState("");
+  const [searchMaxAmt, setSearchMaxAmt]   = useState("");
+  const [searchCustomer, setSearchCustomer] = useState("All");
+  const [customers, setCustomers]         = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchTotal, setSearchTotal]     = useState(0);
+  const [searchPage, setSearchPage]       = useState(0);
+  const [searchDone, setSearchDone]       = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   // Panel state
   const [sidebarOpen, setSidebarOpen]   = useState(false);
@@ -187,6 +216,15 @@ export default function ItemsManager() {
   // Settings
   useEffect(() => {
     getSettings().then(res => setTailoringRates(res?.data?.tailoring_rates || {})).catch(() => {});
+    getCustomers().then(res => setCustomers(res.data || [])).catch(() => {});
+  }, []);
+
+  // Pre-fill search from URL params (Reports drill-down: /items?name=CustomerName)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const n = params.get("name");
+    if (n) { setNameFilter(n); setDebouncedName(n); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Debounce search
@@ -202,12 +240,50 @@ export default function ItemsManager() {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  // Load data
+  // Derived: are any advanced filters active?
+  const hasAdvancedFilters = searchDateFrom || searchDateTo || searchStatus !== "All" || searchPayment !== "All" || searchMinAmt || searchMaxAmt || searchCustomer !== "All";
+  const isSearchMode = !!(debouncedName || hasAdvancedFilters);
+
+  // Full-search via /search API
+  const runSearch = useCallback(async (page = 0) => {
+    setSearchLoading(true);
+    setSearchPage(page);
+    const params = { q: debouncedName || "", limit: SEARCH_PER_PAGE, skip: page * SEARCH_PER_PAGE };
+    if (searchCustomer !== "All") params.customer = searchCustomer;
+    if (searchDateFrom) params.date_from = searchDateFrom;
+    if (searchDateTo) params.date_to = searchDateTo;
+    if (searchStatus !== "All") params.status = searchStatus;
+    if (searchPayment !== "All") params.payment_status = searchPayment;
+    if (searchMinAmt) params.min_amount = parseFloat(searchMinAmt);
+    if (searchMaxAmt) params.max_amount = parseFloat(searchMaxAmt);
+    try {
+      const res = await searchItems(params);
+      setSearchResults(res.data.items || []);
+      setSearchTotal(res.data.total || 0);
+      setSearchDone(true);
+    } catch { setSearchResults([]); setSearchTotal(0); }
+    finally { setSearchLoading(false); }
+  }, [debouncedName, searchCustomer, searchDateFrom, searchDateTo, searchStatus, searchPayment, searchMinAmt, searchMaxAmt]);
+
+  // Auto-run search when search mode is active
+  useEffect(() => {
+    if (isSearchMode) { runSearch(0); }
+    else { setSearchDone(false); setSearchResults([]); setSearchTotal(0); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSearchMode, runSearch]);
+
+  const clearSearch = () => {
+    setNameFilter(""); setDebouncedName("");
+    setSearchDateFrom(""); setSearchDateTo(""); setSearchStatus("All"); setSearchPayment("All");
+    setSearchMinAmt(""); setSearchMaxAmt(""); setSearchCustomer("All");
+    setShowFilters(false); setSearchDone(false); setSearchResults([]); setSearchTotal(0);
+  };
+
+  // Load data (grouped list mode)
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const params = { limit: 500, summary: true };
-      if (debouncedName) params.name = debouncedName;
       const [itemsRes, advRes] = await Promise.all([getItems(params), getAdvances()]);
       setAllItems(itemsRes.data.items || []);
       setAdvances(advRes.data || []);
@@ -217,7 +293,7 @@ export default function ItemsManager() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedName]);
+  }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -490,25 +566,177 @@ export default function ItemsManager() {
           </div>
         </div>
 
-        {/* Row 2: search bar + message — aligned to order list area */}
+        {/* Row 2: search bar + filter toggle */}
         <div className="flex items-center gap-2 px-3 sm:px-4 pb-2">
           <div className="relative flex-1 min-w-0">
             <MagnifyingGlass size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] pointer-events-none"/>
             <input ref={searchRef} type="text" value={nameFilter} onChange={e => setNameFilter(e.target.value)}
-              placeholder="Search customer…"
+              placeholder="Search by name, barcode, ref, article type, karigar…"
               className="w-full pl-7 pr-6 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]"/>
             {nameFilter && <button onClick={() => setNameFilter("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><X size={11}/></button>}
           </div>
+          <button onClick={() => setShowFilters(f => !f)}
+            className={`flex items-center gap-1.5 px-2 py-1.5 text-xs border rounded-sm transition-colors flex-shrink-0 ${(showFilters||hasAdvancedFilters)?"bg-[var(--brand)] text-white border-[var(--brand)]":"border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]"}`}>
+            <Funnel size={13}/><span className="hidden sm:inline">Filters{hasAdvancedFilters ? " ·" : ""}</span>
+          </button>
+          {isSearchMode && <button onClick={clearSearch} className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--error)] border border-[var(--border-subtle)] rounded-sm flex-shrink-0" title="Clear search"><X size={13}/></button>}
           {message && (
             <div className={`text-xs px-2.5 py-1.5 rounded-sm border flex-shrink-0 ${message.type==="success"?"bg-[#455D4A10] border-[var(--success)] text-[var(--success)]":"bg-[#9E473D10] border-[var(--error)] text-[var(--error)]"}`}>
               {message.text}
             </div>
           )}
         </div>
+
+        {/* Filter panel */}
+        {showFilters && (
+          <div className="px-3 sm:px-4 pb-3 border-t border-[var(--border-subtle)] pt-2.5 space-y-2.5">
+            <div className="flex flex-wrap gap-1">
+              {SEARCH_DATE_PRESETS.map(p => (
+                <button key={p.label} onClick={() => { setSearchDateFrom(p.from); setSearchDateTo(p.to); }}
+                  className={`px-2.5 py-1 text-[10px] font-medium rounded-sm border transition-colors ${
+                    searchDateFrom === p.from && searchDateTo === p.to
+                      ? "bg-[var(--brand)] text-white border-[var(--brand)]"
+                      : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]"
+                  }`}>{p.label}</button>
+              ))}
+              {(searchDateFrom || searchDateTo) && (
+                <button onClick={() => { setSearchDateFrom(""); setSearchDateTo(""); }}
+                  className="px-2.5 py-1 text-[10px] rounded-sm border border-[var(--border-subtle)] text-[var(--error)] hover:bg-[#9E473D08]">Clear dates</button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              <div>
+                <label className="text-[9px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Customer</label>
+                <select value={searchCustomer} onChange={e => setSearchCustomer(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)]">
+                  <option value="All">All</option>
+                  {customers.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[9px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Date From</label>
+                <DatePickerInput value={searchDateFrom} onChange={setSearchDateFrom} placeholder="From date"/>
+              </div>
+              <div>
+                <label className="text-[9px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Date To</label>
+                <DatePickerInput value={searchDateTo} onChange={setSearchDateTo} placeholder="To date"/>
+              </div>
+              <div>
+                <label className="text-[9px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Tailoring Status</label>
+                <select value={searchStatus} onChange={e => setSearchStatus(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)]">
+                  {["All","N/A","Awaiting Order","Pending","Stitched","Delivered"].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[9px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Payment</label>
+                <select value={searchPayment} onChange={e => setSearchPayment(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)]">
+                  {["All","Pending","Settled"].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[9px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Min Amount</label>
+                <input type="number" value={searchMinAmt} onChange={e => setSearchMinAmt(e.target.value)} placeholder="₹0" className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)]"/>
+              </div>
+              <div>
+                <label className="text-[9px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Max Amount</label>
+                <input type="number" value={searchMaxAmt} onChange={e => setSearchMaxAmt(e.target.value)} placeholder="₹99999" className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)]"/>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ── BODY ── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      {/* ── SEARCH RESULTS (replaces body when search active) ── */}
+      {isSearchMode && (
+        <div className="flex-1 overflow-auto">
+          <div className="px-3 sm:px-4 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg)] flex items-center justify-between">
+            <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">
+              {searchLoading ? "Searching…" : `${searchTotal} result${searchTotal !== 1 ? "s" : ""}`}
+            </p>
+            {searchTotal > SEARCH_PER_PAGE && (
+              <div className="flex items-center gap-2">
+                <button onClick={() => runSearch(searchPage - 1)} disabled={searchPage === 0 || searchLoading}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)] disabled:opacity-40"><CaretLeft size={11}/>Prev</button>
+                <span className="text-[10px] text-[var(--text-secondary)]">{searchPage + 1} / {Math.ceil(searchTotal / SEARCH_PER_PAGE)}</span>
+                <button onClick={() => runSearch(searchPage + 1)} disabled={(searchPage + 1) * SEARCH_PER_PAGE >= searchTotal || searchLoading}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)] disabled:opacity-40">Next<CaretRight size={11}/></button>
+              </div>
+            )}
+          </div>
+          {searchDone && searchResults.length === 0 && (
+            <div className="py-16 text-center text-sm text-[var(--text-secondary)]">No results found</div>
+          )}
+          {searchResults.length > 0 && (
+            <>
+              {/* Mobile */}
+              <div className="md:hidden divide-y divide-[var(--border-subtle)]">
+                {searchResults.map((item, i) => (
+                  <div key={i} className="p-3 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-medium">{item.name}</p>
+                        <p className="font-mono text-[10px] text-[var(--text-secondary)]">{item.ref} · {item.date}</p>
+                      </div>
+                      <button onClick={() => setInvoiceRef(item.ref)} className="p-1.5 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm flex-shrink-0" title="Invoice"><FilePdf size={15}/></button>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--text-secondary)]">
+                      {item.barcode && item.barcode !== "N/A" && <span>{item.barcode}</span>}
+                      {item.article_type && item.article_type !== "N/A" && <span>{item.article_type}</span>}
+                      <span className={`inline-flex items-center gap-1 text-xs ${item.payment_status === "Settled" ? "text-[var(--success)]" : "text-[var(--warning)]"}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${item.payment_status === "Settled" ? "bg-[var(--success)]" : "bg-[var(--warning)]"}`}/>
+                        {item.payment_status || "Pending"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Desktop */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-[var(--bg)]">
+                      {["Date","Customer","Ref","Barcode","Amount","Article","Tailoring","Embroidery","Payment",""].map(h => (
+                        <th key={h} className="text-left px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap border-b border-[var(--border-subtle)]">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {searchResults.map((item, i) => (
+                      <tr key={i} className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D04]">
+                        <td className="px-3 py-2 font-mono text-[10px] text-[var(--text-secondary)]">{item.date}</td>
+                        <td className="px-3 py-2 text-xs font-medium max-w-[140px] truncate">{item.name}</td>
+                        <td className="px-3 py-2 font-mono text-[10px] text-[var(--brand)]">{item.ref}</td>
+                        <td className="px-3 py-2 text-[10px] text-[var(--text-secondary)] max-w-[90px] truncate">{item.barcode !== "N/A" ? item.barcode : "—"}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-right">₹{fmt(item.fabric_amount)}</td>
+                        <td className="px-3 py-2 text-xs">{item.article_type !== "N/A" ? item.article_type : "—"}</td>
+                        <td className="px-3 py-2 text-xs">
+                          <span className={item.tailoring_status === "Delivered" ? "text-[var(--success)]" : item.tailoring_status === "N/A" ? "text-[var(--text-secondary)]" : "text-[var(--warning)]"}
+                          >{item.tailoring_status}</span>
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          <span className={item.embroidery_status === "Finished" ? "text-[var(--success)]" : item.embroidery_status === "N/A" || item.embroidery_status === "Not Required" ? "text-[var(--text-secondary)]" : "text-[var(--info)]"}
+                          >{item.embroidery_status}</span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-flex items-center gap-1 text-xs ${item.payment_status === "Settled" ? "text-[var(--success)]" : "text-[var(--warning)]"}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${item.payment_status === "Settled" ? "bg-[var(--success)]" : "bg-[var(--warning)]"}`}/>
+                            {item.payment_status || "Pending"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <button onClick={() => setInvoiceRef(item.ref)} className="p-1 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm" title="Invoice"><FilePdf size={14}/></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── BODY (grouped list — hidden while search active) ── */}
+      <div className={`flex flex-1 min-h-0 overflow-hidden ${isSearchMode ? "hidden" : ""}`}>
 
         {/* Sidebar */}
         {sidebarOpen && (

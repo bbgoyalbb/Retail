@@ -33,7 +33,6 @@ const JobWork       = lazy(() => import("@/pages/JobWork"));
 const Daybook       = lazy(() => import("@/pages/Daybook"));
 const LabourPayments = lazy(() => import("@/pages/LabourPayments"));
 const ItemsManager  = lazy(() => import("@/pages/ItemsManager"));
-const SearchPage    = lazy(() => import("@/pages/SearchPage"));
 const OrderStatus   = lazy(() => import("@/pages/OrderStatus"));
 const Reports       = lazy(() => import("@/pages/Reports"));
 const DataManager   = lazy(() => import("@/pages/DataManager"));
@@ -150,8 +149,6 @@ function AppShell() {
                 <Route path="/new-bill" element={<NewBill />} />
                 <Route path="/jobwork" element={<JobWork />} />
                 <Route path="/order-status" element={<OrderStatus />} />
-                <Route path="/search" element={<SearchPage />} />
-
                 {/* Manager + Admin */}
                 <Route path="/daybook" element={<RequireRole roles={["admin","manager"]} path="/daybook"><Daybook /></RequireRole>} />
                 <Route path="/labour" element={<RequireRole roles={["admin","manager"]} path="/labour"><LabourPayments /></RequireRole>} />
@@ -166,6 +163,7 @@ function AppShell() {
 
                 <Route path="/settlements" element={<Navigate to="/items" replace />} />
                 <Route path="/tailoring" element={<Navigate to="/jobwork" replace />} />
+                <Route path="/search" element={<Navigate to="/items" replace />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             </Suspense>

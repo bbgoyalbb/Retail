@@ -34,13 +34,13 @@ export function KeyboardShortcuts() {
       if (!isInput && e.key === "?") { setOpen(o => !o); return; }
       if (isInput) return;
 
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); navigate("/search"); }
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); navigate("/items"); }
       if ((e.ctrlKey || e.metaKey) && e.key === "n") { e.preventDefault(); navigate("/new-bill"); }
       if ((e.ctrlKey || e.metaKey) && e.key === "d") { e.preventDefault(); navigate("/"); }
 
       if ((e.ctrlKey || e.metaKey) && e.key >= "1" && e.key <= "9") {
         e.preventDefault();
-        const map = { "1": "/", "2": "/new-bill", "3": "/jobwork", "4": "/items", "5": "/daybook", "6": "/order-status", "7": "/search", "8": "/settings" };
+        const map = { "1": "/", "2": "/new-bill", "3": "/jobwork", "4": "/items", "5": "/daybook", "6": "/order-status", "7": "/settings" };
         if (map[e.key]) navigate(map[e.key]);
       }
     };

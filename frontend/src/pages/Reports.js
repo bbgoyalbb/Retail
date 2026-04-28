@@ -259,7 +259,7 @@ export default function Reports() {
                   <tr key={c.name} className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D05]">
                     <td className="px-4 py-2.5 font-mono text-xs text-[var(--text-secondary)]">{i + 1}</td>
                     <td className="px-4 py-2.5 text-sm font-medium">
-                      <button onClick={() => navigate(`/search?customer=${encodeURIComponent(c.name)}`)} className="hover:text-[var(--brand)] hover:underline text-left">{c.name}</button>
+                      <button onClick={() => navigate(`/items?name=${encodeURIComponent(c.name)}`)} className="hover:text-[var(--brand)] hover:underline text-left">{c.name}</button>
                     </td>
                     <td className="px-4 py-2.5 font-mono text-xs">{c.refs_count}</td>
                     <td className="px-4 py-2.5 font-mono text-xs">{c.items_count}</td>
