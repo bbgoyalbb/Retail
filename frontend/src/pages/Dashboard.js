@@ -158,7 +158,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-3 px-5 py-3 bg-[#9E473D10] border border-[var(--error)] rounded-sm">
           <Warning size={18} className="text-[var(--error)] flex-shrink-0" weight="fill" />
           <span className="text-sm text-[var(--error)] font-medium">
-            {data.overdue_orders_count} order{data.overdue_orders_count !== 1 ? 's' : ''} overdue for delivery — delivery date has passed but tailoring is not complete.
+            {data.overdue_orders_count} article{data.overdue_orders_count !== 1 ? 's' : ''} overdue for delivery — delivery date has passed but tailoring is not complete.
           </span>
           <button onClick={() => navigate('/order-status')}
             className="ml-auto text-xs font-medium text-[var(--error)] underline underline-offset-2 hover:opacity-80 whitespace-nowrap">

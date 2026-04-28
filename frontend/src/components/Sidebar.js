@@ -147,11 +147,11 @@ export default function Sidebar({ open, setOpen }) {
 
         {/* Logo */}
 
-        <div className={`border-b border-[var(--border-subtle)] flex items-center justify-between ${collapsed ? 'p-3' : 'px-3 py-3'}`}>
+        <div className={`border-b border-[var(--border-subtle)] flex items-center justify-between ${collapsed ? 'p-3' : 'px-3 py-4'}`}>
 
           <div className={`flex items-center gap-2.5 overflow-hidden ${collapsed ? 'justify-center w-full' : ''}`}>
 
-            <div className={`flex-shrink-0 flex items-center justify-center ${collapsed ? 'w-9 h-9' : 'w-[52px] h-[52px]'}`} style={{ background: firmLogo ? "transparent" : "var(--brand)", borderRadius: "8px" }}>
+            <div className={`flex-shrink-0 flex items-center justify-center ${collapsed ? 'w-9 h-9' : 'w-[68px] h-[68px]'}`} style={{ background: firmLogo ? "transparent" : "var(--brand)", borderRadius: "8px" }}>
 
               {firmLogo
                 ? <img src={firmLogo.startsWith("http") ? firmLogo : `${BACKEND_URL}${firmLogo}`} alt="logo" className="w-full h-full object-contain" style={{ borderRadius: "8px" }} />
