@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DatePickerInput } from "@/components/DatePickerInput";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "@/components/ThemeProvider";
 import { getRevenueReport, getCustomerReport, getSummaryReport, exportExcelUrl } from "@/api";
 import { fmt } from "@/lib/fmt";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
@@ -59,7 +60,8 @@ const DATE_PRESETS = [
 
 export default function Reports() {
   const navigate = useNavigate();
-  const COLORS = useMemo(() => getChartColors(), []);
+  const { theme } = useTheme();
+  const COLORS = useMemo(() => getChartColors(), [theme]);
   const [tab, setTab] = useState("revenue");
   const [period, setPeriod] = useState("daily");
   const [dateFrom, setDateFrom] = useState("");

@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react"; // useEffect used in OfflineBanner
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
 import BackToTop from "@/components/BackToTop";
@@ -93,11 +93,20 @@ function OfflineBanner() {
 }
 
 function AppShell() {
+  const contentRef = useRef(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try { return localStorage.getItem("sidebar_open") !== "false"; } catch { return true; }
   });
   const { user, loading } = useAuth();
   const location = useLocation();
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    el.classList.remove("page-in");
+    void el.offsetWidth;
+    el.classList.add("page-in");
+  }, [location.pathname]);
 
   const handleSetOpen = (v) => {
     setSidebarOpen(v);
@@ -131,7 +140,7 @@ function AppShell() {
       <BackToTop />
       <main className="flex-1 overflow-y-auto min-w-0">
         <MobileTopBar title={PAGE_TITLES[location.pathname] ?? "Retail Book"} onMenuClick={() => handleSetOpen(!sidebarOpen)} />
-        <div key={location.pathname} className="p-4 pt-16 md:p-6 md:pt-6 lg:p-8 max-w-[1600px] mx-auto page-in">
+        <div ref={contentRef} className="p-4 pt-16 md:p-6 md:pt-6 lg:p-8 max-w-[1600px] mx-auto page-in">
           <ErrorBoundary>
             <Suspense fallback={<PageLoader />}>
               <KeyboardShortcuts />
@@ -155,6 +164,8 @@ function AppShell() {
                 <Route path="/users" element={<RequireRole roles={["admin"]} path="/users"><UsersPage /></RequireRole>} />
                 <Route path="/audit" element={<RequireRole roles={["admin"]} path="/audit"><AuditLogPage /></RequireRole>} />
 
+                <Route path="/settlements" element={<Navigate to="/items" replace />} />
+                <Route path="/tailoring" element={<Navigate to="/jobwork" replace />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             </Suspense>

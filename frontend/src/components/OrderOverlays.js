@@ -2,9 +2,7 @@ import React, { useState, useEffect } from "react";
 import { getSettings, addAddons, assignTailoring, splitTailoring, getItems, invalidateItemsCache } from "@/api";
 import { X, Check, Plus, Trash, Scissors, Tag, PlusCircle, ArrowsSplit } from "@phosphor-icons/react";
 
-const DEFAULT_ADDON_ITEMS = ["Bow","Tie","Cufflinks","Stall","Buttons","Saffa","Dye","Malla","Kalangi"];
 const EMB_OPTIONS = ["Not Required","Required"];
-const ARTICLE_TYPES = ["Shirt","Pant","Gurkha Pant","Kurta","Pajama","Blazer","Safari Shirt","Indo","Sherwani","Jacket","W Coat"];
 
 // ─── Split sub-form ───────────────────────────────────────────
 function SplitForm({ item, articleTypes, onConfirm, onCancel }) {
@@ -59,7 +57,7 @@ function SplitForm({ item, articleTypes, onConfirm, onCancel }) {
 export function TailoringOverlay({ group, onClose, onSuccess }) {
   const [assignments, setAssignments] = useState([]);
   const [splitItem, setSplitItem] = useState(null);
-  const [articleTypes, setArticleTypes] = useState(ARTICLE_TYPES);
+  const [articleTypes, setArticleTypes] = useState([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
 
@@ -240,8 +238,8 @@ export function TailoringOverlay({ group, onClose, onSuccess }) {
 export function AddOnOverlay({ group, onClose, onSuccess }) {
   const [articles, setArticles] = useState(group.items || []);
   const [selectedArticle, setSelectedArticle] = useState(null);
-  const [addonItems, setAddonItems] = useState(DEFAULT_ADDON_ITEMS);
-  const [addons, setAddons] = useState(DEFAULT_ADDON_ITEMS.map(n => ({ name: n, checked: false, price: "" })));
+  const [addonItems, setAddonItems] = useState([]);
+  const [addons, setAddons] = useState([]);
   const [msg, setMsg] = useState(null);
   const [saving, setSaving] = useState(false);
 
