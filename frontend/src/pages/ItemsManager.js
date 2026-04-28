@@ -338,8 +338,12 @@ export default function ItemsManager() {
   const searchGrouped = useMemo(() => buildGrouped(searchResults, advances), [searchResults, advances]);
 
   const refs = useMemo(() => {
-    const source = isSearchMode ? Object.values(searchGrouped) : Object.values(grouped);
-    const filtered = isSearchMode ? source : source.filter(g => {
+    // In search mode: get the unique matched refs, then resolve full group data from `grouped`
+    // so the order list shows the right refs but detail pane always gets complete items.
+    const source = isSearchMode
+      ? Object.keys(searchGrouped).map(ref => grouped[ref] || searchGrouped[ref])
+      : Object.values(grouped);
+    const filtered = isSearchMode ? source.filter(Boolean) : source.filter(g => {
       if (settleTab === "unsettled") return !isOrderSettled(g);
       if (settleTab === "settled")   return isOrderSettled(g) && g.totals.total > 0;
       if (settleTab === "awaiting")  return g.items.some(i => i.tailoring_status === "Awaiting Order");
@@ -351,7 +355,11 @@ export default function ItemsManager() {
     });
   }, [grouped, searchGrouped, isSearchMode, settleTab, sortDir]);
 
-  const selectedGroups = useMemo(() => refs.filter(g => selectedRefs.has(g.ref)), [refs, selectedRefs]);
+  // Always look up full group from `grouped` so detail pane shows complete order data
+  const selectedGroups = useMemo(
+    () => Array.from(selectedRefs).map(ref => grouped[ref]).filter(Boolean),
+    [selectedRefs, grouped]
+  );
 
   // Select / deselect
   const selectRef = (ref, multi = false) => {
