@@ -147,18 +147,25 @@ export default function Sidebar({ open, setOpen }) {
 
         {/* Logo */}
 
-        <div className={`border-b border-[var(--border-subtle)] flex items-center justify-between ${collapsed ? 'p-3' : 'p-5'}`}>
+        <div className={`border-b border-[var(--border-subtle)] flex items-center justify-between ${collapsed ? 'p-3' : 'px-4 py-3'}`}>
 
           <div className={`flex items-center gap-3 overflow-hidden ${collapsed ? 'justify-center w-full' : ''}`}>
 
-            <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center" style={{ background: firmLogo ? "transparent" : "var(--brand)", borderRadius: "6px" }}>
+            <div className={`flex-shrink-0 flex items-center justify-center ${collapsed ? 'w-9 h-9' : 'w-12 h-12'}`} style={{ background: firmLogo ? "transparent" : "var(--brand)", borderRadius: "8px" }}>
 
               {firmLogo
-                ? <img src={firmLogo.startsWith("http") ? firmLogo : `${BACKEND_URL}${firmLogo}`} alt="logo" className="w-full h-full object-contain" />
-                : <span className="w-full h-full flex items-center justify-center text-white font-serif font-bold text-lg leading-none">{firmName.charAt(0).toUpperCase()}</span>
+                ? <img src={firmLogo.startsWith("http") ? firmLogo : `${BACKEND_URL}${firmLogo}`} alt="logo" className="w-full h-full object-contain" style={{ borderRadius: "8px" }} />
+                : <span className="w-full h-full flex items-center justify-center text-white font-serif font-bold text-xl leading-none">{firmName.charAt(0).toUpperCase()}</span>
               }
 
             </div>
+
+            {!collapsed && (
+              <div className="overflow-hidden">
+                <p className="text-sm font-semibold text-[var(--text-primary)] leading-tight truncate">{firmName}</p>
+                <p className="text-[10px] text-[var(--text-secondary)] leading-tight mt-0.5">Retail Book</p>
+              </div>
+            )}
 
           </div>
 

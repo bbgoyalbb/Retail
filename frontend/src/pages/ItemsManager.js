@@ -716,21 +716,17 @@ export default function ItemsManager() {
                         ${isSelected ? "bg-[#C86B4D08] border-l-2 border-l-[var(--brand)]" : "hover:bg-[#C86B4D03] border-l-2 border-l-transparent"}`}
                       onClick={e => selectRef(group.ref, e.ctrlKey || e.metaKey || e.shiftKey)}
                     >
-                      <div className="flex items-center gap-1 px-2 py-2">
-                        {/* Date — fixed 68px */}
-                        <span className="font-mono text-[10px] text-[var(--text-secondary)] flex-shrink-0 w-[68px] text-center">{group.date || "—"}</span>
-                        {/* Name — fixed width, truncated */}
-                        <p className={`text-xs font-medium truncate flex-shrink-0 w-[90px] ${isCancelled ? "line-through text-[var(--text-secondary)]" : ""}`}>
+                      <div className="flex items-center gap-2 px-3 py-2.5">
+                        {/* Name — takes all available space */}
+                        <p className={`text-xs font-medium truncate flex-1 min-w-0 ${isCancelled ? "line-through text-[var(--text-secondary)]" : ""}`}>
                           {group.name}
                         </p>
-                        {/* Ref — fixed */}
-                        <span className="font-mono text-[10px] text-[var(--brand)] flex-shrink-0 w-[58px] truncate">{group.ref}</span>
-                        {/* Order no — fixed, fills gap */}
-                        <span className="font-mono text-[10px] text-[var(--text-secondary)] flex-shrink-0 w-[52px] truncate">
+                        {/* Ref */}
+                        <span className="font-mono text-[10px] text-[var(--brand)] flex-shrink-0 w-[64px] truncate text-right">{group.ref}</span>
+                        {/* Order no */}
+                        <span className="font-mono text-[10px] text-[var(--text-secondary)] flex-shrink-0 w-[44px] truncate text-right">
                           {orderNos.length > 0 ? `#${orderNos[0]}` : ""}
                         </span>
-                        {/* Spacer */}
-                        <div className="flex-1"/>
                         {/* Actions — always visible */}
                         <div className="flex items-center gap-0 flex-shrink-0" onClick={e => e.stopPropagation()}>
                           <button onClick={() => setTailoringGroup(group)} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E15] rounded-sm" title="Assign Tailoring"><Scissors size={11}/></button>
