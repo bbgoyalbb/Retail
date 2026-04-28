@@ -37,7 +37,6 @@ api.interceptors.response.use(
   }
 );
 
-export const seedData = () => api.post("/seed");
 export const getDashboard = () => api.get("/dashboard");
 let _customersCache = null;
 let _customersCacheTime = 0;
