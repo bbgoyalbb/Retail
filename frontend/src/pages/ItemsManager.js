@@ -10,7 +10,6 @@ import { DatePickerInput } from "@/components/DatePickerInput";
 import {
   PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle,
   CurrencyDollar, Scissors, Tag, MagnifyingGlass, SlidersHorizontal, Funnel,
-  FilePdf, CaretLeft,
 } from "@phosphor-icons/react";
 import InvoiceModal from "@/components/InvoiceModal";
 import SettlementPanel from "@/components/SettlementPanel";
@@ -146,7 +145,6 @@ const SEARCH_DATE_PRESETS = [
   { label: "Last Month",  from: new Date(new Date().getFullYear(), new Date().getMonth()-1, 1).toISOString().split("T")[0], to: new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().split("T")[0] },
   { label: "Last 90 Days",from: new Date(Date.now() - 89*86400000).toISOString().split("T")[0], to: new Date().toISOString().split("T")[0] },
 ];
-const SEARCH_PER_PAGE = 100;
 
 export default function ItemsManager() {
   const searchRef = useRef(null);
@@ -175,9 +173,6 @@ export default function ItemsManager() {
   const [searchCustomer, setSearchCustomer] = useState("All");
   const [customers, setCustomers]         = useState([]);
   const [searchResults, setSearchResults] = useState([]);
-  const [searchTotal, setSearchTotal]     = useState(0);
-  const [searchPage, setSearchPage]       = useState(0);
-  const [searchDone, setSearchDone]       = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
 
   // Panel state
@@ -244,11 +239,10 @@ export default function ItemsManager() {
   const hasAdvancedFilters = searchDateFrom || searchDateTo || searchStatus !== "All" || searchPayment !== "All" || searchMinAmt || searchMaxAmt || searchCustomer !== "All";
   const isSearchMode = !!(debouncedName || hasAdvancedFilters);
 
-  // Full-search via /search API
-  const runSearch = useCallback(async (page = 0) => {
+  // Full-search via /search API — fetches all matching items (up to 500)
+  const runSearch = useCallback(async () => {
     setSearchLoading(true);
-    setSearchPage(page);
-    const params = { q: debouncedName || "", limit: SEARCH_PER_PAGE, skip: page * SEARCH_PER_PAGE };
+    const params = { q: debouncedName || "", limit: 500, skip: 0 };
     if (searchCustomer !== "All") params.customer = searchCustomer;
     if (searchDateFrom) params.date_from = searchDateFrom;
     if (searchDateTo) params.date_to = searchDateTo;
@@ -259,16 +253,14 @@ export default function ItemsManager() {
     try {
       const res = await searchItems(params);
       setSearchResults(res.data.items || []);
-      setSearchTotal(res.data.total || 0);
-      setSearchDone(true);
-    } catch { setSearchResults([]); setSearchTotal(0); }
+    } catch { setSearchResults([]); }
     finally { setSearchLoading(false); }
   }, [debouncedName, searchCustomer, searchDateFrom, searchDateTo, searchStatus, searchPayment, searchMinAmt, searchMaxAmt]);
 
   // Auto-run search when search mode is active
   useEffect(() => {
-    if (isSearchMode) { runSearch(0); }
-    else { setSearchDone(false); setSearchResults([]); setSearchTotal(0); }
+    if (isSearchMode) { runSearch(); }
+    else { setSearchResults([]); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSearchMode, runSearch]);
 
@@ -276,7 +268,7 @@ export default function ItemsManager() {
     setNameFilter(""); setDebouncedName("");
     setSearchDateFrom(""); setSearchDateTo(""); setSearchStatus("All"); setSearchPayment("All");
     setSearchMinAmt(""); setSearchMaxAmt(""); setSearchCustomer("All");
-    setShowFilters(false); setSearchDone(false); setSearchResults([]); setSearchTotal(0);
+    setShowFilters(false); setSearchResults([]);
   };
 
   // Load data (grouped list mode)
@@ -310,10 +302,10 @@ export default function ItemsManager() {
     });
   };
 
-  // Group by ref
-  const grouped = useMemo(() => {
+  // Helper: build grouped map from a flat items array
+  const buildGrouped = (items, advList) => {
     const g = {};
-    allItems.forEach(item => {
+    items.forEach(item => {
       if (!g[item.ref]) g[item.ref] = {
         ref: item.ref, name: item.name, date: item.date, items: [],
         totals: { fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0, total: 0, received: 0, pending: 0 },
@@ -331,13 +323,16 @@ export default function ItemsManager() {
       if (!String(item.embroidery_pay_mode || "").startsWith("Settled")) gr.totals.pending += item.embroidery_pending || 0;
       if (!String(item.addon_pay_mode || "").startsWith("Settled"))      gr.totals.pending += item.addon_pending || 0;
     });
-    advances.forEach(adv => { if (g[adv.ref]) g[adv.ref].totals.advance += adv.amount || 0; });
+    advList.forEach(adv => { if (g[adv.ref]) g[adv.ref].totals.advance += adv.amount || 0; });
     return g;
-  }, [allItems, advances]);
+  };
+
+  const grouped = useMemo(() => buildGrouped(allItems, advances), [allItems, advances]);
+  const searchGrouped = useMemo(() => buildGrouped(searchResults, advances), [searchResults, advances]);
 
   const refs = useMemo(() => {
-    const all = Object.values(grouped);
-    const filtered = all.filter(g => {
+    const source = isSearchMode ? Object.values(searchGrouped) : Object.values(grouped);
+    const filtered = isSearchMode ? source : source.filter(g => {
       if (settleTab === "unsettled") return !isOrderSettled(g);
       if (settleTab === "settled")   return isOrderSettled(g) && g.totals.total > 0;
       if (settleTab === "awaiting")  return g.items.some(i => i.tailoring_status === "Awaiting Order");
@@ -347,7 +342,7 @@ export default function ItemsManager() {
       const cmp = String(a.date || "").localeCompare(String(b.date || ""));
       return sortDir === "desc" ? -cmp : cmp;
     });
-  }, [grouped, settleTab, sortDir]);
+  }, [grouped, searchGrouped, isSearchMode, settleTab, sortDir]);
 
   const selectedGroups = useMemo(() => refs.filter(g => selectedRefs.has(g.ref)), [refs, selectedRefs]);
 
@@ -645,98 +640,8 @@ export default function ItemsManager() {
         )}
       </div>
 
-      {/* ── SEARCH RESULTS (replaces body when search active) ── */}
-      {isSearchMode && (
-        <div className="flex-1 overflow-auto">
-          <div className="px-3 sm:px-4 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg)] flex items-center justify-between">
-            <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">
-              {searchLoading ? "Searching…" : `${searchTotal} result${searchTotal !== 1 ? "s" : ""}`}
-            </p>
-            {searchTotal > SEARCH_PER_PAGE && (
-              <div className="flex items-center gap-2">
-                <button onClick={() => runSearch(searchPage - 1)} disabled={searchPage === 0 || searchLoading}
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)] disabled:opacity-40"><CaretLeft size={11}/>Prev</button>
-                <span className="text-[10px] text-[var(--text-secondary)]">{searchPage + 1} / {Math.ceil(searchTotal / SEARCH_PER_PAGE)}</span>
-                <button onClick={() => runSearch(searchPage + 1)} disabled={(searchPage + 1) * SEARCH_PER_PAGE >= searchTotal || searchLoading}
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)] disabled:opacity-40">Next<CaretRight size={11}/></button>
-              </div>
-            )}
-          </div>
-          {searchDone && searchResults.length === 0 && (
-            <div className="py-16 text-center text-sm text-[var(--text-secondary)]">No results found</div>
-          )}
-          {searchResults.length > 0 && (
-            <>
-              {/* Mobile */}
-              <div className="md:hidden divide-y divide-[var(--border-subtle)]">
-                {searchResults.map((item, i) => (
-                  <div key={i} className="p-3 space-y-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-xs font-medium">{item.name}</p>
-                        <p className="font-mono text-[10px] text-[var(--text-secondary)]">{item.ref} · {item.date}</p>
-                      </div>
-                      <button onClick={() => setInvoiceRef(item.ref)} className="p-1.5 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm flex-shrink-0" title="Invoice"><FilePdf size={15}/></button>
-                    </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--text-secondary)]">
-                      {item.barcode && item.barcode !== "N/A" && <span>{item.barcode}</span>}
-                      {item.article_type && item.article_type !== "N/A" && <span>{item.article_type}</span>}
-                      <span className={`inline-flex items-center gap-1 text-xs ${item.payment_status === "Settled" ? "text-[var(--success)]" : "text-[var(--warning)]"}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${item.payment_status === "Settled" ? "bg-[var(--success)]" : "bg-[var(--warning)]"}`}/>
-                        {item.payment_status || "Pending"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {/* Desktop */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-[var(--bg)]">
-                      {["Date","Customer","Ref","Barcode","Amount","Article","Tailoring","Embroidery","Payment",""].map(h => (
-                        <th key={h} className="text-left px-3 py-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap border-b border-[var(--border-subtle)]">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {searchResults.map((item, i) => (
-                      <tr key={i} className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D04]">
-                        <td className="px-3 py-2 font-mono text-[10px] text-[var(--text-secondary)]">{item.date}</td>
-                        <td className="px-3 py-2 text-xs font-medium max-w-[140px] truncate">{item.name}</td>
-                        <td className="px-3 py-2 font-mono text-[10px] text-[var(--brand)]">{item.ref}</td>
-                        <td className="px-3 py-2 text-[10px] text-[var(--text-secondary)] max-w-[90px] truncate">{item.barcode !== "N/A" ? item.barcode : "—"}</td>
-                        <td className="px-3 py-2 font-mono text-xs text-right">₹{fmt(item.fabric_amount)}</td>
-                        <td className="px-3 py-2 text-xs">{item.article_type !== "N/A" ? item.article_type : "—"}</td>
-                        <td className="px-3 py-2 text-xs">
-                          <span className={item.tailoring_status === "Delivered" ? "text-[var(--success)]" : item.tailoring_status === "N/A" ? "text-[var(--text-secondary)]" : "text-[var(--warning)]"}
-                          >{item.tailoring_status}</span>
-                        </td>
-                        <td className="px-3 py-2 text-xs">
-                          <span className={item.embroidery_status === "Finished" ? "text-[var(--success)]" : item.embroidery_status === "N/A" || item.embroidery_status === "Not Required" ? "text-[var(--text-secondary)]" : "text-[var(--info)]"}
-                          >{item.embroidery_status}</span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className={`inline-flex items-center gap-1 text-xs ${item.payment_status === "Settled" ? "text-[var(--success)]" : "text-[var(--warning)]"}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${item.payment_status === "Settled" ? "bg-[var(--success)]" : "bg-[var(--warning)]"}`}/>
-                            {item.payment_status || "Pending"}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <button onClick={() => setInvoiceRef(item.ref)} className="p-1 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm" title="Invoice"><FilePdf size={14}/></button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── BODY (grouped list — hidden while search active) ── */}
-      <div className={`flex flex-1 min-h-0 overflow-hidden ${isSearchMode ? "hidden" : ""}`}>
+      {/* ── BODY ── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
 
         {/* Sidebar */}
         {sidebarOpen && (
@@ -767,7 +672,7 @@ export default function ItemsManager() {
 
           <div className="flex-shrink-0 px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg)] flex items-center justify-between">
             <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">
-              Orders <span className="font-mono ml-1">{refs.length}</span>
+              {isSearchMode ? "Search results" : "Orders"} <span className="font-mono ml-1">{searchLoading ? "…" : refs.length}</span>
             </p>
             {selectedRefs.size > 0 && (
               <button onClick={() => setSelectedRefs(new Set())} className="text-[10px] text-[var(--brand)] hover:underline">{selectedRefs.size} selected · clear</button>
@@ -781,7 +686,9 @@ export default function ItemsManager() {
 
             {!loading && refs.length === 0 && (
               <div className="py-14 px-4 text-center text-sm text-[var(--text-secondary)]">
-                {nameFilter ? "No orders match your search" : `No ${settleTab==="unsettled"?"pending":settleTab==="settled"?"settled":settleTab==="awaiting"?"awaiting tailoring":""} orders`}
+                {isSearchMode
+                  ? searchLoading ? "Searching…" : "No orders match your search"
+                  : `No ${settleTab==="unsettled"?"pending":settleTab==="settled"?"settled":settleTab==="awaiting"?"awaiting tailoring":""} orders`}
               </div>
             )}
 
