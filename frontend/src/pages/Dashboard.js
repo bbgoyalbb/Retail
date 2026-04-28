@@ -227,12 +227,12 @@ export default function Dashboard() {
               { label: "Embroidery", value: data.embroidery_pending_amount },
               { label: "Add-on", value: data.addon_pending_amount },
             ].map(({ label, value }) => (
-              <div key={label} className="flex items-center justify-between py-2.5 border-b border-[var(--border-subtle)]">
+              <div key={label} className="flex items-center justify-between py-2.5 border-b border-[var(--border-subtle)] last:border-0">
                 <span className="text-sm text-[var(--text-secondary)]">{label}</span>
                 <span className="font-mono text-sm font-medium text-[var(--warning)]">₹{fmt(value)}</span>
               </div>
             ))}
-            <div className="flex items-center justify-between py-2.5 border-b border-[var(--border-subtle)]">
+            <div className="flex items-center justify-between py-2.5">
               <span className="text-sm text-[var(--text-secondary)]">Advances Balance</span>
               <span className="font-mono text-sm font-medium text-[var(--success)]">₹{fmt(data.total_advances_amount)}</span>
             </div>

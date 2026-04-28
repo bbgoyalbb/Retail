@@ -25,7 +25,7 @@ export default function LabourPayments() {
     };
     getLabourItems(params)
       .then(res => setItems(res.data))
-      .catch(() => {});
+      .catch(err => setMessage({ type: "error", text: err.message || "Failed to load labour items" }));
   }, [filterType, filterKarigar, viewMode]);
 
   useEffect(() => {
@@ -80,7 +80,7 @@ export default function LabourPayments() {
       setSelected([]);
       loadData();
     } catch (err) {
-      setMessage({ type: "error", text: "Failed to process" });
+      setMessage({ type: "error", text: err.response?.data?.detail || err.message || "Failed to process payment" });
     } finally {
       setSaving(false);
     }

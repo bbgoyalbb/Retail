@@ -817,53 +817,59 @@ async def get_revenue_report(period: str = "daily", date_from: Optional[str] = N
     if date_to:
         match_query.setdefault("date", {})["$lte"] = date_to
 
-    pipeline = [
-        {"$match": match_query} if match_query else {"$match": {}},
-        {"$group": {
-            "_id": "$date",
-            "fabric_total": {"$sum": "$fabric_amount"},
-            "fabric_received": {"$sum": "$fabric_received"},
-            "tailoring_total": {"$sum": "$tailoring_amount"},
-            "tailoring_received": {"$sum": "$tailoring_received"},
-            "embroidery_total": {"$sum": "$embroidery_amount"},
-            "embroidery_received": {"$sum": "$embroidery_received"},
-            "addon_total": {"$sum": "$addon_amount"},
-            "count": {"$sum": 1},
-        }},
-        {"$sort": {"_id": 1}},
-    ]
+    _agg_fields = {
+        "fabric_total":        {"$sum": "$fabric_amount"},
+        "fabric_received":     {"$sum": "$fabric_received"},
+        "tailoring_total":     {"$sum": "$tailoring_amount"},
+        "tailoring_received":  {"$sum": "$tailoring_received"},
+        "embroidery_total":    {"$sum": "$embroidery_amount"},
+        "embroidery_received": {"$sum": "$embroidery_received"},
+        "addon_total":         {"$sum": "$addon_amount"},
+        "count":               {"$sum": 1},
+    }
 
-    daily = await db.items.aggregate(pipeline).to_list(1000)
-
+    # Push grouping into MongoDB for weekly/monthly — avoids fetching 1000 rows to Python
     if period == "weekly":
-        weekly = {}
-        for d in daily:
-            try:
-                dt = datetime.strptime(d["_id"], "%Y-%m-%d")
-                week_start = dt.strftime("%Y-W%W")
-                if week_start not in weekly:
-                    weekly[week_start] = {"_id": week_start, "fabric_total": 0, "fabric_received": 0, "tailoring_total": 0, "tailoring_received": 0, "embroidery_total": 0, "embroidery_received": 0, "addon_total": 0, "count": 0}
-                for k in ["fabric_total", "fabric_received", "tailoring_total", "tailoring_received", "embroidery_total", "embroidery_received", "addon_total", "count"]:
-                    weekly[week_start][k] += d[k]
-            except Exception:
-                pass
-        return list(weekly.values())
+        pipeline = [
+            {"$match": match_query} if match_query else {"$match": {}},
+            {"$addFields": {"_dt": {"$dateFromString": {"dateString": "$date", "onError": None}}}},
+            {"$match": {"_dt": {"$ne": None}}},
+            {"$group": {"_id": {"$dateToString": {"format": "%Y-W%V", "date": "$_dt"}}, **_agg_fields}},
+            {"$sort": {"_id": 1}},
+        ]
+        return await db.items.aggregate(pipeline).to_list(500)
 
     if period == "monthly":
-        monthly = {}
-        for d in daily:
-            month_key = d["_id"][:7] if d["_id"] else "unknown"
-            if month_key not in monthly:
-                monthly[month_key] = {"_id": month_key, "fabric_total": 0, "fabric_received": 0, "tailoring_total": 0, "tailoring_received": 0, "embroidery_total": 0, "embroidery_received": 0, "addon_total": 0, "count": 0}
-            for k in ["fabric_total", "fabric_received", "tailoring_total", "tailoring_received", "embroidery_total", "embroidery_received", "addon_total", "count"]:
-                monthly[month_key][k] += d[k]
-        return list(monthly.values())
+        pipeline = [
+            {"$match": match_query} if match_query else {"$match": {}},
+            {"$addFields": {"_dt": {"$dateFromString": {"dateString": "$date", "onError": None}}}},
+            {"$match": {"_dt": {"$ne": None}}},
+            {"$group": {"_id": {"$dateToString": {"format": "%Y-%m", "date": "$_dt"}}, **_agg_fields}},
+            {"$sort": {"_id": 1}},
+        ]
+        return await db.items.aggregate(pipeline).to_list(200)
 
-    return daily
+    # daily — group by date string directly (no parse needed)
+    pipeline = [
+        {"$match": match_query} if match_query else {"$match": {}},
+        {"$group": {"_id": "$date", **_agg_fields}},
+        {"$sort": {"_id": 1}},
+        {"$limit": 500},
+    ]
+    return await db.items.aggregate(pipeline).to_list(500)
 
 @router.get("/reports/customers")
-async def get_customer_report(current_user: dict = Depends(get_current_user_dep)):
-    pipeline = [
+async def get_customer_report(date_from: Optional[str] = None, date_to: Optional[str] = None, current_user: dict = Depends(get_current_user_dep)):
+    match_query = {}
+    if date_from:
+        match_query.setdefault("date", {})["$gte"] = date_from
+    if date_to:
+        match_query.setdefault("date", {})["$lte"] = date_to
+
+    pipeline = []
+    if match_query:
+        pipeline.append({"$match": match_query})
+    pipeline += [
         {"$group": {
             "_id": "$name",
             "total_fabric": {"$sum": "$fabric_amount"},

@@ -20,6 +20,8 @@ function StatusPill({ label, value, tone }) {
   );
 }
 
+const TODAY = new Date().toISOString().split("T")[0];
+
 export default function OrderStatus() {
   const [rows, setRows] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -49,6 +51,8 @@ export default function OrderStatus() {
       setRows(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       setRows([]);
+      setMessage({ type: "error", text: err.response?.data?.detail || err.message || "Failed to load orders" });
+      setTimeout(() => setMessage(null), 4000);
     } finally {
       setLoading(false);
     }
@@ -154,15 +158,25 @@ export default function OrderStatus() {
           <span className="ml-auto text-xs text-[var(--text-secondary)]">{loading ? "Loading..." : `${rows.length} orders`}</span>
         </div>
 
-        {/* Mobile card view */}
+        {/* Loading skeleton */}
+        {loading && (
+          <div className="p-4 space-y-2">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="h-10 bg-[var(--bg)] animate-pulse rounded-sm" />
+            ))}
+          </div>
+        )}
+
+      {/* Mobile card view */}
         <div className="md:hidden divide-y divide-[var(--border-subtle)]">
           {!loading && rows.length === 0 && (
             <p className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">No orders found.</p>
           )}
-          {rows.map((row) => {
+          {!loading && rows.map((row) => {
             const hasUndelivered = (row.tailoring_pending || 0) + (row.tailoring_stitched || 0) > 0;
+            const isOverdue = hasUndelivered && row.latest_delivery_date && row.latest_delivery_date !== "N/A" && row.latest_delivery_date < TODAY;
             return (
-              <div key={row._id || row.order_no} className="p-4 space-y-2">
+              <div key={row._id || row.order_no} className={`p-4 space-y-2 ${isOverdue ? "bg-[#9E473D08] border-l-2 border-l-[var(--error)]" : ""}`}>
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-sm font-semibold">{row.order_no || "-"}</span>
                   <span className="font-mono text-xs text-[var(--brand)]">₹{fmt(row.order_total || 0)}</span>
@@ -177,7 +191,7 @@ export default function OrderStatus() {
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)]">
                   <span>Bill: {row.latest_bill_date || "-"}</span>
-                  <span>Delivery: {row.latest_delivery_date && row.latest_delivery_date !== "N/A" ? row.latest_delivery_date : "-"}</span>
+                  <span className={isOverdue ? "text-[var(--error)] font-medium" : ""}>Delivery: {row.latest_delivery_date && row.latest_delivery_date !== "N/A" ? row.latest_delivery_date : "-"}{isOverdue ? " ⚠" : ""}</span>
                 </div>
                 {hasUndelivered && (
                   <button
@@ -230,10 +244,11 @@ export default function OrderStatus() {
                 </tr>
               )}
 
-              {rows.map((row) => {
+              {!loading && rows.map((row) => {
                 const hasUndelivered = (row.tailoring_pending || 0) + (row.tailoring_stitched || 0) > 0;
+                const isOverdue = hasUndelivered && row.latest_delivery_date && row.latest_delivery_date !== "N/A" && row.latest_delivery_date < TODAY;
                 return (
-                <tr key={row._id || row.order_no} className="border-t border-[var(--border-subtle)] align-top hover:bg-[#C86B4D06]">
+                <tr key={row._id || row.order_no} className={`border-t border-[var(--border-subtle)] align-top hover:bg-[#C86B4D06] ${isOverdue ? "bg-[#9E473D06] border-l-2 border-l-[var(--error)]" : ""}`}>
                   <td className="px-3 py-2 font-mono text-xs font-semibold sticky left-0 z-10 bg-[var(--surface)] border-r border-[var(--border-subtle)]">{row.order_no || "-"}</td>
                   <td className="px-3 py-2 text-xs">{(row.customers || []).join(", ") || "-"}</td>
                   <td className="px-3 py-2 text-xs">{(row.refs || []).join(", ") || "-"}</td>
@@ -254,7 +269,7 @@ export default function OrderStatus() {
                   </td>
                   <td className="px-3 py-2 font-mono text-xs">₹{fmt(row.order_total || 0)}</td>
                   <td className="px-3 py-2 font-mono text-xs">{row.latest_bill_date || "-"}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{row.latest_delivery_date && row.latest_delivery_date !== "N/A" ? row.latest_delivery_date : "-"}</td>
+                  <td className={`px-3 py-2 font-mono text-xs ${isOverdue ? "text-[var(--error)] font-semibold" : ""}`}>{row.latest_delivery_date && row.latest_delivery_date !== "N/A" ? row.latest_delivery_date : "-"}{isOverdue ? " ⚠" : ""}</td>
                   <td className="px-3 py-2">
                     {hasUndelivered && (
                       <button

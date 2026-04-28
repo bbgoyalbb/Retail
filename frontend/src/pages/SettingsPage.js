@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from "react";
-import { getSettings, updateSettings, uploadLogo, BACKEND_URL } from "@/api";
+import { getSettings, updateSettings, uploadLogo, invalidatePublicSettingsCache, BACKEND_URL } from "@/api";
 import { FloppyDisk, Plus, Trash, CheckCircle, Warning, Keyboard } from "@phosphor-icons/react";
 import { DEFAULT_NUM_SHORTCUTS } from "@/components/KeyboardShortcuts";
 
@@ -80,6 +80,7 @@ export default function SettingsPage() {
       const res = await updateSettings(settings);
       setSettings(res.data);
       setSavedSettings(res.data);
+      invalidatePublicSettingsCache();
       showMessage({ type: "success", text: "Settings saved successfully!" });
     } catch (err) {
       showMessage({ type: "error", text: err.message || "Failed to save settings" });
@@ -242,6 +243,7 @@ export default function SettingsPage() {
                           setSettings(updatedSettings);
                           await updateSettings(updatedSettings);
                           setSavedSettings(updatedSettings);
+                          invalidatePublicSettingsCache();
                           showMessage({ type: "success", text: "Logo uploaded and saved successfully!" });
                         } catch (err) {
                           showMessage({ type: "error", text: err.message || "Failed to upload logo" });

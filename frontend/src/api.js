@@ -145,7 +145,7 @@ export const getInvoiceUrl = (ref) => { const t = _authToken(); return `${BACKEN
 
 // Reports
 export const getRevenueReport = (params) => api.get("/reports/revenue", { params });
-export const getCustomerReport = () => api.get("/reports/customers");
+export const getCustomerReport = (params) => api.get("/reports/customers", { params });
 export const getSummaryReport = (params) => api.get("/reports/summary", { params });
 
 // Import / Export / Backup
@@ -159,7 +159,21 @@ export const normalizeDbData = (params) => api.post("/db/normalize", null, { par
 export const repairDbData = (params) => api.post("/db/repair", null, { params });
 
 // Settings
-export const getPublicSettings = () => api.get("/settings/public").then(r => r.data);
+let _publicSettingsCache = null;
+let _publicSettingsCacheTime = 0;
+const PUBLIC_SETTINGS_TTL = 120000; // 2 minutes
+export const getPublicSettings = () => {
+  const now = Date.now();
+  if (_publicSettingsCache && now - _publicSettingsCacheTime < PUBLIC_SETTINGS_TTL) {
+    return Promise.resolve(_publicSettingsCache);
+  }
+  return api.get("/settings/public").then(r => {
+    _publicSettingsCache = r.data;
+    _publicSettingsCacheTime = Date.now();
+    return r.data;
+  });
+};
+export const invalidatePublicSettingsCache = () => { _publicSettingsCache = null; };
 export const getSettings = () => api.get("/settings");
 export const updateSettings = (data) => api.put("/settings", data);
 export const uploadLogo = (formData) => api.post("/upload/logo", formData, {

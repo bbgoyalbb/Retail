@@ -89,9 +89,17 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
 
   const grandTotal = visibleEntries.reduce((s, e) => s + (e.total || 0), 0);
 
+  const NUMERIC_SORT_KEYS = new Set(["fabric", "tailoring", "embroidery", "addon", "advance", "total"]);
   const sorted = [...visibleEntries].sort((a, b) => {
-    let va = a[sortKey] ?? "";
-    let vb = b[sortKey] ?? "";
+    let va = a[sortKey];
+    let vb = b[sortKey];
+    if (NUMERIC_SORT_KEYS.has(sortKey)) {
+      const na = parseFloat(va) || 0;
+      const nb = parseFloat(vb) || 0;
+      return sortDir === "asc" ? na - nb : nb - na;
+    }
+    va = va ?? "";
+    vb = vb ?? "";
     if (typeof va === "number" && typeof vb === "number") {
       return sortDir === "asc" ? va - vb : vb - va;
     }
@@ -233,7 +241,7 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
                 <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Emb.</th>
                 <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Add-on</th>
                 <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Adv.</th>
-                <th className="px-2 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right">Total</th>
+                <th className="px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] text-right cursor-pointer hover:text-[var(--brand)] select-none whitespace-nowrap" onClick={() => handleSort("total")}>Total {sortKey === "total" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
               </tr>
             </thead>
             <tbody>

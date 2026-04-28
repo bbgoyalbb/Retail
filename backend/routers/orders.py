@@ -83,7 +83,12 @@ async def get_order_status(
         if es == "Required": g["emb_required"] += 1
         elif es == "In Progress": g["emb_in_progress"] += 1
         elif es == "Finished": g["emb_finished"] += 1
-        g["order_total"] += float(item.get("fabric_amount", 0))
+        g["order_total"] += (
+            float(item.get("fabric_amount", 0)) +
+            float(item.get("tailoring_amount", 0)) +
+            float(item.get("embroidery_amount", 0)) +
+            float(item.get("addon_amount", 0))
+        )
         d = item.get("date", "")
         if d and d > g["latest_bill_date"]: g["latest_bill_date"] = d
         dd = item.get("delivery_date", "")

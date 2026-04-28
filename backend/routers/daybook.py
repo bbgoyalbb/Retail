@@ -98,18 +98,22 @@ async def get_daybook(date_filter: Optional[str] = None, current_user: dict = De
 
 @router.get("/daybook/dates")
 async def get_daybook_dates(current_user: dict = Depends(get_current_user_dep)):
-    dates = set()
-    for field in ["fabric_pay_date", "tailoring_pay_date", "embroidery_pay_date", "addon_pay_date"]:
-        vals = await db.items.distinct(field)
-        for v in vals:
-            if v and v != "N/A":
-                dates.add(v)
-
-    adv_dates = await db.advances.distinct("date")
-    for v in adv_dates:
+    import asyncio
+    # Single aggregation: project all 4 pay-date fields into an array, unwind, group distinct values
+    pipeline = [
+        {"$project": {"dates": ["$fabric_pay_date", "$tailoring_pay_date", "$embroidery_pay_date", "$addon_pay_date"]}},
+        {"$unwind": "$dates"},
+        {"$match": {"dates": {"$nin": [None, "", "N/A"]}}},
+        {"$group": {"_id": "$dates"}},
+    ]
+    item_dates_res, adv_dates_res = await asyncio.gather(
+        db.items.aggregate(pipeline).to_list(2000),
+        db.advances.distinct("date"),
+    )
+    dates = set(r["_id"] for r in item_dates_res)
+    for v in adv_dates_res:
         if v:
             dates.add(v)
-
     return sorted(list(dates), reverse=True)
 
 @router.get("/daybook/pending-count")

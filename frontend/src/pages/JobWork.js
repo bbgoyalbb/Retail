@@ -162,8 +162,10 @@ export default function JobWork() {
     if (orderFilter !== "All") params.order_no = orderFilter;
     if (dateFilter !== "All") params.date_filter = dateFilter;
     if (deliveryFilter !== "All") params.delivery_filter = deliveryFilter;
-    getJobwork(params).then(res => setData(res.data)).catch(() => {});
-  }, [tab, orderFilter, dateFilter, deliveryFilter]);
+    getJobwork(params).then(res => setData(res.data)).catch(err => {
+      toast({ title: "Error", description: err.message || "Failed to load job work data", variant: "destructive" });
+    });
+  }, [tab, orderFilter, dateFilter, deliveryFilter, toast]);
 
   useEffect(() => { getJobworkFilters().then(res => setFilters(res.data)).catch(() => {}); }, []);
   useEffect(() => { loadData(); }, [loadData]);

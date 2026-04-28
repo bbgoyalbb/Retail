@@ -99,7 +99,7 @@ export default function NewBill() {
 
   const nameSuggestions = customerName.trim()
     ? customers.filter(c => c.toLowerCase().includes(customerName.trim().toLowerCase())).slice(0, 8)
-    : customers.slice(0, 8);
+    : customers.slice(0, 6);
 
   useEffect(() => {
     const handleClick = (e) => { if (nameWrapRef.current && !nameWrapRef.current.contains(e.target)) setShowSuggestions(false); };
@@ -660,7 +660,7 @@ export default function NewBill() {
 
           <div>
             <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Amount Received</label>
-            <input ref={amountRef} data-testid="amount-paid-input" type="number" value={amountPaid} onChange={e => setAmountPaid(e.target.value)} onKeyDown={e => enterNav(e, payDateRef)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" placeholder="Amount received" />
+            <input ref={amountRef} data-testid="amount-paid-input" type="number" min="0" value={amountPaid} onChange={e => setAmountPaid(e.target.value)} onKeyDown={e => enterNav(e, payDateRef)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" placeholder="Amount received" />
           </div>
 
           {amountPaid !== "" && (

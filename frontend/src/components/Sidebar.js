@@ -64,8 +64,9 @@ export default function Sidebar({ open, setOpen }) {
       }).catch(() => {});
     };
     fetchSettings();
-    window.addEventListener("focus", fetchSettings);
-    return () => window.removeEventListener("focus", fetchSettings);
+    const onFocus = () => fetchSettings();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, []);
 
   useEffect(() => {

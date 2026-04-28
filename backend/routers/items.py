@@ -55,7 +55,13 @@ async def update_item(item_id: str, req: ItemUpdateRequest, current_user: dict =
         new_fabric_amount = round((p - (p * d / 100)) * q, 0)
         update_fields["fabric_amount"] = new_fabric_amount
         fabric_received = update_fields.get("fabric_received", item.get("fabric_received", 0))
-        update_fields["fabric_pending"] = round(new_fabric_amount - (fabric_received or 0), 2)
+        new_pending = round(new_fabric_amount - (fabric_received or 0), 2)
+        update_fields["fabric_pending"] = new_pending
+        raw_mode = item.get("fabric_pay_mode", "")
+        clean_modes = [m.strip() for m in raw_mode.replace("Settled - ", "").replace("Settled", "").split(",") if m.strip() and m.strip() != "N/A"]
+        update_fields["fabric_pay_mode"] = build_payment_mode_label(
+            clean_modes or ["Cash"], new_pending, fabric_received or 0
+        )
 
     if update_fields:
         await db.items.update_one({"id": item_id}, {"$set": update_fields})
@@ -184,11 +190,11 @@ async def search_items(
         """Escape special regex characters to prevent ReDoS attacks."""
         return re.escape(pattern.strip()) if pattern else ""
     
-    query = {}
+    filters = []
 
     if q:
         escaped = safe_regex(q)
-        query["$or"] = [
+        filters.append({"$or": [
             {"name": {"$regex": escaped, "$options": "i"}},
             {"barcode": {"$regex": escaped, "$options": "i"}},
             {"ref": {"$regex": escaped, "$options": "i"}},
@@ -196,33 +202,40 @@ async def search_items(
             {"order_no": {"$regex": escaped, "$options": "i"}},
             {"karigar": {"$regex": escaped, "$options": "i"}},
             {"addon_desc": {"$regex": escaped, "$options": "i"}},
-        ]
+        ]})
 
     if customer and customer != "All":
-        query["name"] = customer
+        filters.append({"name": customer})
 
-    if date_from:
-        query.setdefault("date", {})["$gte"] = date_from
-    if date_to:
-        query.setdefault("date", {})["$lte"] = date_to
+    if date_from or date_to:
+        date_q = {}
+        if date_from:
+            date_q["$gte"] = date_from
+        if date_to:
+            date_q["$lte"] = date_to
+        filters.append({"date": date_q})
 
     if status and status != "All":
         if status in ["Pending", "Stitched", "Delivered", "Awaiting Order", "N/A"]:
-            query["tailoring_status"] = status
+            filters.append({"tailoring_status": status})
         elif status in ["Required", "In Progress", "Finished", "Not Required"]:
-            query["embroidery_status"] = status
+            filters.append({"embroidery_status": status})
 
     if payment_status and payment_status != "All":
         if payment_status == "Settled":
-            query["fabric_pay_mode"] = {"$regex": "^Settled"}
+            filters.append({"fabric_pay_mode": {"$regex": "^Settled"}})
         elif payment_status == "Pending":
-            query["fabric_pay_mode"] = {"$not": {"$regex": "^Settled"}}
-            query["fabric_amount"] = {"$gt": 0}
+            filters.append({"fabric_pay_mode": {"$not": {"$regex": "^Settled"}}, "fabric_amount": {"$gt": 0}})
 
-    if min_amount is not None:
-        query.setdefault("fabric_amount", {})["$gte"] = min_amount
-    if max_amount is not None:
-        query.setdefault("fabric_amount", {})["$lte"] = max_amount
+    if min_amount is not None or max_amount is not None:
+        amt_q = {}
+        if min_amount is not None:
+            amt_q["$gte"] = min_amount
+        if max_amount is not None:
+            amt_q["$lte"] = max_amount
+        filters.append({"fabric_amount": amt_q})
+
+    query = {"$and": filters} if len(filters) > 1 else (filters[0] if filters else {})
 
     items = await db.items.find(query, {"_id": 0}).sort("date", -1).skip(skip).limit(limit).to_list(limit)
     for item in items:

@@ -193,14 +193,20 @@ async def get_dashboard(current_user: dict = Depends(get_current_user_dep)):
         "overdue_orders": [{"$match": {"delivery_date": {"$lt": today, "$gt": ""}, "tailoring_status": {"$in": ["Pending", "Stitched"]}}}, {"$count": "n"}],
     }}]
 
+    cutoff_90d = (date.today() - timedelta(days=90)).isoformat()
     pipeline_recent = [
-        {"$sort": {"date": -1, "ref": -1}},
-        {"$group": {"_id": "$ref", "date": {"$first": "$date"}, "name": {"$first": "$name"},
-            "total": {"$sum": {"$add": ["$fabric_amount", "$tailoring_amount", "$embroidery_amount", "$addon_amount"]}},
-            "item_count": {"$sum": 1}}},
+        {"$match": {"date": {"$gte": cutoff_90d}}},  # use date index; covers any real "recent" scenario
+        {"$sort": {"date": -1, "_id": -1}},
+        {"$group": {
+            "_id": "$ref",
+            "date":       {"$first": "$date"},
+            "name":       {"$first": "$name"},
+            "total":      {"$sum": {"$add": ["$fabric_amount", "$tailoring_amount", "$embroidery_amount", "$addon_amount"]}},
+            "item_count": {"$sum": 1},
+        }},
         {"$sort": {"date": -1}},
         {"$limit": 10},
-        {"$project": {"_id": 0, "ref": "$_id", "date": 1, "name": 1, "total": 1, "item_count": 1}}
+        {"$project": {"_id": 0, "ref": "$_id", "date": 1, "name": 1, "total": 1, "item_count": 1}},
     ]
     pipeline_adv = [{"$facet": {
         "total_ct":  [{"$count": "n"}],
@@ -308,9 +314,6 @@ async def get_items(
                   "addon_desc", "karigar"]:
             projection[f] = 1
 
-    if summary:
-        items = await db.items.find(query, projection).sort("date", -1).skip(skip).limit(limit).to_list(limit)
-        return {"items": items, "total": len(items)}
     items, total = await asyncio.gather(
         db.items.find(query, projection).sort("date", -1).skip(skip).limit(limit).to_list(limit),
         db.items.count_documents(query),

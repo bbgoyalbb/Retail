@@ -201,6 +201,8 @@ async def startup_db_client():
     await db.items.create_index("tailoring_pay_date",   background=True)
     await db.items.create_index("embroidery_pay_date",  background=True)
     await db.items.create_index("addon_pay_date",       background=True)
+    await db.items.create_index("delivery_date",        background=True)
+    await db.items.create_index([("delivery_date", ASCENDING), ("tailoring_status", ASCENDING)], background=True)
 
     # _id index is automatic — no explicit creation needed for counters
     await db.advances.create_index("id",  unique=True, background=True)

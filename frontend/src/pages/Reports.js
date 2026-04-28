@@ -83,7 +83,7 @@ export default function Reports() {
         const [revenueRes, summaryRes, customerRes] = await Promise.all([
           getRevenueReport(params),
           getSummaryReport(params),
-          getCustomerReport()
+          getCustomerReport(params),
         ]);
         setRevenueData(revenueRes.data);
         setSummary(summaryRes.data);
@@ -242,8 +242,31 @@ export default function Reports() {
       {/* Customers Tab */}
       {tab === "customers" && (
         <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm">
-          <div className="p-4 border-b border-[var(--border-subtle)]">
+          <div className="p-4 border-b border-[var(--border-subtle)] space-y-3">
             <h3 className="font-heading text-base font-medium">Customer Revenue Ranking</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {DATE_PRESETS.map(p => (
+                <button key={p.label} onClick={() => { setDateFrom(p.from); setDateTo(p.to); }}
+                  className={`px-3 py-1 text-xs font-medium rounded-sm border transition-colors ${
+                    dateFrom === p.from && dateTo === p.to
+                      ? 'bg-[var(--brand)] text-white border-[var(--brand)]'
+                      : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]'
+                  }`}>{p.label}</button>
+              ))}
+              {(dateFrom || dateTo) && (
+                <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+                  className="px-3 py-1 text-xs font-medium rounded-sm border border-[var(--border-subtle)] text-[var(--error)] hover:bg-[#9E473D08]">Clear</button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-3 items-center">
+              <DatePickerInput value={dateFrom} onChange={setDateFrom} placeholder="From date" />
+              <DatePickerInput value={dateTo} onChange={setDateTo} placeholder="To date" />
+              {(dateFrom || dateTo) && (
+                <span className="text-xs text-[var(--text-secondary)]">
+                  Showing: {dateFrom || "all"} → {dateTo || "all"}
+                </span>
+              )}
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full" data-testid="customer-report-table">
