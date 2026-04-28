@@ -55,7 +55,7 @@ async def update_item(item_id: str, req: ItemUpdateRequest, current_user: dict =
         new_fabric_amount = round((p - (p * d / 100)) * q, 0)
         update_fields["fabric_amount"] = new_fabric_amount
         fabric_received = update_fields.get("fabric_received", item.get("fabric_received", 0))
-        new_pending = round(new_fabric_amount - (fabric_received or 0), 2)
+        new_pending = round(new_fabric_amount - (fabric_received or 0), 0)
         update_fields["fabric_pending"] = new_pending
         raw_mode = item.get("fabric_pay_mode", "")
         clean_modes = [m.strip() for m in raw_mode.replace("Settled - ", "").replace("Settled", "").split(",") if m.strip() and m.strip() != "N/A"]

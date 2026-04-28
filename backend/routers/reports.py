@@ -220,7 +220,7 @@ async def generate_invoice(request: Request, ref_id: str = Query(..., alias="ref
                 gst  = round(total_with_gst - base, 2)
                 disc_str = f"₹{fmt(disc_amt)}" if disc_pct > 0 else "—"
                 desc = f'<div class="sec-barcode">{item.get("barcode","N/A")}</div>'
-                cols = [desc, f"{qty:.2f}", f"₹{fmt(price)}", f"{disc_pct:.0f}%", disc_str, f"₹{fmt(base)}", f"₹{fmt(gst)}", f"₹{fmt(total_with_gst)}"]
+                cols = [desc, f"{qty:.2f}", f"₹{fmt(price)}", f"{disc_pct:.0f}%", disc_str, f"₹{fmt(base)}", f"₹{fmt(gst)}", f"₹{fmt(amt)}"]
             elif section_label == "Tailoring":
                 tail_amt = float(item.get("tailoring_amount", 0))
                 gst = 0.0
@@ -250,7 +250,7 @@ async def generate_invoice(request: Request, ref_id: str = Query(..., alias="ref
             if section_label == "Fabric":
                 sub_base += base
                 sub_disc += disc_amt
-                sub_amt += total_with_gst  # use original to avoid rounding drift
+                sub_amt += amt  # use stored DB fabric_amount to match grand total source
             else:
                 sub_base += base
                 sub_disc += 0
@@ -279,6 +279,8 @@ async def generate_invoice(request: Request, ref_id: str = Query(..., alias="ref
 
         if label == "Fabric":
             # Fabric: base = price*qty - disc (GST-exclusive), GST col, Total col
+            # Recompute sub_gst from sub_amt (DB value) so base+gst=total exactly
+            sub_gst = round(sub_amt - sub_base, 2)
             headers = ["Article / Barcode", "Qty (m)", "Rate", "Disc %", "Disc Amt", f"Base (excl GST {int(GST_RATE)}%)", f"GST {int(GST_RATE)}%", "Total"]
             th_row = "".join(f'<th{"" if i==0 else " class=\"r\""} >{h}</th>' for i, h in enumerate(headers))
             sub_tds = f'<td class="subtd" colspan="4">Subtotal ({len(items_list)} articles)</td><td class="subtd r">₹{fmt(sub_disc)}</td><td class="subtd r">₹{fmt(sub_base)}</td><td class="subtd r">₹{fmt(sub_gst)}</td><td class="subtd r">₹{fmt(sub_amt)}</td>'
@@ -825,6 +827,7 @@ async def get_revenue_report(period: str = "daily", date_from: Optional[str] = N
         "embroidery_total":    {"$sum": "$embroidery_amount"},
         "embroidery_received": {"$sum": "$embroidery_received"},
         "addon_total":         {"$sum": "$addon_amount"},
+        "addon_received":      {"$sum": "$addon_received"},
         "count":               {"$sum": 1},
     }
 
@@ -873,8 +876,13 @@ async def get_customer_report(date_from: Optional[str] = None, date_to: Optional
         {"$group": {
             "_id": "$name",
             "total_fabric": {"$sum": "$fabric_amount"},
-            "total_received": {"$sum": "$fabric_received"},
-            "total_pending_raw": {"$sum": {"$cond": [{"$not": [{"$regexMatch": {"input": {"$ifNull": ["$fabric_pay_mode", ""]}, "regex": "^Settled"}}]}, "$fabric_pending", 0]}},
+            "total_received": {"$sum": {"$add": ["$fabric_received", "$tailoring_received", "$embroidery_received", "$addon_received"]}},
+            "total_pending_raw": {"$sum": {"$add": [
+                {"$cond": [{"$not": [{"$regexMatch": {"input": {"$ifNull": ["$fabric_pay_mode",     ""]}, "regex": "^Settled"}}]}, "$fabric_pending",     0]},
+                {"$cond": [{"$not": [{"$regexMatch": {"input": {"$ifNull": ["$tailoring_pay_mode",  ""]}, "regex": "^Settled"}}]}, "$tailoring_pending",  0]},
+                {"$cond": [{"$not": [{"$regexMatch": {"input": {"$ifNull": ["$embroidery_pay_mode", ""]}, "regex": "^Settled"}}]}, "$embroidery_pending", 0]},
+                {"$cond": [{"$not": [{"$regexMatch": {"input": {"$ifNull": ["$addon_pay_mode",      ""]}, "regex": "^Settled"}}]}, "$addon_pending",      0]},
+            ]}},
             "total_tailoring": {"$sum": "$tailoring_amount"},
             "items_count": {"$sum": 1},
             "refs": {"$addToSet": "$ref"},
@@ -887,7 +895,7 @@ async def get_customer_report(date_from: Optional[str] = None, date_to: Optional
             "name": r["_id"],
             "total_fabric": r["total_fabric"],
             "total_received": r["total_received"],
-            "total_pending": max(0, r["total_pending_raw"]),
+            "total_pending": r["total_pending_raw"],
             "total_tailoring": r["total_tailoring"],
             "items_count": r["items_count"],
             "refs_count": len(r["refs"]),
@@ -924,7 +932,10 @@ async def get_summary_report(date_from: Optional[str] = None, date_to: Optional[
             "embroidery_pending": [{"$match": {"embroidery_pay_mode": _ns}}, {"$group": {"_id": None, "v": {"$sum": "$embroidery_pending"}}}],
             "addon_pending":      [{"$match": {"addon_pay_mode":      _ns}}, {"$group": {"_id": None, "v": {"$sum": "$addon_pending"}}}],
             "article_types":      [{"$match": {"article_type": {"$nin": ["N/A", "", None]}}}, {"$group": {"_id": "$article_type", "count": {"$sum": 1}}}],
-            "mode_counts":        [{"$match": {"fabric_pay_mode": {"$regex": "^Settled"}}}, {"$group": {"_id": "$fabric_pay_mode", "amount": {"$sum": "$fabric_received"}}}],
+            "mode_counts_fab":  [{"$match": {"fabric_pay_mode":     {"$regex": "^Settled"}}}, {"$group": {"_id": "$fabric_pay_mode",     "amount": {"$sum": "$fabric_received"}}}],
+            "mode_counts_tail": [{"$match": {"tailoring_pay_mode":  {"$regex": "^Settled"}}}, {"$group": {"_id": "$tailoring_pay_mode",  "amount": {"$sum": "$tailoring_received"}}}],
+            "mode_counts_emb":  [{"$match": {"embroidery_pay_mode": {"$regex": "^Settled"}}}, {"$group": {"_id": "$embroidery_pay_mode", "amount": {"$sum": "$embroidery_received"}}}],
+            "mode_counts_ao":   [{"$match": {"addon_pay_mode":      {"$regex": "^Settled"}}}, {"$group": {"_id": "$addon_pay_mode",      "amount": {"$sum": "$addon_received"}}}],
         }}
     ]
     import asyncio
@@ -935,16 +946,17 @@ async def get_summary_report(date_from: Optional[str] = None, date_to: Optional[
     r = res_list[0] if res_list else {}
     t = r.get("totals", [{}])[0] if r.get("totals") else {}
 
-    # Parse mode_counts from aggregated fabric_pay_mode labels
+    # Parse mode_counts from all 4 settled categories
     mode_counts = {}
-    for entry in r.get("mode_counts", []):
-        label = entry.get("_id", "") or ""
-        amount = entry.get("amount", 0)
-        parts = label.replace("Settled - ", "").split(", ")
-        for p in parts:
-            p = p.strip()
-            if p:
-                mode_counts[p] = mode_counts.get(p, 0) + amount
+    for bucket in ["mode_counts_fab", "mode_counts_tail", "mode_counts_emb", "mode_counts_ao"]:
+        for entry in r.get(bucket, []):
+            label = entry.get("_id", "") or ""
+            amount = entry.get("amount", 0)
+            parts = label.replace("Settled - ", "").split(", ")
+            for p in parts:
+                p = p.strip()
+                if p:
+                    mode_counts[p] = mode_counts.get(p, 0) + amount
 
     return {
         "total_fabric":              t.get("total_fabric", 0),

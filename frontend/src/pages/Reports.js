@@ -201,7 +201,7 @@ export default function Reports() {
           </div>
 
           <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
-            <h3 className="font-heading text-base font-medium mb-4">Fabric Sales Over Time</h3>
+            <h3 className="font-heading text-base font-medium mb-4">Fabric Revenue Over Time</h3>
             {!loading && revenueData.length === 0 && (
               <div className="p-8 text-center text-sm text-[var(--text-secondary)]">
                 No data available for selected period

@@ -178,16 +178,16 @@ async def get_dashboard(current_user: dict = Depends(get_current_user_dep)):
         "tail_pending": [{"$match": {"tailoring_amount":  {"$gt": 0}, "tailoring_pay_mode":  _ns}}, {"$group": {"_id": None, "t": {"$sum": "$tailoring_pending"}}}],
         "emb_pending":  [{"$match": {"embroidery_amount": {"$gt": 0}, "embroidery_pay_mode": _ns}}, {"$group": {"_id": None, "t": {"$sum": "$embroidery_pending"}}}],
         "addon_pending":[{"$match": {"addon_amount":      {"$gt": 0}, "addon_pay_mode":      _ns}}, {"$group": {"_id": None, "t": {"$sum": "$addon_pending"}}}],
-        "revenue":      [{"$group": {"_id": None, "t": {"$sum": "$fabric_received"}}}],
+        "revenue":      [{"$group": {"_id": None, "t": {"$sum": {"$add": ["$fabric_received", "$tailoring_received", "$embroidery_received", "$addon_received"]}}}}],
         "tail_pend_ct": [{"$match": {"tailoring_status": "Pending"}},     {"$count": "n"}],
         "tail_stit_ct": [{"$match": {"tailoring_status": "Stitched"}},    {"$count": "n"}],
         "emb_req_ct":   [{"$match": {"embroidery_status": "Required"}},   {"$count": "n"}],
         "emb_prog_ct":  [{"$match": {"embroidery_status": "In Progress"}},{"$count": "n"}],
-        "trend":        [{"$match": {"date": {"$in": days}}}, {"$group": {"_id": "$date", "t": {"$sum": "$fabric_received"}}}],
+        "trend":        [{"$match": {"date": {"$in": days}}}, {"$group": {"_id": "$date", "t": {"$sum": {"$add": ["$fabric_received", "$tailoring_received", "$embroidery_received", "$addon_received"]}}}}],
         "customers":    [{"$group": {"_id": "$name"}}],
         "total_ct":     [{"$count": "n"}],
         "today_refs":   [{"$match": {"date": today}}, {"$group": {"_id": "$ref"}}],
-        "today_collected": [{"$match": {"date": today}}, {"$group": {"_id": None,
+        "today_collected_items": [{"$match": {"date": today}}, {"$group": {"_id": None,
             "t": {"$sum": {"$add": ["$fabric_received", "$tailoring_received", "$embroidery_received", "$addon_received"]}}
         }}],
         "overdue_orders": [{"$match": {"delivery_date": {"$lt": today, "$gt": ""}, "tailoring_status": {"$in": ["Pending", "Stitched"]}}}, {"$count": "n"}],
@@ -213,11 +213,18 @@ async def get_dashboard(current_user: dict = Depends(get_current_user_dep)):
         "total_amt": [{"$group": {"_id": None, "t": {"$sum": "$amount"}}}],
     }}]
 
-    # Run all 3 aggregations concurrently
-    facet_res, recent_items, adv_res = await asyncio.gather(
+    pipeline_today_adv = [{
+        "$match": {"date": today, "amount": {"$gt": 0}}
+    }, {
+        "$group": {"_id": None, "t": {"$sum": "$amount"}}
+    }]
+
+    # Run all aggregations concurrently
+    facet_res, recent_items, adv_res, today_adv_res = await asyncio.gather(
         db.items.aggregate(facet_pipeline).to_list(1),
         db.items.aggregate(pipeline_recent).to_list(10),
         db.advances.aggregate(pipeline_adv).to_list(1),
+        db.advances.aggregate(pipeline_today_adv).to_list(1),
     )
 
     f = facet_res[0] if facet_res else {}
@@ -242,7 +249,7 @@ async def get_dashboard(current_user: dict = Depends(get_current_user_dep)):
         "total_revenue":             f["revenue"][0]["t"]       if f.get("revenue")      else 0,
         "total_advances_amount":     a["total_amt"][0]["t"]    if a.get("total_amt")    else 0,
         "today_bills_count":         len(f.get("today_refs", [])),
-        "today_collected":           f["today_collected"][0]["t"] if f.get("today_collected") else 0,
+        "today_collected":           (f["today_collected_items"][0]["t"] if f.get("today_collected_items") else 0) + (today_adv_res[0]["t"] if today_adv_res else 0),
         "overdue_orders_count":      f["overdue_orders"][0]["n"]  if f.get("overdue_orders")  else 0,
         "recent_items":              recent_items,
     }
@@ -451,10 +458,12 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
     modes_str = ", ".join(req.payment_modes) if req.payment_modes else "Cash"
     tailoring_status = "Awaiting Order" if req.needs_tailoring else "N/A"
 
-    grand_total = 0
+    fabric_only_total = 0
+    addon_only_total = 0
     for item in req.items:
-        discounted_price = round(item.price - (item.price * item.discount / 100), 0)
-        grand_total += round(discounted_price * item.qty, 0)
+        fabric_only_total += round((item.price - item.price * item.discount / 100) * item.qty, 0)
+        addon_only_total += round(sum(float(a.get("price", 0)) for a in (item.addons or [])), 0)
+    grand_total = fabric_only_total + addon_only_total
 
     # No hard block: amount_paid may be less than, equal to, or greater than grand_total.
     # Any amount received marks the section as Settled; pending stores the actual difference.
@@ -464,8 +473,7 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
     running_discount = 0
 
     for idx, item in enumerate(req.items):
-        discounted_price = round(item.price - (item.price * item.discount / 100), 0)
-        item_total = round(discounted_price * item.qty, 0)
+        item_total = round((item.price - item.price * item.discount / 100) * item.qty, 0)
 
         # Resolve per-item tailoring fields sent from NewBill frontend
         item_article_type  = item.article_type    or "N/A"
@@ -488,15 +496,22 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
         effective_settled = req.is_settled and req.amount_paid > 0
 
         if effective_settled:
-            total_diff = grand_total - req.amount_paid
+            # Pro-rata fabric payment only over fabric_only_total (addons handled separately below)
+            fabric_diff = fabric_only_total - req.amount_paid
             if idx == len(req.items) - 1:
-                item_discount = total_diff - running_discount
+                item_discount = fabric_diff - running_discount
                 item_paid = req.amount_paid - running_paid
             else:
-                item_discount = round(item_total * (total_diff / grand_total), 0) if grand_total > 0 else 0
-                item_paid = round(item_total * (req.amount_paid / grand_total), 0) if grand_total > 0 else 0
+                item_discount = round(item_total * (fabric_diff / fabric_only_total), 0) if fabric_only_total > 0 else 0
+                item_paid = round(item_total * (req.amount_paid / fabric_only_total), 0) if fabric_only_total > 0 else 0
                 running_discount += item_discount
                 running_paid += item_paid
+
+            # Settle addon section too when the bill is being settled at creation
+            eff_addon_pay_mode = f"Settled - {modes_str}" if item_addon_amount > 0 else "N/A"
+            eff_addon_pay_date = req.payment_date if item_addon_amount > 0 else "N/A"
+            eff_addon_received = item_addon_amount
+            eff_addon_pending  = 0
 
             doc = {
                 "id": str(uuid.uuid4()),
@@ -532,10 +547,10 @@ async def create_bill(req: CreateBillRequest, current_user: dict = Depends(get_c
                 "embroidery_pay_date": "N/A",
                 "embroidery_received": 0,
                 "embroidery_pending": 0,
-                "addon_pay_mode": item_addon_pay_mode,
-                "addon_pay_date": "N/A",
-                "addon_received": 0,
-                "addon_pending": item_addon_pending,
+                "addon_pay_mode": eff_addon_pay_mode,
+                "addon_pay_date": eff_addon_pay_date,
+                "addon_received": eff_addon_received,
+                "addon_pending": eff_addon_pending,
                 "karigar": "N/A",
                 "tally_fabric": False,
                 "tally_tailoring": False,

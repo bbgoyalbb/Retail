@@ -11,10 +11,13 @@ export const DEFAULT_NUM_SHORTCUTS = [
   { key: "7", path: "/settings",    desc: "Settings" },
 ];
 
-const FIXED_SHORTCUTS = [
-  { keys: "Ctrl + K", desc: "Manage Orders" },
-  { keys: "Ctrl + N", desc: "New Bill" },
-  { keys: "Ctrl + D", desc: "Dashboard" },
+export const DEFAULT_LETTER_SHORTCUTS = [
+  { key: "k", path: "/items",    desc: "Manage Orders" },
+  { key: "n", path: "/new-bill", desc: "New Bill" },
+  { key: "d", path: "/",         desc: "Dashboard" },
+];
+
+const STATIC_SHORTCUTS = [
   { keys: "Ctrl + S", desc: "Save Bill (on New Bill page)" },
   { keys: "?",        desc: "Show this help" },
   { keys: "Esc",      desc: "Close modals / dialogs" },
@@ -28,13 +31,25 @@ function loadNumShortcuts() {
   return DEFAULT_NUM_SHORTCUTS;
 }
 
+export function loadLetterShortcuts() {
+  try {
+    const raw = localStorage.getItem("keyboard_letter_shortcuts");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return DEFAULT_LETTER_SHORTCUTS;
+}
+
 export function KeyboardShortcuts() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [numShortcuts, setNumShortcuts] = useState(loadNumShortcuts);
+  const [letterShortcuts, setLetterShortcuts] = useState(loadLetterShortcuts);
 
   useEffect(() => {
-    const onStorage = () => setNumShortcuts(loadNumShortcuts());
+    const onStorage = () => {
+      setNumShortcuts(loadNumShortcuts());
+      setLetterShortcuts(loadLetterShortcuts());
+    };
     window.addEventListener("shortcuts:updated", onStorage);
     return () => window.removeEventListener("shortcuts:updated", onStorage);
   }, []);
@@ -48,14 +63,16 @@ export function KeyboardShortcuts() {
       if (!isInput && e.key === "?") { setOpen(o => !o); return; }
       if (isInput) return;
 
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); navigate("/items"); }
-      if ((e.ctrlKey || e.metaKey) && e.key === "n") { e.preventDefault(); navigate("/new-bill"); }
-      if ((e.ctrlKey || e.metaKey) && e.key === "d") { e.preventDefault(); navigate("/"); }
-
       if ((e.ctrlKey || e.metaKey) && e.key >= "1" && e.key <= "9") {
         e.preventDefault();
         const sc = numShortcuts.find(s => s.key === e.key);
         if (sc?.path) navigate(sc.path);
+        return;
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        const sc = letterShortcuts.find(s => s.key === e.key);
+        if (sc?.path) { e.preventDefault(); navigate(sc.path); }
       }
     };
 
@@ -63,7 +80,7 @@ export function KeyboardShortcuts() {
     window.addEventListener("keydown", onKey);
     window.addEventListener("shortcuts:open", onOpen);
     return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("shortcuts:open", onOpen); };
-  }, [navigate, numShortcuts]);
+  }, [navigate, numShortcuts, letterShortcuts]);
 
   if (!open) return null;
 
@@ -75,7 +92,14 @@ export function KeyboardShortcuts() {
           <button onClick={() => setOpen(false)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-lg leading-none">✕</button>
         </div>
         <div className="space-y-1.5 max-h-80 overflow-y-auto">
-          {FIXED_SHORTCUTS.map(s => (
+          <p className="text-[9px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] pb-0.5">Letter shortcuts (Ctrl + key)</p>
+          {letterShortcuts.map(s => (
+            <div key={s.key} className="flex items-center justify-between gap-4 py-1">
+              <span className="text-xs text-[var(--text-secondary)]">{s.desc}</span>
+              <kbd className="flex-shrink-0 px-2 py-0.5 text-[10px] border border-[var(--border-subtle)] rounded bg-[var(--bg)] font-mono text-[var(--text-primary)]">Ctrl + {s.key.toUpperCase()}</kbd>
+            </div>
+          ))}
+          {STATIC_SHORTCUTS.map(s => (
             <div key={s.keys} className="flex items-center justify-between gap-4 py-1">
               <span className="text-xs text-[var(--text-secondary)]">{s.desc}</span>
               <kbd className="flex-shrink-0 px-2 py-0.5 text-[10px] border border-[var(--border-subtle)] rounded bg-[var(--bg)] font-mono text-[var(--text-primary)]">{s.keys}</kbd>

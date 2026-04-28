@@ -54,19 +54,23 @@ export default function Sidebar({ open, setOpen }) {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [daybookPending, setDaybookPending] = useState(0);
   const [firmLogo, setFirmLogo] = useState(null);
+  const [firmLogoDark, setFirmLogoDark] = useState(null);
   const [firmName, setFirmName] = useState("Retail Book");
 
   useEffect(() => {
     const fetchSettings = () => {
       getPublicSettings().then(s => {
         setFirmLogo(s?.firm_logo || null);
+        setFirmLogoDark(s?.firm_logo_dark || null);
         if (s?.firm_name) setFirmName(s.firm_name);
       }).catch(() => {});
     };
     fetchSettings();
     const onFocus = () => fetchSettings();
+    const onSettingsUpdated = () => fetchSettings();
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    window.addEventListener("settings:updated", onSettingsUpdated);
+    return () => { window.removeEventListener("focus", onFocus); window.removeEventListener("settings:updated", onSettingsUpdated); };
   }, []);
 
   useEffect(() => {
@@ -152,12 +156,12 @@ export default function Sidebar({ open, setOpen }) {
 
           <div className={`flex items-center gap-2.5 overflow-hidden ${collapsed ? 'justify-center w-full' : ''}`}>
 
-            <div className={`flex-shrink-0 flex items-center justify-center ${collapsed ? 'w-9 h-9' : 'w-[68px] h-[68px]'}`} style={{ background: firmLogo ? "transparent" : "var(--brand)", borderRadius: "8px" }}>
+            <div className={`flex-shrink-0 flex items-center justify-center ${collapsed ? 'w-9 h-9' : 'w-[68px] h-[68px]'}`} style={{ background: (theme === 'dark' ? firmLogoDark || firmLogo : firmLogo) ? "transparent" : "var(--brand)", borderRadius: "8px" }}>
 
-              {firmLogo
-                ? <img src={firmLogo.startsWith("http") ? firmLogo : `${BACKEND_URL}${firmLogo}`} alt="logo" className="w-full h-full object-contain" style={{ borderRadius: "8px" }} />
-                : <span className="w-full h-full flex items-center justify-center text-white font-serif font-bold text-xl leading-none">{firmName.charAt(0).toUpperCase()}</span>
-              }
+              {(() => { const src = theme === 'dark' ? (firmLogoDark || firmLogo) : firmLogo; return src
+                ? <img src={src.startsWith("http") ? src : `${BACKEND_URL}${src}`} alt="logo" className="w-full h-full object-contain" style={{ borderRadius: "8px" }} />
+                : <span className="w-full h-full flex items-center justify-center text-white font-serif font-bold text-xl leading-none">{firmName.charAt(0).toUpperCase()}</span>;
+              })()}
 
             </div>
 

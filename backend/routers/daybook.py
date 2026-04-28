@@ -119,19 +119,26 @@ async def get_daybook_dates(current_user: dict = Depends(get_current_user_dep)):
 @router.get("/daybook/pending-count")
 async def get_daybook_pending_count(current_user: dict = Depends(get_current_user_dep)):
     """Return the number of untallied payment entries for today."""
+    import asyncio
     today = date.today().isoformat()
-    categories = [
-        ("fabric_pay_date",     "tally_fabric"),
-        ("tailoring_pay_date",  "tally_tailoring"),
-        ("embroidery_pay_date", "tally_embroidery"),
-        ("addon_pay_date",      "tally_addon"),
-    ]
-    count = 0
-    for date_field, tally_field in categories:
-        n = await db.items.count_documents({date_field: today, tally_field: {"$ne": True}})
-        count += n
-    adv_count = await db.advances.count_documents({"date": today, "tally": {"$ne": True}})
-    count += adv_count
+    facet_pipeline = [{"$facet": {
+        "fab":  [{"$match": {"fabric_pay_date":     today, "fabric_received":     {"$gt": 0}, "tally_fabric":     {"$ne": True}}}, {"$count": "n"}],
+        "tail": [{"$match": {"tailoring_pay_date":  today, "tailoring_received":  {"$gt": 0}, "tally_tailoring":  {"$ne": True}}}, {"$count": "n"}],
+        "emb":  [{"$match": {"embroidery_pay_date": today, "embroidery_received": {"$gt": 0}, "tally_embroidery": {"$ne": True}}}, {"$count": "n"}],
+        "ao":   [{"$match": {"addon_pay_date":      today, "addon_received":      {"$gt": 0}, "tally_addon":      {"$ne": True}}}, {"$count": "n"}],
+    }}]
+    items_res, adv_count = await asyncio.gather(
+        db.items.aggregate(facet_pipeline).to_list(1),
+        db.advances.count_documents({"date": today, "tally": {"$ne": True}}),
+    )
+    f = items_res[0] if items_res else {}
+    count = (
+        (f["fab"][0]["n"]  if f.get("fab")  else 0) +
+        (f["tail"][0]["n"] if f.get("tail") else 0) +
+        (f["emb"][0]["n"]  if f.get("emb")  else 0) +
+        (f["ao"][0]["n"]   if f.get("ao")   else 0) +
+        adv_count
+    )
     return {"count": count}
 
 @router.post("/daybook/tally")

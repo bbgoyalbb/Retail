@@ -68,6 +68,7 @@ async def get_public_settings():
     return {
         "firm_name": merged.get("firm_name", "Retail Book"),
         "firm_logo": merged.get("firm_logo"),
+        "firm_logo_dark": merged.get("firm_logo_dark"),
         "firm_name_color": merged.get("firm_name_color", "#C86B4D"),
     }
 

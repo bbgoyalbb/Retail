@@ -75,7 +75,7 @@ async def process_settlement(req: SettlementRequest, current_user: dict = Depend
     
     async def apply_pro_rata(pay_mode_field, pay_date_field, received_field, pending_field, total_to_pay):
         amount_field = pending_field.replace("_pending", "_amount")
-        eligible = [i for i in all_items if round_money(i.get(amount_field, 0)) > 0]
+        eligible = [i for i in all_items if round_money(i.get(amount_field, 0)) > 0 and not str(i.get(pay_mode_field, "")).startswith("Settled")]
         if not eligible:
             return
 

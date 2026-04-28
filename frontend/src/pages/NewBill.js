@@ -148,7 +148,10 @@ export default function NewBill() {
     }).catch(() => {});
   }, []);
 
-  const grandTotal = items.reduce((sum, item) => sum + item.total, 0);
+  const grandTotal = items.reduce((sum, item) => {
+    const addonTotal = (item.addon?.items || []).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+    return sum + item.total + addonTotal;
+  }, 0);
 
   // Get default article type (extracted for dependency clarity)
   const defaultArticleType = articleTypes[0] || "Shirt";
@@ -177,8 +180,7 @@ export default function NewBill() {
   const addItem = useCallback(() => {
     if (!barcode || !qty || !price) return;
     const d = parseFloat(discount) || 0;
-    const discountedPrice = Math.round(parseFloat(price) - (parseFloat(price) * d / 100));
-    const total = Math.round(discountedPrice * parseFloat(qty));
+    const total = Math.round((parseFloat(price) - parseFloat(price) * d / 100) * parseFloat(qty));
 
     if (editingIndex !== null) {
       setItems(prev => prev.map((row, idx) => (
@@ -918,16 +920,20 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
     const newItems = [...items];
     const totalQty = splitItem.originalQty;
 
-    // Calculate proportional amounts for each split
+    // Calculate proportional amounts for each split, remainder-correcting the last part
+    let runningTotal = 0;
     const splitData = splitItem.splits.map((split, i) => {
+      const isLast = i === splitItem.splits.length - 1;
       const ratio = (parseFloat(split.qty) || 0) / totalQty;
-      const splitTotal = Math.round(originalItem.total * ratio);
-      const splitPrice = originalItem.price;
+      const splitTotal = isLast
+        ? originalItem.total - runningTotal
+        : Math.round(originalItem.total * ratio);
+      if (!isLast) runningTotal += splitTotal;
       return {
         ...split,
         ratio,
         total: splitTotal,
-        price: splitPrice,
+        price: originalItem.price,
         discount: originalItem.discount
       };
     });

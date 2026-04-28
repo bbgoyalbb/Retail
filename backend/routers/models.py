@@ -39,6 +39,7 @@ DEFAULT_SETTINGS = {
     "firm_phones": "9467902343, 7056212655",
     "firm_gstin": "06ADMPG9353K1Z4",
     "firm_logo": None,
+    "firm_logo_dark": None,
     "firm_name_color": "#C86B4D",
     "firm_name_size": "16",
     "firm_name_case": "uppercase",

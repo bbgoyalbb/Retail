@@ -339,7 +339,7 @@ No paid entries`}
                       </th>
                       <th className="text-left px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Order</th>
                       <th className="text-left px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Article</th>
-                      <th className="text-left px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Karigar</th>
+                      {filterType !== "Tailoring Labour" && <th className="text-left px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Karigar</th>}
                       <th className="text-right px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Amount</th>
                       <th className="text-left px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Type</th>
                     </tr>
@@ -355,7 +355,7 @@ No paid entries`}
                           </td>
                           <td className="px-3 py-2.5 font-mono text-xs">{item.order_no}</td>
                           <td className="px-3 py-2.5 text-sm">{item.article_type}</td>
-                          <td className="px-3 py-2.5 text-sm text-[var(--text-secondary)]">{item.karigar !== "N/A" ? item.karigar : "-"}</td>
+                          {filterType !== "Tailoring Labour" && <td className="px-3 py-2.5 text-sm text-[var(--text-secondary)]">{item.labour_type === "Embroidery" && item.karigar !== "N/A" ? item.karigar : "-"}</td>}
                           <td className="px-3 py-2.5 font-mono text-sm text-right font-medium">₹{fmt(amount)}</td>
                           <td className="px-3 py-2.5">
                             <span className={`text-xs font-medium uppercase tracking-wider ${item.labour_type === "Tailoring" ? 'text-[var(--info)]' : 'text-[var(--brand)]'}`}>

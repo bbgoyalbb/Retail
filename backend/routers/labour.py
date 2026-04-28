@@ -35,9 +35,7 @@ async def get_labour_items(filter_type: str = "All", filter_karigar: str = "All"
             }
         tail_items = await db.items.find(query, {"_id": 0}).to_list(500)
         for item in tail_items:
-            karigar = item.get("karigar", "N/A")
-            if filter_karigar == "All" or karigar == filter_karigar:
-                items.append({**item, "labour_type": "Tailoring"})
+            items.append({**item, "labour_type": "Tailoring"})
 
     if filter_type in ("All", "Embroidery Labour"):
         if paid:
@@ -52,11 +50,11 @@ async def get_labour_items(filter_type: str = "All", filter_karigar: str = "All"
                 "emb_labour_paid": {"$in": ["N/A", "", None]},
                 "emb_labour_amount": {"$gt": 0},
             }
+        if filter_karigar != "All":
+            query["karigar"] = filter_karigar
         emb_items = await db.items.find(query, {"_id": 0}).to_list(500)
         for item in emb_items:
-            karigar = item.get("karigar", "N/A")
-            if filter_karigar == "All" or karigar == filter_karigar:
-                items.append({**item, "labour_type": "Embroidery"})
+            items.append({**item, "labour_type": "Embroidery"})
 
     return items
 

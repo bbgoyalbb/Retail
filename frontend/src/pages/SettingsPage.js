@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import { getSettings, updateSettings, uploadLogo, invalidatePublicSettingsCache, BACKEND_URL } from "@/api";
 import { FloppyDisk, Plus, Trash, CheckCircle, Warning, Keyboard } from "@phosphor-icons/react";
-import { DEFAULT_NUM_SHORTCUTS } from "@/components/KeyboardShortcuts";
+import { DEFAULT_NUM_SHORTCUTS, DEFAULT_LETTER_SHORTCUTS, loadLetterShortcuts } from "@/components/KeyboardShortcuts";
 
 const getLogoUrl = (path) => {
   if (!path) return null;
@@ -26,6 +26,7 @@ export default function SettingsPage() {
     try { const r = localStorage.getItem("keyboard_shortcuts"); if (r) return JSON.parse(r); } catch {}
     return DEFAULT_NUM_SHORTCUTS;
   });
+  const [letterShortcuts, setLetterShortcuts] = useState(loadLetterShortcuts);
 
   const PAGE_OPTIONS = [
     { path: "/",             label: "Dashboard" },
@@ -48,10 +49,22 @@ export default function SettingsPage() {
     showMessage({ type: "success", text: "Keyboard shortcuts saved!" });
   };
 
+  const saveLetterShortcuts = (shortcuts) => {
+    localStorage.setItem("keyboard_letter_shortcuts", JSON.stringify(shortcuts));
+    window.dispatchEvent(new CustomEvent("shortcuts:updated"));
+    showMessage({ type: "success", text: "Keyboard shortcuts saved!" });
+  };
+
   const updateShortcut = (key, path) => {
     const label = PAGE_OPTIONS.find(p => p.path === path)?.label || path;
     const updated = numShortcuts.map(s => s.key === key ? { ...s, path, desc: label } : s);
     setNumShortcuts(updated);
+  };
+
+  const updateLetterShortcut = (key, path) => {
+    const label = PAGE_OPTIONS.find(p => p.path === path)?.label || path;
+    const updated = letterShortcuts.map(s => s.key === key ? { ...s, path, desc: label } : s);
+    setLetterShortcuts(updated);
   };
 
   const isDirty = settings && savedSettings && JSON.stringify(settings) !== JSON.stringify(savedSettings);
@@ -81,6 +94,7 @@ export default function SettingsPage() {
       setSettings(res.data);
       setSavedSettings(res.data);
       invalidatePublicSettingsCache();
+      window.dispatchEvent(new CustomEvent("settings:updated"));
       showMessage({ type: "success", text: "Settings saved successfully!" });
     } catch (err) {
       showMessage({ type: "error", text: err.message || "Failed to save settings" });
@@ -244,6 +258,7 @@ export default function SettingsPage() {
                           await updateSettings(updatedSettings);
                           setSavedSettings(updatedSettings);
                           invalidatePublicSettingsCache();
+                          window.dispatchEvent(new CustomEvent("settings:updated"));
                           showMessage({ type: "success", text: "Logo uploaded and saved successfully!" });
                         } catch (err) {
                           showMessage({ type: "error", text: err.message || "Failed to upload logo" });
@@ -263,6 +278,58 @@ export default function SettingsPage() {
                   )}
                 </div>
                 <p className="text-[10px] text-[var(--text-secondary)]">Upload PNG/JPG logo (recommended: 200x200px, will be auto-resized)</p>
+              </div>
+
+              {/* Dark Mode Logo Upload */}
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Dark Mode Logo <span className="normal-case font-normal">(optional — falls back to main logo)</span></label>
+                <div className="flex items-center gap-3">
+                  {settings.firm_logo_dark && (
+                    <img
+                      src={getLogoUrl(settings.firm_logo_dark)}
+                      alt="Dark logo preview"
+                      className="w-16 h-16 object-contain border border-[var(--border-subtle)] rounded-sm bg-[#1a1917]"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async e => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        if (file.size > 1024 * 1024) { showMessage({ type: "error", text: "Logo image too large. Maximum size is 1MB." }); return; }
+                        try {
+                          const formData = new FormData();
+                          formData.append("file", file);
+                          showMessage({ type: "success", text: "Uploading dark logo..." });
+                          const res = await uploadLogo(formData);
+                          const logoUrl = res.data.url;
+                          const updatedSettings = { ...settings, firm_logo_dark: logoUrl };
+                          setSettings(updatedSettings);
+                          await updateSettings(updatedSettings);
+                          setSavedSettings(updatedSettings);
+                          invalidatePublicSettingsCache();
+                          window.dispatchEvent(new CustomEvent("settings:updated"));
+                          showMessage({ type: "success", text: "Dark mode logo uploaded and saved!" });
+                        } catch (err) {
+                          showMessage({ type: "error", text: err.message || "Failed to upload logo" });
+                        }
+                      }}
+                      className="w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-xs file:bg-[var(--brand)] file:text-white hover:file:bg-[var(--brand-hover)]"
+                    />
+                  </div>
+                  {settings.firm_logo_dark && (
+                    <button
+                      onClick={() => { setSettings(p => ({...p, firm_logo_dark: ''})); }}
+                      className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"
+                      title="Remove dark logo"
+                    >
+                      <Trash size={16} />
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-[var(--text-secondary)]">Shown in sidebar and login when dark mode is active</p>
               </div>
 
               <input value={settings.firm_name || ""} onChange={e => setSettings(p => ({...p, firm_name: e.target.value}))} placeholder="Firm Name" className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
@@ -328,37 +395,79 @@ export default function SettingsPage() {
         </div>
       </div>
       {/* Keyboard Shortcuts */}
-      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Keyboard size={16} className="text-[var(--brand)]" />
-            <h3 className="font-heading text-base font-medium">Keyboard Shortcuts (Ctrl + 1–9)</h3>
+      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-6">
+        <div className="flex items-center gap-2">
+          <Keyboard size={16} className="text-[var(--brand)]" />
+          <h3 className="font-heading text-base font-medium">Keyboard Shortcuts</h3>
+        </div>
+
+        {/* Letter shortcuts */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Letter Shortcuts (Ctrl + key)</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">Assign a page to each letter key.</p>
+            </div>
+            <button
+              onClick={() => saveLetterShortcuts(letterShortcuts)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">
+              <FloppyDisk size={13} weight="bold" /> Save
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {letterShortcuts.map(sc => (
+              <div key={sc.key} className="flex items-center gap-2">
+                <kbd className="flex-shrink-0 w-16 text-center px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded bg-[var(--bg)] font-mono text-[var(--text-primary)]">Ctrl+{sc.key.toUpperCase()}</kbd>
+                <select
+                  value={sc.path}
+                  onChange={e => updateLetterShortcut(sc.key, e.target.value)}
+                  className="flex-1 px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]">
+                  {PAGE_OPTIONS.map(p => <option key={p.path} value={p.path}>{p.label}</option>)}
+                </select>
+              </div>
+            ))}
           </div>
           <button
-            onClick={() => saveShortcuts(numShortcuts)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">
-            <FloppyDisk size={13} weight="bold" /> Save Shortcuts
+            onClick={() => setLetterShortcuts(DEFAULT_LETTER_SHORTCUTS)}
+            className="text-xs text-[var(--text-secondary)] hover:text-[var(--error)] transition-colors">
+            Reset to defaults
           </button>
         </div>
-        <p className="text-xs text-[var(--text-secondary)]">Assign a page to each number key. Press Ctrl + number to navigate.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {numShortcuts.map(sc => (
-            <div key={sc.key} className="flex items-center gap-2">
-              <kbd className="flex-shrink-0 w-16 text-center px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded bg-[var(--bg)] font-mono text-[var(--text-primary)]">Ctrl+{sc.key}</kbd>
-              <select
-                value={sc.path}
-                onChange={e => updateShortcut(sc.key, e.target.value)}
-                className="flex-1 px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]">
-                {PAGE_OPTIONS.map(p => <option key={p.path} value={p.path}>{p.label}</option>)}
-              </select>
+
+        <div className="border-t border-[var(--border-subtle)]" />
+
+        {/* Number shortcuts */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Number Shortcuts (Ctrl + 1–9)</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">Assign a page to each number key.</p>
             </div>
-          ))}
+            <button
+              onClick={() => saveShortcuts(numShortcuts)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">
+              <FloppyDisk size={13} weight="bold" /> Save
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {numShortcuts.map(sc => (
+              <div key={sc.key} className="flex items-center gap-2">
+                <kbd className="flex-shrink-0 w-16 text-center px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded bg-[var(--bg)] font-mono text-[var(--text-primary)]">Ctrl+{sc.key}</kbd>
+                <select
+                  value={sc.path}
+                  onChange={e => updateShortcut(sc.key, e.target.value)}
+                  className="flex-1 px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]">
+                  {PAGE_OPTIONS.map(p => <option key={p.path} value={p.path}>{p.label}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => setNumShortcuts(DEFAULT_NUM_SHORTCUTS)}
+            className="text-xs text-[var(--text-secondary)] hover:text-[var(--error)] transition-colors">
+            Reset to defaults
+          </button>
         </div>
-        <button
-          onClick={() => { setNumShortcuts(DEFAULT_NUM_SHORTCUTS); }}
-          className="text-xs text-[var(--text-secondary)] hover:text-[var(--error)] transition-colors">
-          Reset to defaults
-        </button>
       </div>
 
     </div>

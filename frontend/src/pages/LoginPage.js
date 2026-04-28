@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/components/ThemeProvider";
 import { getPublicSettings, BACKEND_URL } from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import { Scissors, Eye, EyeSlash } from "@phosphor-icons/react";
@@ -13,16 +14,21 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const { theme } = useTheme();
   const [firmName, setFirmName] = useState("Retail Book");
   const [firmLogo, setFirmLogo] = useState(null);
+  const [firmLogoDark, setFirmLogoDark] = useState(null);
   const [showPwd, setShowPwd] = useState(false);
 
   useEffect(() => {
     getPublicSettings().then(s => {
       if (s?.firm_name) setFirmName(s.firm_name);
       if (s?.firm_logo) setFirmLogo(s.firm_logo.startsWith("http") ? s.firm_logo : `${BACKEND_URL}${s.firm_logo}`);
+      if (s?.firm_logo_dark) setFirmLogoDark(s.firm_logo_dark.startsWith("http") ? s.firm_logo_dark : `${BACKEND_URL}${s.firm_logo_dark}`);
     }).catch(() => {});
   }, []);
+
+  const activeLogo = theme === 'dark' ? (firmLogoDark || firmLogo) : firmLogo;
 
   const from = location.state?.from || "/";
 
@@ -57,9 +63,9 @@ export default function LoginPage() {
         <div className="relative w-full max-w-sm">
           {/* Brand mark */}
           <div className="flex flex-col items-center mb-8">
-            <div className="w-24 h-24 rounded-sm flex items-center justify-center mb-4 shadow-sm overflow-hidden" style={{ background: firmLogo ? "transparent" : "var(--brand)" }}>
-              {firmLogo
-                ? <img src={firmLogo} alt={firmName} className="w-full h-full object-contain" style={{ borderRadius: "6px" }} />
+            <div className="w-24 h-24 rounded-sm flex items-center justify-center mb-4 shadow-sm overflow-hidden" style={{ background: activeLogo ? "transparent" : "var(--brand)" }}>
+              {activeLogo
+                ? <img src={activeLogo} alt={firmName} className="w-full h-full object-contain" style={{ borderRadius: "6px" }} />
                 : <span className="text-white font-serif font-bold text-4xl leading-none">{firmName.charAt(0).toUpperCase()}</span>
               }
             </div>
