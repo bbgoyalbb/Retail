@@ -546,7 +546,7 @@ export default function ItemsManager() {
               className="flex items-center gap-1.5 px-2 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] transition-colors text-xs"
               title="Toggle sort order">
               {sortDir==="desc" ? <CaretDown size={13}/> : <CaretRight size={13} className="-rotate-90"/>}
-              <span className="hidden sm:inline">{sortDir==="desc" ? "Newest" : "Oldest"}</span>
+              <span className="hidden sm:inline">Order Date: {sortDir==="desc" ? "Newest" : "Oldest"}</span>
             </button>
           </div>
 
