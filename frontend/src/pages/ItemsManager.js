@@ -651,7 +651,7 @@ export default function ItemsManager() {
               </div>
             </div>
           </div>
-        }
+        )}
       </div>
 
       {/* ── BODY ── */}
