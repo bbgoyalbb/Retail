@@ -2,7 +2,7 @@
 import { listAuditLogs, listUsers } from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowClockwise, Funnel, X } from "@phosphor-icons/react";
-import DatePickerInput from "@/components/DatePickerInput";
+import { DatePickerInput } from "@/components/DatePickerInput";
 
 const ACTION_COLORS = {
   create: "text-[var(--success)] bg-[#455D4A10]",
