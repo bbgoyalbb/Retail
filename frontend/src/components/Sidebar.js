@@ -139,7 +139,7 @@ export default function Sidebar({ open, setOpen }) {
 
           ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
 
-          ${collapsed ? 'md:w-[60px]' : 'w-[200px]'}
+          ${collapsed ? 'md:w-[60px]' : 'w-[220px]'}
 
         `}
 
@@ -147,11 +147,11 @@ export default function Sidebar({ open, setOpen }) {
 
         {/* Logo */}
 
-        <div className={`border-b border-[var(--border-subtle)] flex items-center justify-between ${collapsed ? 'p-3' : 'px-4 py-3'}`}>
+        <div className={`border-b border-[var(--border-subtle)] flex items-center justify-between ${collapsed ? 'p-3' : 'px-3 py-3'}`}>
 
-          <div className={`flex items-center gap-3 overflow-hidden ${collapsed ? 'justify-center w-full' : ''}`}>
+          <div className={`flex items-center gap-2.5 overflow-hidden ${collapsed ? 'justify-center w-full' : ''}`}>
 
-            <div className={`flex-shrink-0 flex items-center justify-center ${collapsed ? 'w-9 h-9' : 'w-12 h-12'}`} style={{ background: firmLogo ? "transparent" : "var(--brand)", borderRadius: "8px" }}>
+            <div className={`flex-shrink-0 flex items-center justify-center ${collapsed ? 'w-9 h-9' : 'w-10 h-10'}`} style={{ background: firmLogo ? "transparent" : "var(--brand)", borderRadius: "8px" }}>
 
               {firmLogo
                 ? <img src={firmLogo.startsWith("http") ? firmLogo : `${BACKEND_URL}${firmLogo}`} alt="logo" className="w-full h-full object-contain" style={{ borderRadius: "8px" }} />
@@ -162,7 +162,7 @@ export default function Sidebar({ open, setOpen }) {
 
             {!collapsed && (
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-[var(--text-primary)] leading-tight truncate" title={firmName}>{firmName}</p>
+                <p className="text-xs font-semibold text-[var(--text-primary)] leading-tight line-clamp-2" title={firmName}>{firmName}</p>
                 <p className="text-[10px] text-[var(--text-secondary)] leading-tight mt-0.5">Retail Book</p>
               </div>
             )}
