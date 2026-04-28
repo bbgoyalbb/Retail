@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import { getSettings, updateSettings, uploadLogo, BACKEND_URL } from "@/api";
-import { FloppyDisk, Plus, Trash, Gear, CheckCircle, Warning } from "@phosphor-icons/react";
+import { FloppyDisk, Plus, Trash, CheckCircle, Warning, Keyboard } from "@phosphor-icons/react";
+import { DEFAULT_NUM_SHORTCUTS } from "@/components/KeyboardShortcuts";
 
 const getLogoUrl = (path) => {
   if (!path) return null;
@@ -19,6 +20,39 @@ export default function SettingsPage() {
   const [newAddon, setNewAddon] = useState("");
   const [logoPreview, setLogoPreview] = useState(null);
   const msgTimerRef = useRef(null);
+
+  // Keyboard shortcuts (stored in localStorage only, not backend)
+  const [numShortcuts, setNumShortcuts] = useState(() => {
+    try { const r = localStorage.getItem("keyboard_shortcuts"); if (r) return JSON.parse(r); } catch {}
+    return DEFAULT_NUM_SHORTCUTS;
+  });
+
+  const PAGE_OPTIONS = [
+    { path: "/",             label: "Dashboard" },
+    { path: "/new-bill",     label: "New Bill" },
+    { path: "/jobwork",      label: "Job Work" },
+    { path: "/items",        label: "Manage Orders" },
+    { path: "/daybook",      label: "Daybook" },
+    { path: "/order-status", label: "Order Status" },
+    { path: "/reports",      label: "Reports" },
+    { path: "/labour",       label: "Labour Payments" },
+    { path: "/data",         label: "Data Manager" },
+    { path: "/settings",     label: "Settings" },
+    { path: "/users",        label: "Users" },
+    { path: "/audit",        label: "Audit Log" },
+  ];
+
+  const saveShortcuts = (shortcuts) => {
+    localStorage.setItem("keyboard_shortcuts", JSON.stringify(shortcuts));
+    window.dispatchEvent(new CustomEvent("shortcuts:updated"));
+    showMessage({ type: "success", text: "Keyboard shortcuts saved!" });
+  };
+
+  const updateShortcut = (key, path) => {
+    const label = PAGE_OPTIONS.find(p => p.path === path)?.label || path;
+    const updated = numShortcuts.map(s => s.key === key ? { ...s, path, desc: label } : s);
+    setNumShortcuts(updated);
+  };
 
   const isDirty = settings && savedSettings && JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
@@ -291,6 +325,40 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+      {/* Keyboard Shortcuts */}
+      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Keyboard size={16} className="text-[var(--brand)]" />
+            <h3 className="font-heading text-base font-medium">Keyboard Shortcuts (Ctrl + 1–9)</h3>
+          </div>
+          <button
+            onClick={() => saveShortcuts(numShortcuts)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">
+            <FloppyDisk size={13} weight="bold" /> Save Shortcuts
+          </button>
+        </div>
+        <p className="text-xs text-[var(--text-secondary)]">Assign a page to each number key. Press Ctrl + number to navigate.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {numShortcuts.map(sc => (
+            <div key={sc.key} className="flex items-center gap-2">
+              <kbd className="flex-shrink-0 w-16 text-center px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded bg-[var(--bg)] font-mono text-[var(--text-primary)]">Ctrl+{sc.key}</kbd>
+              <select
+                value={sc.path}
+                onChange={e => updateShortcut(sc.key, e.target.value)}
+                className="flex-1 px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]">
+                {PAGE_OPTIONS.map(p => <option key={p.path} value={p.path}>{p.label}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+        <button
+          onClick={() => { setNumShortcuts(DEFAULT_NUM_SHORTCUTS); }}
+          className="text-xs text-[var(--text-secondary)] hover:text-[var(--error)] transition-colors">
+          Reset to defaults
+        </button>
+      </div>
+
     </div>
   );
 }

@@ -1,34 +1,48 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const SHORTCUTS = [
-  { keys: "Ctrl + K",   desc: "Go to Search" },
-  { keys: "Ctrl + N",   desc: "New Bill" },
-  { keys: "Ctrl + D",   desc: "Dashboard" },
-  { keys: "Ctrl + 1",   desc: "Dashboard" },
-  { keys: "Ctrl + 2",   desc: "New Bill" },
-  { keys: "Ctrl + 3",   desc: "Job Work" },
-  { keys: "Ctrl + 4",   desc: "Manage Orders" },
-  { keys: "Ctrl + 5",   desc: "Daybook" },
-  { keys: "Ctrl + 6",   desc: "Order Status" },
-  { keys: "Ctrl + 7",   desc: "Search" },
-  { keys: "Ctrl + 8",   desc: "Settings" },
-  { keys: "Ctrl + S",   desc: "Save Bill (on New Bill page)" },
-  { keys: "?",          desc: "Show this help" },
-  { keys: "Esc",        desc: "Close modals / dialogs" },
+export const DEFAULT_NUM_SHORTCUTS = [
+  { key: "1", path: "/",            desc: "Dashboard" },
+  { key: "2", path: "/new-bill",    desc: "New Bill" },
+  { key: "3", path: "/jobwork",     desc: "Job Work" },
+  { key: "4", path: "/items",       desc: "Manage Orders" },
+  { key: "5", path: "/daybook",     desc: "Daybook" },
+  { key: "6", path: "/order-status",desc: "Order Status" },
+  { key: "7", path: "/settings",    desc: "Settings" },
 ];
+
+const FIXED_SHORTCUTS = [
+  { keys: "Ctrl + K", desc: "Manage Orders" },
+  { keys: "Ctrl + N", desc: "New Bill" },
+  { keys: "Ctrl + D", desc: "Dashboard" },
+  { keys: "Ctrl + S", desc: "Save Bill (on New Bill page)" },
+  { keys: "?",        desc: "Show this help" },
+  { keys: "Esc",      desc: "Close modals / dialogs" },
+];
+
+function loadNumShortcuts() {
+  try {
+    const raw = localStorage.getItem("keyboard_shortcuts");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return DEFAULT_NUM_SHORTCUTS;
+}
 
 export function KeyboardShortcuts() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [numShortcuts, setNumShortcuts] = useState(loadNumShortcuts);
+
+  useEffect(() => {
+    const onStorage = () => setNumShortcuts(loadNumShortcuts());
+    window.addEventListener("shortcuts:updated", onStorage);
+    return () => window.removeEventListener("shortcuts:updated", onStorage);
+  }, []);
 
   useEffect(() => {
     const onKey = (e) => {
       const target = e.target;
-      const isInput =
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.contentEditable === "true";
+      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.contentEditable === "true";
 
       if (e.key === "Escape") { setOpen(false); return; }
       if (!isInput && e.key === "?") { setOpen(o => !o); return; }
@@ -40,8 +54,8 @@ export function KeyboardShortcuts() {
 
       if ((e.ctrlKey || e.metaKey) && e.key >= "1" && e.key <= "9") {
         e.preventDefault();
-        const map = { "1": "/", "2": "/new-bill", "3": "/jobwork", "4": "/items", "5": "/daybook", "6": "/order-status", "7": "/settings" };
-        if (map[e.key]) navigate(map[e.key]);
+        const sc = numShortcuts.find(s => s.key === e.key);
+        if (sc?.path) navigate(sc.path);
       }
     };
 
@@ -49,7 +63,7 @@ export function KeyboardShortcuts() {
     window.addEventListener("keydown", onKey);
     window.addEventListener("shortcuts:open", onOpen);
     return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("shortcuts:open", onOpen); };
-  }, [navigate]);
+  }, [navigate, numShortcuts]);
 
   if (!open) return null;
 
@@ -61,14 +75,21 @@ export function KeyboardShortcuts() {
           <button onClick={() => setOpen(false)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-lg leading-none">✕</button>
         </div>
         <div className="space-y-1.5 max-h-80 overflow-y-auto">
-          {SHORTCUTS.map(s => (
+          {FIXED_SHORTCUTS.map(s => (
             <div key={s.keys} className="flex items-center justify-between gap-4 py-1">
               <span className="text-xs text-[var(--text-secondary)]">{s.desc}</span>
               <kbd className="flex-shrink-0 px-2 py-0.5 text-[10px] border border-[var(--border-subtle)] rounded bg-[var(--bg)] font-mono text-[var(--text-primary)]">{s.keys}</kbd>
             </div>
           ))}
+          <p className="text-[9px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] pt-2 pb-0.5">Number shortcuts (Ctrl + 1–9)</p>
+          {numShortcuts.map(s => (
+            <div key={s.key} className="flex items-center justify-between gap-4 py-1">
+              <span className="text-xs text-[var(--text-secondary)]">{s.desc}</span>
+              <kbd className="flex-shrink-0 px-2 py-0.5 text-[10px] border border-[var(--border-subtle)] rounded bg-[var(--bg)] font-mono text-[var(--text-primary)]">Ctrl + {s.key}</kbd>
+            </div>
+          ))}
         </div>
-        <p className="mt-4 text-[10px] text-[var(--text-secondary)] text-center">Press <kbd className="px-1 border border-[var(--border-subtle)] rounded font-mono">?</kbd> or <kbd className="px-1 border border-[var(--border-subtle)] rounded font-mono">Esc</kbd> to toggle</p>
+        <p className="mt-4 text-[10px] text-[var(--text-secondary)] text-center">Configurable in <span className="font-medium">Settings → Keyboard Shortcuts</span></p>
       </div>
     </div>
   );

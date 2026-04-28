@@ -25,14 +25,14 @@ const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: House, path: "/" },
   { key: "section-tx", type: "section", label: "Transactions" },
   { key: "new-bill", label: "New Bill", icon: Receipt, path: "/new-bill" },
-  { key: "jobwork", label: "Job Work", icon: Kanban, path: "/jobwork" },
-  { key: "section-fin", type: "section", label: "Finances", managerOnly: true },
   { key: "daybook", label: "Daybook", icon: BookOpen, path: "/daybook", managerOnly: true },
   { key: "labour", label: "Labour Payments", icon: UsersThree, path: "/labour", managerOnly: true },
   { key: "section-mgmt", type: "section", label: "Manage" },
   { key: "items", label: "Manage Orders", icon: Table, path: "/items", managerOnly: true },
+  { key: "jobwork", label: "Job Work", icon: Kanban, path: "/jobwork" },
   { key: "order-status", label: "Order Status", icon: ClipboardText, path: "/order-status" },
   { key: "reports", label: "Reports", icon: ChartBar, path: "/reports", managerOnly: true },
+  { key: "section-admin", type: "section", label: "Admin", adminOnly: true },
   { key: "data", label: "Data Manager", icon: Database, path: "/data", adminOnly: true },
   { key: "settings", label: "Settings", icon: Gear, path: "/settings", adminOnly: true },
   { key: "users", label: "Users", icon: UsersFour, path: "/users", adminOnly: true },
@@ -139,7 +139,7 @@ export default function Sidebar({ open, setOpen }) {
 
           ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
 
-          ${collapsed ? 'md:w-[60px]' : 'w-[220px]'}
+          ${collapsed ? 'md:w-[60px]' : 'w-[240px]'}
 
         `}
 
@@ -151,7 +151,7 @@ export default function Sidebar({ open, setOpen }) {
 
           <div className={`flex items-center gap-2.5 overflow-hidden ${collapsed ? 'justify-center w-full' : ''}`}>
 
-            <div className={`flex-shrink-0 flex items-center justify-center ${collapsed ? 'w-9 h-9' : 'w-10 h-10'}`} style={{ background: firmLogo ? "transparent" : "var(--brand)", borderRadius: "8px" }}>
+            <div className={`flex-shrink-0 flex items-center justify-center ${collapsed ? 'w-9 h-9' : 'w-[52px] h-[52px]'}`} style={{ background: firmLogo ? "transparent" : "var(--brand)", borderRadius: "8px" }}>
 
               {firmLogo
                 ? <img src={firmLogo.startsWith("http") ? firmLogo : `${BACKEND_URL}${firmLogo}`} alt="logo" className="w-full h-full object-contain" style={{ borderRadius: "8px" }} />
@@ -221,7 +221,7 @@ export default function Sidebar({ open, setOpen }) {
 
                   relative w-full flex items-center text-sm rounded-sm transition-all duration-150 active:scale-[0.97]
 
-                  ${collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'}
+                  ${collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2 text-left'}
 
                   ${isActive
 
@@ -263,6 +263,22 @@ export default function Sidebar({ open, setOpen }) {
 
             <button
 
+              onClick={toggle}
+
+              className="flex items-center justify-center gap-2 py-2 px-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg)] rounded-sm transition-colors"
+
+              title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+
+            >
+
+              {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
+
+              {!collapsed && <span>{theme === "light" ? "Dark" : "Light"}</span>}
+
+            </button>
+
+            <button
+
               onClick={toggleCollapse}
 
               className="hidden md:flex flex-1 items-center justify-center gap-2 py-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg)] rounded-sm transition-colors"
@@ -278,22 +294,6 @@ export default function Sidebar({ open, setOpen }) {
                 : <><CaretDoubleLeft size={16} /><span>Collapse</span></>
 
               }
-
-            </button>
-
-            <button
-
-              onClick={toggle}
-
-              className="flex items-center justify-center gap-2 py-2 px-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg)] rounded-sm transition-colors"
-
-              title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
-
-            >
-
-              {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
-
-              {!collapsed && <span>{theme === "light" ? "Dark" : "Light"}</span>}
 
             </button>
 
