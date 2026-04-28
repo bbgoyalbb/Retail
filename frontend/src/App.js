@@ -137,7 +137,7 @@ function AppShell() {
       <OfflineBanner />
       <Sidebar open={sidebarOpen} setOpen={handleSetOpen} />
       <BackToTop />
-      <main className="flex-1 overflow-hidden min-w-0 flex flex-col">
+      <main className="flex-1 overflow-hidden min-w-0 flex flex-col relative">
         <MobileTopBar title={PAGE_TITLES[location.pathname] ?? "Retail Book"} onMenuClick={() => handleSetOpen(!sidebarOpen)} />
         <div ref={contentRef} className="flex-1 overflow-y-auto p-4 pt-16 md:p-6 md:pt-6 lg:p-8 page-in">
           <ErrorBoundary>

@@ -139,7 +139,7 @@ export default function Sidebar({ open, setOpen }) {
 
           ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
 
-          ${collapsed ? 'md:w-[60px]' : 'w-64'}
+          ${collapsed ? 'md:w-[60px]' : 'w-[200px]'}
 
         `}
 
@@ -161,8 +161,8 @@ export default function Sidebar({ open, setOpen }) {
             </div>
 
             {!collapsed && (
-              <div className="overflow-hidden">
-                <p className="text-sm font-semibold text-[var(--text-primary)] leading-tight truncate">{firmName}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[var(--text-primary)] leading-tight truncate" title={firmName}>{firmName}</p>
                 <p className="text-[10px] text-[var(--text-secondary)] leading-tight mt-0.5">Retail Book</p>
               </div>
             )}

@@ -527,7 +527,7 @@ export default function ItemsManager() {
 
   // ─── Render ───────────────────────────────────────────────
   return (
-    <div data-testid="items-manager-page" className="flex h-full -m-4 sm:-m-6 lg:-m-8 overflow-hidden">
+    <div data-testid="items-manager-page" className="flex absolute inset-0 top-12 md:top-0 overflow-hidden">
 
       {/* ── LEFT COLUMN ── */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -544,9 +544,9 @@ export default function ItemsManager() {
             </button>
             <button onClick={() => setSortDir(d => d==="desc"?"asc":"desc")}
               className="flex items-center gap-1.5 px-2 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] transition-colors text-xs"
-              title={`Sort by date ${sortDir==="desc"?"oldest first":"newest first"}`}>
+              title="Toggle sort order">
               {sortDir==="desc" ? <CaretDown size={13}/> : <CaretRight size={13} className="-rotate-90"/>}
-              <span className="hidden sm:inline">Sort</span>
+              <span className="hidden sm:inline">{sortDir==="desc" ? "Newest" : "Oldest"}</span>
             </button>
           </div>
 
@@ -721,12 +721,11 @@ export default function ItemsManager() {
                         <p className={`text-xs font-medium truncate flex-1 min-w-0 ${isCancelled ? "line-through text-[var(--text-secondary)]" : ""}`}>
                           {group.name}
                         </p>
-                        {/* Ref */}
-                        <span className="font-mono text-[10px] text-[var(--brand)] flex-shrink-0 w-[64px] truncate text-right">{group.ref}</span>
-                        {/* Order no */}
-                        <span className="font-mono text-[10px] text-[var(--text-secondary)] flex-shrink-0 w-[44px] truncate text-right">
-                          {orderNos.length > 0 ? `#${orderNos[0]}` : ""}
-                        </span>
+                        {/* Ref + order# */}
+                        <div className="flex flex-col items-end flex-shrink-0">
+                          <span className="font-mono text-[10px] text-[var(--brand)]">{group.ref}</span>
+                          {orderNos.length > 0 && <span className="font-mono text-[9px] text-[var(--text-secondary)] leading-tight">#{orderNos[0]}</span>}
+                        </div>
                         {/* Actions — always visible */}
                         <div className="flex items-center gap-0 flex-shrink-0" onClick={e => e.stopPropagation()}>
                           <button onClick={() => setTailoringGroup(group)} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E15] rounded-sm" title="Assign Tailoring"><Scissors size={11}/></button>
