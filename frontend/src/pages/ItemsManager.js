@@ -210,7 +210,14 @@ export default function ItemsManager() {
 
   // Settings
   useEffect(() => {
-    getSettings().then(res => setTailoringRates(res?.data?.tailoring_rates || {})).catch(() => {});
+    getSettings().then(res => {
+      const s = res?.data || {};
+      setTailoringRates(s.tailoring_rates || {});
+      if (Array.isArray(s.article_types) && s.article_types.length > 0) {
+        const field = SECTIONS.tailoring.fields.find(f => f.key === "article_type");
+        if (field) field.options = ["N/A", ...s.article_types];
+      }
+    }).catch(() => {});
     getCustomers().then(res => setCustomers(res.data || [])).catch(() => {});
   }, []);
 
