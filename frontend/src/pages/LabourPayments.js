@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback } from "react";
 import { getLabourItems, getKarigars, payLabour, deleteLabourPayment, getSettings } from "@/api";
+import { dataEvents } from "@/lib/dataEvents";
 import { fmt } from "@/lib/fmt";
 import { UsersThree, CurrencyDollar, CheckCircle, Circle, CaretDown, CaretRight, Trash, PencilSimple, X } from "@phosphor-icons/react";
 
@@ -36,6 +37,12 @@ export default function LabourPayments() {
   }, []);
 
   useEffect(() => { loadData(); setSelected([]); }, [loadData]);
+
+  useEffect(() => {
+    const handler = () => loadData();
+    dataEvents.addEventListener("labour", handler);
+    return () => dataEvents.removeEventListener("labour", handler);
+  }, [loadData]);
 
   const toggleSelect = (id) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);

@@ -58,7 +58,7 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
     if (m.includes("[E]")) return "E";
     if (m.includes("[S]")) return "S";
     return mode ? mode.slice(0, 2).toUpperCase() : "";
-  };
+  }; 
 
   const CATS = ["fabric", "tailoring", "embroidery", "addon", "advance"];
 

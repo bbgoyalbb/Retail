@@ -168,7 +168,7 @@ export default function Dashboard() {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={TrendUp} label="Revenue Collected" value={`₹${fmt(data.total_revenue)}`}
           sub={`${data.total_items} transactions`} color="var(--success)" trend={data.revenue_trend} />
         <StatCard icon={Warning} label="Total Outstanding" value={`₹${fmt(totalPending)}`}

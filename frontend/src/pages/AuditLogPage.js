@@ -2,6 +2,7 @@
 import { listAuditLogs, listUsers } from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowClockwise, Funnel, X } from "@phosphor-icons/react";
+import DatePickerInput from "@/components/DatePickerInput";
 
 const ACTION_COLORS = {
   create: "text-[var(--success)] bg-[#455D4A10]",
@@ -134,21 +135,11 @@ export default function AuditLogPage() {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">From Date</label>
-              <input 
-                type="date" 
-                value={filterDateFrom} 
-                onChange={e => setFilterDateFrom(e.target.value)}
-                className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-              />
+              <DatePickerInput value={filterDateFrom} onChange={setFilterDateFrom} placeholder="From date" />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">To Date</label>
-              <input 
-                type="date" 
-                value={filterDateTo} 
-                onChange={e => setFilterDateTo(e.target.value)}
-                className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-              />
+              <DatePickerInput value={filterDateTo} onChange={setFilterDateTo} placeholder="To date" />
             </div>
             <button
               onClick={clearFilters}

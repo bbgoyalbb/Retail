@@ -2,7 +2,6 @@
 Tailoring router.
 """
 from fastapi import APIRouter, HTTPException, Query, Depends, Request
-from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, date
 import uuid
