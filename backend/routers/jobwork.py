@@ -75,18 +75,43 @@ async def get_jobwork(
     if delivery_filter and delivery_filter != "All":
         query["delivery_date"] = delivery_filter
 
-    items = await db.items.find(query, {"_id": 0}).sort("date", -1).to_list(500)
+    sort_stage = {"$sort": {"date": -1}}
+    proj_stage = {"$project": {"_id": 0}}
 
     if tab == "tailoring":
-        pending = [i for i in items if i["tailoring_status"] == "Pending"]
-        stitched = [i for i in items if i["tailoring_status"] == "Stitched"]
-        delivered = [i for i in items if i["tailoring_status"] == "Delivered"]
-        return {"pending": pending, "stitched": stitched, "delivered": delivered}
+        status_field = "tailoring_status"
+        buckets = ["Pending", "Stitched", "Delivered"]
     else:
-        required = [i for i in items if i["embroidery_status"] == "Required"]
-        in_progress = [i for i in items if i["embroidery_status"] == "In Progress"]
-        finished = [i for i in items if i["embroidery_status"] == "Finished"]
-        return {"required": required, "in_progress": in_progress, "finished": finished}
+        status_field = "embroidery_status"
+        buckets = ["Required", "In Progress", "Finished"]
+
+    pipeline = [
+        {"$match": query},
+        {"$facet": {
+            bucket: [
+                {"$match": {status_field: bucket}},
+                sort_stage,
+                {"$limit": 500},
+                proj_stage,
+            ]
+            for bucket in buckets
+        }},
+    ]
+    results = await db.items.aggregate(pipeline).to_list(1)
+    r = results[0] if results else {}
+
+    if tab == "tailoring":
+        return {
+            "pending":   r.get("Pending", []),
+            "stitched":  r.get("Stitched", []),
+            "delivered": r.get("Delivered", []),
+        }
+    else:
+        return {
+            "required":    r.get("Required", []),
+            "in_progress": r.get("In Progress", []),
+            "finished":    r.get("Finished", []),
+        }
 
 @router.post("/jobwork/move")
 async def move_jobwork(req: StatusUpdateRequest, current_user: dict = Depends(get_current_user_dep)):

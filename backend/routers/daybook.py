@@ -15,6 +15,10 @@ from .models import TallyRequest
 
 router = APIRouter()
 
+_daybook_dates_cache: list = []
+_daybook_dates_cache_time: float = 0.0
+_DAYBOOK_DATES_TTL: float = 60.0
+
 @router.get("/daybook")
 async def get_daybook(date_filter: Optional[str] = None, current_user: dict = Depends(get_current_user_dep)):
     # Key: (date, ref) — each unique pay-date × ref combination is a separate row
@@ -98,8 +102,10 @@ async def get_daybook(date_filter: Optional[str] = None, current_user: dict = De
 
 @router.get("/daybook/dates")
 async def get_daybook_dates(current_user: dict = Depends(get_current_user_dep)):
-    import asyncio
-    # Single aggregation: project all 4 pay-date fields into an array, unwind, group distinct values
+    import asyncio, time
+    global _daybook_dates_cache, _daybook_dates_cache_time
+    if _daybook_dates_cache and (time.monotonic() - _daybook_dates_cache_time) < _DAYBOOK_DATES_TTL:
+        return _daybook_dates_cache
     pipeline = [
         {"$project": {"dates": ["$fabric_pay_date", "$tailoring_pay_date", "$embroidery_pay_date", "$addon_pay_date"]}},
         {"$unwind": "$dates"},
@@ -114,7 +120,10 @@ async def get_daybook_dates(current_user: dict = Depends(get_current_user_dep)):
     for v in adv_dates_res:
         if v:
             dates.add(v)
-    return sorted(list(dates), reverse=True)
+    result = sorted(list(dates), reverse=True)
+    _daybook_dates_cache = result
+    _daybook_dates_cache_time = time.monotonic()
+    return result
 
 @router.get("/daybook/pending-count")
 async def get_daybook_pending_count(current_user: dict = Depends(get_current_user_dep)):

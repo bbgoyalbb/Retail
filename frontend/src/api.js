@@ -19,6 +19,17 @@ api.interceptors.request.use(
   (err) => Promise.reject(err)
 );
 
+/**
+ * Returns an axios GET call bound to an AbortController.
+ * Usage: const { request, abort } = apiGet("/endpoint");
+ * Call abort() in useEffect cleanup to cancel on unmount.
+ */
+export const apiGet = (path, params) => {
+  const controller = new AbortController();
+  const request = api.get(path, { params, signal: controller.signal });
+  return { request, abort: () => controller.abort() };
+};
+
 // Normalize error messages from backend detail field
 api.interceptors.response.use(
   (res) => res,
@@ -96,7 +107,21 @@ export const getBalances = (params) => api.get("/settlements/balances", { params
 export const processSettlement = (data) => api.post("/settlements/pay", data);
 
 export const getDaybook = (params) => api.get("/daybook", { params });
-export const getDaybookDates = () => api.get("/daybook/dates");
+let _daybookDatesCache = null;
+let _daybookDatesCacheTime = 0;
+const DAYBOOK_DATES_TTL = 60000;
+export const getDaybookDates = () => {
+  const now = Date.now();
+  if (_daybookDatesCache && now - _daybookDatesCacheTime < DAYBOOK_DATES_TTL) {
+    return Promise.resolve(_daybookDatesCache);
+  }
+  return api.get("/daybook/dates").then(res => {
+    _daybookDatesCache = res;
+    _daybookDatesCacheTime = Date.now();
+    return res;
+  });
+};
+export const invalidateDaybookDatesCache = () => { _daybookDatesCache = null; };
 export const getDaybookPendingCount = () => api.get("/daybook/pending-count");
 export const tallyEntries = (data) => api.post("/daybook/tally", data);
 

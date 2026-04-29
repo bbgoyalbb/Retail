@@ -51,55 +51,45 @@ async def get_order_status(
         query.setdefault("date", {})["$gte"] = date_from
     if date_to:
         query.setdefault("date", {})["$lte"] = date_to
-    items = await db.items.find(query, {"_id": 0}).to_list(limit)
-    grouped: dict = {}
-    for item in items:
-        ono = item.get("order_no", "")
-        if ono not in grouped:
-            grouped[ono] = {
-                "order_no": ono,
-                "customers": set(),
-                "refs": set(),
-                "item_count": 0,
-                "tailoring_pending": 0,
-                "tailoring_stitched": 0,
-                "tailoring_delivered": 0,
-                "emb_required": 0,
-                "emb_in_progress": 0,
-                "emb_finished": 0,
-                "order_total": 0,
-                "latest_bill_date": "",
-                "latest_delivery_date": "",
-            }
-        g = grouped[ono]
-        g["customers"].add(item.get("name", ""))
-        g["refs"].add(item.get("ref", ""))
-        g["item_count"] += 1
-        ts = item.get("tailoring_status", "N/A")
-        if ts == "Pending": g["tailoring_pending"] += 1
-        elif ts == "Stitched": g["tailoring_stitched"] += 1
-        elif ts == "Delivered": g["tailoring_delivered"] += 1
-        es = item.get("embroidery_status", "N/A")
-        if es == "Required": g["emb_required"] += 1
-        elif es == "In Progress": g["emb_in_progress"] += 1
-        elif es == "Finished": g["emb_finished"] += 1
-        g["order_total"] += (
-            float(item.get("fabric_amount", 0)) +
-            float(item.get("tailoring_amount", 0)) +
-            float(item.get("embroidery_amount", 0)) +
-            float(item.get("addon_amount", 0))
-        )
-        d = item.get("date", "")
-        if d and d > g["latest_bill_date"]: g["latest_bill_date"] = d
-        dd = item.get("delivery_date", "")
-        if dd and dd not in ("N/A", "", None) and dd > g["latest_delivery_date"]: g["latest_delivery_date"] = dd
-    result = []
-    for g in grouped.values():
-        g["customers"] = sorted(g["customers"])
-        g["refs"] = sorted(g["refs"])
-        result.append(g)
-    result.sort(key=lambda x: x.get("latest_bill_date", ""), reverse=True)
-    return result
+    pipeline = [
+        {"$match": query},
+        {"$group": {
+            "_id": "$order_no",
+            "customers":           {"$addToSet": "$name"},
+            "refs":                {"$addToSet": "$ref"},
+            "item_count":          {"$sum": 1},
+            "tailoring_pending":   {"$sum": {"$cond": [{"$eq": ["$tailoring_status",  "Pending"]},     1, 0]}},
+            "tailoring_stitched":  {"$sum": {"$cond": [{"$eq": ["$tailoring_status",  "Stitched"]},    1, 0]}},
+            "tailoring_delivered": {"$sum": {"$cond": [{"$eq": ["$tailoring_status",  "Delivered"]},   1, 0]}},
+            "emb_required":        {"$sum": {"$cond": [{"$eq": ["$embroidery_status", "Required"]},    1, 0]}},
+            "emb_in_progress":     {"$sum": {"$cond": [{"$eq": ["$embroidery_status", "In Progress"]}, 1, 0]}},
+            "emb_finished":        {"$sum": {"$cond": [{"$eq": ["$embroidery_status", "Finished"]},    1, 0]}},
+            "order_total":         {"$sum": {"$add": ["$fabric_amount", "$tailoring_amount", "$embroidery_amount", "$addon_amount"]}},
+            "latest_bill_date":    {"$max": "$date"},
+            "latest_delivery_date":{"$max": {"$cond": [{"$not": [{"$in": ["$delivery_date", ["N/A", "", None]]}]}, "$delivery_date", None]}},
+        }},
+        {"$sort": {"latest_bill_date": -1}},
+        {"$limit": limit},
+    ]
+    rows = await db.items.aggregate(pipeline).to_list(limit)
+    return [
+        {
+            "order_no":            r["_id"],
+            "customers":           sorted(r["customers"]),
+            "refs":                sorted(r["refs"]),
+            "item_count":          r["item_count"],
+            "tailoring_pending":   r["tailoring_pending"],
+            "tailoring_stitched":  r["tailoring_stitched"],
+            "tailoring_delivered": r["tailoring_delivered"],
+            "emb_required":        r["emb_required"],
+            "emb_in_progress":     r["emb_in_progress"],
+            "emb_finished":        r["emb_finished"],
+            "order_total":         r["order_total"],
+            "latest_bill_date":    r.get("latest_bill_date") or "",
+            "latest_delivery_date":r.get("latest_delivery_date") or "",
+        }
+        for r in rows
+    ]
 
 @router.post("/orders/deliver")
 async def mark_order_delivered(

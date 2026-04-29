@@ -213,7 +213,7 @@ async def get_refs(name: Optional[str] = None, pending_only: bool = False, curre
         {"$group": {"_id": "$ref"}},
         {"$sort": {"_id": -1}}
     ]
-    refs = await db.items.aggregate(pipeline).to_list(500)
+    refs = await db.items.aggregate(pipeline).to_list(2000)
     return [r["_id"] for r in refs if r["_id"] and r["_id"] != "N/A"]
 
 # ==========================================
@@ -222,20 +222,23 @@ async def get_refs(name: Optional[str] = None, pending_only: bool = False, curre
 
 @router.get("/bills/next-ref")
 async def get_next_ref(date: str, current_user: dict = Depends(get_current_user_dep)):
+    import asyncio
     try:
         parts = date.split("-")
         date_suffix = f"{parts[2]}{parts[1]}{parts[0][2:]}"
     except Exception:
         date_suffix = "000000"
     counter_key = f"bill_seq_{date}"
-    existing_refs = await db.items.distinct("ref", {"date": date})
+    existing_refs, counter_doc = await asyncio.gather(
+        db.items.distinct("ref", {"date": date}),
+        db.counters.find_one({"_id": counter_key}),
+    )
     max_existing_seq = 0
     for r in existing_refs:
         try:
             max_existing_seq = max(max_existing_seq, int(r.split("/")[0]))
         except (ValueError, IndexError):
             pass
-    counter_doc = await db.counters.find_one({"_id": counter_key})
     current_seq = max(counter_doc.get("seq", 0) if counter_doc else 0, max_existing_seq)
     next_seq = current_seq + 1
     return {"ref": f"{next_seq:02d}/{date_suffix}", "seq": next_seq}

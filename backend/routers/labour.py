@@ -17,45 +17,58 @@ router = APIRouter()
 
 @router.get("/labour")
 async def get_labour_items(filter_type: str = "All", filter_karigar: str = "All", view_mode: str = "unpaid", current_user: dict = Depends(get_current_user_dep)):
-    items = []
+    import asyncio
     paid = view_mode == "paid"
 
+    tail_query = None
     if filter_type in ("All", "Tailoring Labour"):
         if paid:
-            query = {
+            tail_query = {
                 "tailoring_status": {"$in": ["Stitched", "Delivered"]},
                 "labour_paid": "Yes",
                 "labour_amount": {"$gt": 0},
             }
         else:
-            query = {
+            tail_query = {
                 "tailoring_status": {"$in": ["Stitched", "Delivered"]},
                 "labour_paid": {"$in": ["N/A", "", None]},
                 "labour_amount": {"$gt": 0},
             }
-        tail_items = await db.items.find(query, {"_id": 0}).to_list(500)
-        for item in tail_items:
-            items.append({**item, "labour_type": "Tailoring"})
 
+    emb_query = None
     if filter_type in ("All", "Embroidery Labour"):
         if paid:
-            query = {
+            emb_query = {
                 "embroidery_status": "Finished",
                 "emb_labour_paid": "Yes",
                 "emb_labour_amount": {"$gt": 0},
             }
         else:
-            query = {
+            emb_query = {
                 "embroidery_status": "Finished",
                 "emb_labour_paid": {"$in": ["N/A", "", None]},
                 "emb_labour_amount": {"$gt": 0},
             }
         if filter_karigar != "All":
-            query["karigar"] = filter_karigar
-        emb_items = await db.items.find(query, {"_id": 0}).to_list(500)
-        for item in emb_items:
-            items.append({**item, "labour_type": "Embroidery"})
+            emb_query["karigar"] = filter_karigar
 
+    coros = []
+    order = []
+    if tail_query is not None:
+        coros.append(db.items.find(tail_query, {"_id": 0}).to_list(500))
+        order.append("tail")
+    if emb_query is not None:
+        coros.append(db.items.find(emb_query, {"_id": 0}).to_list(500))
+        order.append("emb")
+
+    results = await asyncio.gather(*coros)
+    result_map = dict(zip(order, results))
+
+    items = []
+    for item in result_map.get("tail", []):
+        items.append({**item, "labour_type": "Tailoring"})
+    for item in result_map.get("emb", []):
+        items.append({**item, "labour_type": "Embroidery"})
     return items
 
 @router.get("/labour/karigars")
