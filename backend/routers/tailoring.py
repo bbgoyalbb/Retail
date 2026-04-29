@@ -38,53 +38,58 @@ async def get_awaiting_orders(current_user: dict = Depends(get_current_user_dep)
 
 @router.post("/tailoring/assign")
 async def assign_tailoring(req: TailoringOrderRequest, current_user: dict = Depends(get_current_user_dep)):
-    # Fetch tailoring rates from settings instead of hardcoded values
-    stored_settings = await db.settings.find_one({"key": "app_settings"}, {"_id": 0})
+    from pymongo import UpdateOne
+    import asyncio
+    item_ids = [a.get("item_id") for a in req.assignments]
+    stored_settings, existing_items_list = await asyncio.gather(
+        db.settings.find_one({"key": "app_settings"}, {"_id": 0}),
+        db.items.find(
+            {"id": {"$in": item_ids}},
+            {"_id": 0, "id": 1, "tailoring_received": 1, "tailoring_pay_mode": 1}
+        ).to_list(len(item_ids)),
+    )
     settings = merge_settings(stored_settings)
     tailoring_rates = settings.get("tailoring_rates", {})
-    
-    updated = 0
+    item_map = {i["id"]: i for i in existing_items_list}
+
+    bulk_ops = []
     for assignment in req.assignments:
         item_id = assignment.get("item_id")
         article_type = assignment.get("article_type", "Shirt")
         emb_status = assignment.get("embroidery_status", "Not Required")
 
-        # Use settings rates with fallback to hardcoded defaults
         rate_data = tailoring_rates.get(article_type, {})
         if isinstance(rate_data, dict):
             tail_amt = rate_data.get("tailoring", 0)
             labour_amt = rate_data.get("labour", 0)
         else:
-            # Fallback to hardcoded for backwards compatibility
             tail_amt, labour_amt = TAILORING_RATES.get(article_type, (0, 0))
 
-        existing_item = await db.items.find_one({"id": item_id}, {"_id": 0})
-        existing_tail_received = float((existing_item or {}).get("tailoring_received", 0))
-        existing_tail_mode = (existing_item or {}).get("tailoring_pay_mode", "Pending")
+        existing_item = item_map.get(item_id, {})
+        existing_tail_received = float(existing_item.get("tailoring_received", 0))
+        existing_tail_mode = existing_item.get("tailoring_pay_mode", "Pending")
         tail_pending = round(tail_amt - existing_tail_received, 2)
         tail_mode = existing_tail_mode if str(existing_tail_mode).startswith("Settled") else ("Pending" if existing_tail_received <= 0 else existing_tail_mode)
 
-        update = {
-            "$set": {
-                "tailoring_status": "Pending",
-                "article_type": article_type,
-                "order_no": req.order_no,
-                "delivery_date": req.delivery_date,
-                "tailoring_amount": tail_amt,
-                "tailoring_pending": tail_pending,
-                "tailoring_pay_mode": tail_mode,
-                "labour_amount": labour_amt,
-                "embroidery_status": emb_status,
-            }
+        fields = {
+            "tailoring_status": "Pending",
+            "article_type": article_type,
+            "order_no": req.order_no,
+            "delivery_date": req.delivery_date,
+            "tailoring_amount": tail_amt,
+            "tailoring_pending": tail_pending,
+            "tailoring_pay_mode": tail_mode,
+            "labour_amount": labour_amt,
+            "embroidery_status": emb_status,
         }
         if emb_status == "Required":
-            update["$set"]["embroidery_pay_mode"] = "Pending"
+            fields["embroidery_pay_mode"] = "Pending"
+        bulk_ops.append(UpdateOne({"id": item_id}, {"$set": fields}))
 
-        result = await db.items.update_one({"id": item_id}, update)
-        if result.modified_count > 0:
-            updated += 1
-
-    return {"message": f"{updated} items assigned to order {req.order_no}"}
+    if not bulk_ops:
+        return {"message": "0 items assigned"}
+    result = await db.items.bulk_write(bulk_ops, ordered=False)
+    return {"message": f"{result.modified_count} items assigned to order {req.order_no}"}
 
 class SplitItem(BaseModel):
     article_type: str

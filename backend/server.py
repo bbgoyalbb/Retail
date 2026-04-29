@@ -210,9 +210,12 @@ async def startup_db_client():
     )
 
     # _id index is automatic — no explicit creation needed for counters
-    await db.advances.create_index("id",  unique=True, background=True)
-    await db.advances.create_index("ref", background=True)
+    await db.advances.create_index("id",   unique=True, background=True)
+    await db.advances.create_index("ref",  background=True)
     await db.advances.create_index("date", background=True)
+    await db.advances.create_index([("ref",  ASCENDING), ("date",  ASCENDING)], background=True)
+    await db.advances.create_index([("date", ASCENDING), ("tally", ASCENDING)], background=True)
+    await db.items.create_index("created_at", background=True)
     await db.settings.create_index("key", unique=True, background=True)
     await db.token_blocklist.create_index("jti", unique=True, background=True)
     await db.token_blocklist.create_index("created_at", expireAfterSeconds=86400, background=True)
