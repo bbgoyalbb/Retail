@@ -95,6 +95,8 @@ function OfflineBanner() {
 function AppShell() {
   const contentRef = useRef(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
+    // On mobile (< 768px), always start closed regardless of stored preference
+    if (typeof window !== "undefined" && window.innerWidth < 768) return false;
     try { return localStorage.getItem("sidebar_open") !== "false"; } catch { return true; }
   });
   const { user, loading } = useAuth();

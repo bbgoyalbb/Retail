@@ -180,45 +180,46 @@ export default function UsersPage() {
       </div>
 
       {/* User list */}
-      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
+      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-visible">
         {loading ? (
           <div className="p-8 text-center text-[var(--text-secondary)] text-sm">Loading...</div>
         ) : users.length === 0 ? (
           <div className="p-8 text-center text-[var(--text-secondary)] text-sm">No users found.</div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg)]">
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-medium">User</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-medium">Role</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-medium">Status</th>
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-medium">Created</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(u => (
+          <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-[var(--border-strong)]">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg)]">
+                  <th className="text-left px-3 py-3 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-medium w-[170px]">User</th>
+                  <th className="text-left px-3 py-3 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-medium w-[90px]">Role</th>
+                  <th className="text-left px-3 py-3 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-medium w-[80px]">Status</th>
+                  <th className="text-left px-3 py-3 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-medium hidden sm:table-cell">Created</th>
+                  <th className="px-3 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {users.map(u => (
                 <tr key={u.username} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg)] transition-colors">
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <div className="flex items-center gap-2">
-                      <UserCircle size={28} className="text-[var(--text-secondary)]" />
-                      <div>
-                        <p className="font-medium text-[var(--text-primary)]">{u.full_name}</p>
-                        <p className="text-xs text-[var(--text-secondary)]">@{u.username}</p>
+                      <UserCircle size={24} className="flex-shrink-0 text-[var(--text-secondary)]" />
+                      <div className="min-w-0">
+                        <p className="font-medium text-[var(--text-primary)] truncate">{u.full_name}</p>
+                        <p className="text-xs text-[var(--text-secondary)] truncate">@{u.username}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3">{roleBadge(u.role)}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">{roleBadge(u.role)}</td>
+                  <td className="px-3 py-3">
                     {u.is_active
                       ? <span className="flex items-center gap-1 text-green-600 text-xs"><CheckCircle size={14} weight="fill" />Active</span>
                       : <span className="flex items-center gap-1 text-red-500 text-xs"><XCircle size={14} weight="fill" />Disabled</span>
                     }
                   </td>
-                  <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">
+                  <td className="px-3 py-3 text-xs text-[var(--text-secondary)] hidden sm:table-cell">
                     {u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <div className="flex items-center gap-1 justify-end">
                       <button onClick={() => setEditUser({ ...u })} title="Edit" className="p-1.5 rounded-sm hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
                         <PencilSimple size={15} />
@@ -255,6 +256,7 @@ export default function UsersPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

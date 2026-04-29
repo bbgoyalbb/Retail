@@ -152,8 +152,38 @@ export default function Reports() {
       {/* Summary */}
       {!loading && summary && <SummaryCards summary={summary} />}
 
+      {/* Global date filters — shared across all tabs */}
+      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm space-y-3">
+        <div className="flex flex-wrap gap-1.5">
+          {DATE_PRESETS.map(p => (
+            <button key={p.label} onClick={() => { setDateFrom(p.from); setDateTo(p.to); }}
+              className={`px-3 py-1 text-xs font-medium rounded-sm border transition-colors ${
+                dateFrom === p.from && dateTo === p.to
+                  ? 'bg-[var(--brand)] text-white border-[var(--brand)]'
+                  : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]'
+              }`}>{p.label}</button>
+          ))}
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+              className="px-3 py-1 text-xs font-medium rounded-sm border border-[var(--border-subtle)] text-[var(--error)] hover:bg-[#9E473D08]">Clear</button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-3 items-center">
+          <select data-testid="report-period" value={period} onChange={e => setPeriod(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+          <DatePickerInput value={dateFrom} onChange={setDateFrom} placeholder="From date" />
+          <DatePickerInput value={dateTo} onChange={setDateTo} placeholder="To date" />
+          {(dateFrom || dateTo) && (
+            <span className="text-xs text-[var(--text-secondary)]">Showing: {dateFrom || "all"} → {dateTo || "all"}</span>
+          )}
+        </div>
+      </div>
+
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-[var(--border-subtle)]">
+      <div className="flex gap-1 border-b border-[var(--border-subtle)] overflow-x-auto [&::-webkit-scrollbar]:hidden">
         {[
           { key: "revenue", label: "Revenue", icon: TrendUp },
           { key: "customers", label: "Customers", icon: Users },
@@ -163,7 +193,7 @@ export default function Reports() {
             key={t.key}
             data-testid={`report-tab-${t.key}`}
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap flex-shrink-0
               ${tab === t.key ? 'border-[var(--brand)] text-[var(--brand)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
           >
             <t.icon size={16} /> {t.label}
@@ -174,32 +204,6 @@ export default function Reports() {
       {/* Revenue Tab */}
       {tab === "revenue" && (
         <div className="space-y-4">
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm space-y-3">
-            <div className="flex flex-wrap gap-1.5">
-              {DATE_PRESETS.map(p => (
-                <button key={p.label} onClick={() => { setDateFrom(p.from); setDateTo(p.to); }}
-                  className={`px-3 py-1 text-xs font-medium rounded-sm border transition-colors ${
-                    dateFrom === p.from && dateTo === p.to
-                      ? 'bg-[var(--brand)] text-white border-[var(--brand)]'
-                      : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]'
-                  }`}>{p.label}</button>
-              ))}
-              {(dateFrom || dateTo) && (
-                <button onClick={() => { setDateFrom(""); setDateTo(""); }}
-                  className="px-3 py-1 text-xs font-medium rounded-sm border border-[var(--border-subtle)] text-[var(--error)] hover:bg-[#9E473D08]">Clear</button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-3 items-center">
-              <select data-testid="report-period" value={period} onChange={e => setPeriod(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </select>
-              <DatePickerInput value={dateFrom} onChange={setDateFrom} placeholder="From date" />
-              <DatePickerInput value={dateTo} onChange={setDateTo} placeholder="To date" />
-            </div>
-          </div>
-
           <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
             <h3 className="font-heading text-base font-medium mb-4">Fabric Revenue Over Time</h3>
             {!loading && revenueData.length === 0 && (
@@ -242,34 +246,11 @@ export default function Reports() {
       {/* Customers Tab */}
       {tab === "customers" && (
         <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm">
-          <div className="p-4 border-b border-[var(--border-subtle)] space-y-3">
+          <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
             <h3 className="font-heading text-base font-medium">Customer Revenue Ranking</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {DATE_PRESETS.map(p => (
-                <button key={p.label} onClick={() => { setDateFrom(p.from); setDateTo(p.to); }}
-                  className={`px-3 py-1 text-xs font-medium rounded-sm border transition-colors ${
-                    dateFrom === p.from && dateTo === p.to
-                      ? 'bg-[var(--brand)] text-white border-[var(--brand)]'
-                      : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]'
-                  }`}>{p.label}</button>
-              ))}
-              {(dateFrom || dateTo) && (
-                <button onClick={() => { setDateFrom(""); setDateTo(""); }}
-                  className="px-3 py-1 text-xs font-medium rounded-sm border border-[var(--border-subtle)] text-[var(--error)] hover:bg-[#9E473D08]">Clear</button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-3 items-center">
-              <DatePickerInput value={dateFrom} onChange={setDateFrom} placeholder="From date" />
-              <DatePickerInput value={dateTo} onChange={setDateTo} placeholder="To date" />
-              {(dateFrom || dateTo) && (
-                <span className="text-xs text-[var(--text-secondary)]">
-                  Showing: {dateFrom || "all"} → {dateTo || "all"}
-                </span>
-              )}
-            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full" data-testid="customer-report-table">
+          <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-[var(--border-strong)]">
+            <table className="w-full min-w-[640px]" data-testid="customer-report-table">
               <thead>
                 <tr className="bg-[var(--bg)]">
                   {["#", "Customer", "Bills", "Items", "Fabric Total", "Received", "Pending", "Tailoring"].map(h => (
@@ -314,8 +295,8 @@ export default function Reports() {
                       nameKey="mode"
                       cx="50%"
                       cy="50%"
-                      outerRadius={100}
-                      label={({ mode, percent }) => `${mode} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      label={({ mode, percent }) => window.innerWidth < 500 ? `${(percent * 100).toFixed(0)}%` : `${mode} ${(percent * 100).toFixed(0)}%`}
                     >
                       {summary.payment_modes.map((_, i) => (
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />

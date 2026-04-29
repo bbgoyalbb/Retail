@@ -246,7 +246,7 @@ export default function LabourPayments() {
   };
 
   return (
-    <div data-testid="labour-page" className="space-y-6">
+    <div data-testid="labour-page" className="space-y-6 pb-20 lg:pb-0">
       <div>
         <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Labour Payments</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">Pay tailoring and embroidery labour</p>
@@ -385,8 +385,7 @@ No paid entries`}
                     {groupPaidByDateAndPayment(items).map((dateGroup, dateIdx) => (
                       <React.Fragment key={dateGroup.date}>
                         {/* Date Level */}
-                        <tr 
-                          
+                        <tr
                           className="border-b border-[var(--border-subtle)] bg-[#C86B4D08] hover:bg-[#C86B4D12] cursor-pointer"
                           onClick={() => toggleDateExpand(dateGroup.date)}
                         >
@@ -408,8 +407,7 @@ No paid entries`}
                         {/* Payment Entries under this date */}
                         {expandedDates[dateGroup.date] && dateGroup.payments.map((payment, payIdx) => (
                           <React.Fragment key={payment.payment_id || `${dateGroup.date}_${payIdx}`}>
-                            <tr 
-                              
+                            <tr
                               className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D05] cursor-pointer"
                               onClick={() => togglePaymentExpand(payment.payment_id || `${dateGroup.date}_${payIdx}`)}
                             >
@@ -611,6 +609,25 @@ No paid entries`}
           </button>
         </div>
       </div>
+
+      {/* Mobile sticky pay bar — shows when items are selected in unpaid view */}
+      {viewMode === "unpaid" && selected.length > 0 && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--surface)] border-t border-[var(--border-subtle)] px-4 py-3 shadow-lg z-40 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">Selected</p>
+            <p className="text-base font-semibold text-[var(--brand)] leading-tight">₹{fmt(selectedTotal)}</p>
+            <p className="text-[11px] text-[var(--text-secondary)]">{selected.length} item{selected.length !== 1 ? 's' : ''}</p>
+          </div>
+          <button
+            onClick={handlePay}
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 whitespace-nowrap"
+          >
+            <CurrencyDollar size={16} weight="bold" />
+            {saving ? "Processing…" : "Pay Labour"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

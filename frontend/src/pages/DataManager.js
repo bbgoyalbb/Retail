@@ -166,7 +166,7 @@ export default function DataManager() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-[var(--border-subtle)]">
+      <div className="flex gap-1 border-b border-[var(--border-subtle)] overflow-x-auto [&::-webkit-scrollbar]:hidden">
         {[
           { key: "import", label: "Import Excel", icon: Upload },
           { key: "export", label: "Export Data", icon: DownloadSimple },
@@ -177,10 +177,10 @@ export default function DataManager() {
             key={t.key}
             data-testid={`data-tab-${t.key}`}
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px
+            className={`flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap flex-shrink-0
               ${tab === t.key ? 'border-[var(--brand)] text-[var(--brand)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
           >
-            <t.icon size={16} /> {t.label}
+            <t.icon size={14} /> {t.label}
           </button>
         ))}
       </div>

@@ -141,13 +141,13 @@ export default function SettingsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Settings</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">Configure article types, rates, payment modes, and more</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-1 hidden sm:block">Configure article types, rates, payment modes, and more</p>
         </div>
         <button data-testid="save-settings-btn" onClick={save} disabled={saving}
-          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-sm transition-all disabled:opacity-50 ${
+          className={`flex-shrink-0 flex items-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 text-sm font-medium rounded-sm transition-all disabled:opacity-50 whitespace-nowrap ${
             isDirty ? 'bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)] ring-2 ring-[var(--brand)] ring-offset-2' : 'bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)]'
           }`}>
-          {saving ? "Saving..." : <><FloppyDisk size={16} weight="bold" /> {isDirty ? "Save Changes ●" : "Save Settings"}</>}
+          {saving ? "Saving…" : <><FloppyDisk size={16} weight="bold" /> {isDirty ? "Save Changes ●" : "Save Settings"}</>}
         </button>
       </div>
 

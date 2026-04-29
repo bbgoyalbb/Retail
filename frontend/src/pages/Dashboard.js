@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getDashboard } from "@/api";
 import { fmt } from "@/lib/fmt";
 import { dataEvents } from "@/lib/dataEvents";
-import { CurrencyDollar, Scissors, UsersThree, TrendUp, ArrowsClockwise, Receipt, Warning, CalendarCheck, ChartBar, BookOpen, ArrowRight } from "@phosphor-icons/react";
+import { ClipboardText, Scissors, UsersThree, TrendUp, ArrowsClockwise, Receipt, Warning, CalendarCheck, ChartBar, BookOpen, ArrowRight } from "@phosphor-icons/react";
 import { EmptyState } from "@/components/EmptyState";
 
 function Sparkline({ data, color = "var(--success)", width = 60, height = 24 }) {
@@ -43,12 +43,12 @@ function StatCard({ icon: Icon, label, value, sub, color = "var(--brand)", trend
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] font-semibold text-[var(--text-secondary)] mb-2 leading-tight">{label}</p>
-            <p className="font-heading text-2xl sm:text-3xl font-semibold tracking-tight truncate" style={{ color }}>{value}</p>
-            {sub && <p className="text-xs text-[var(--text-secondary)] mt-1.5 truncate">{sub}</p>}
+            <p className="font-heading text-base sm:text-2xl font-semibold tracking-tight leading-snug" style={{ color }}>{value}</p>
+            {sub && <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] mt-1.5 line-clamp-2">{sub}</p>}
           </div>
           <div className="flex flex-col items-end gap-1">
-            <div className="p-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: `${color}15` }}>
-              <Icon size={22} weight="duotone" style={{ color }} />
+            <div className="p-2 sm:p-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: `${color}15` }}>
+              <Icon size={18} weight="duotone" style={{ color }} />
             </div>
             {trend && <Sparkline data={trend} color={color} />}
           </div>
@@ -183,7 +183,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "New Bill", icon: Receipt, path: "/new-bill", color: "var(--brand)" },
-          { label: "Manage Orders", icon: CurrencyDollar, path: "/items", color: "var(--success)" },
+          { label: "Manage Orders", icon: ClipboardText, path: "/items", color: "var(--success)" },
           { label: "Reports", icon: ChartBar, path: "/reports", color: "var(--info)" },
           { label: "Daybook", icon: BookOpen, path: "/daybook", color: "var(--warning)" },
         ].map(({ label, icon: Icon, path, color }) => (
@@ -192,7 +192,7 @@ export default function Dashboard() {
             <div className="p-2 rounded-sm flex-shrink-0" style={{ background: `${color}15` }}>
               <Icon size={16} weight="duotone" style={{ color }} />
             </div>
-            <span className="text-sm font-medium text-[var(--text-primary)] truncate">{label}</span>
+            <span className="text-xs sm:text-sm font-medium text-[var(--text-primary)] line-clamp-2 leading-tight">{label}</span>
             <ArrowRight size={13} className="ml-auto text-[var(--border-strong)] group-hover:text-[var(--brand)] transition-colors flex-shrink-0" />
           </button>
         ))}

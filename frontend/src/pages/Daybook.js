@@ -208,25 +208,70 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
         <>
         {/* Mobile card view */}
         <div className="md:hidden divide-y divide-[var(--border-subtle)]">
-          {visibleEntries.map((entry) => (
-            <div key={entry.id || entry.ref} className="p-3 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-[var(--text-secondary)]">{entry.date}</span>
-                <span className="font-mono text-sm font-semibold text-[var(--brand)]">₹{fmt(entry.total || 0)}</span>
+          {visibleEntries.map((entry) => {
+            const ts = entry.tally_status || {};
+            const modes = entry.modes || {};
+            const cats = activeCats(entry);
+            const allTallied = allCatsTallied(entry);
+            const anyUpdating = cats.some(c => updatingTally[`${rowKey(entry)}:${c}`]);
+            return (
+              <div key={entry.id || entry.ref} className="p-3 space-y-2">
+                {/* Header row */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-xs text-[var(--text-secondary)] whitespace-nowrap">{entry.date}</span>
+                    <span className="font-mono text-xs font-medium text-[var(--brand)]">{entry.ref}</span>
+                    <span className="text-xs text-[var(--text-secondary)] truncate">{entry.name}</span>
+                  </div>
+                  <span className="font-mono text-sm font-semibold whitespace-nowrap">₹{fmt(entry.total || 0)}</span>
+                </div>
+                {/* Per-category tally rows */}
+                <div className="space-y-1">
+                  {[
+                    { cat: "fabric",     label: "Fabric",    amt: entry.fabric },
+                    { cat: "tailoring",  label: "Tailoring", amt: entry.tailoring },
+                    { cat: "embroidery", label: "Emb.",      amt: entry.embroidery },
+                    { cat: "addon",      label: "Add-on",    amt: entry.addon },
+                    { cat: "advance",    label: "Advance",   amt: entry.advance },
+                  ].filter(({ amt }) => amt && amt !== 0).map(({ cat, label, amt }) => {
+                    const key = `${rowKey(entry)}:${cat}`;
+                    const code = modeCode(modes[cat] || "");
+                    return (
+                      <div key={cat} className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[11px] text-[var(--text-secondary)] w-16 flex-shrink-0">{label}</span>
+                          <span className="font-mono text-xs">₹{fmt(amt)}</span>
+                          {code && <span className="font-mono text-[9px] text-[var(--text-secondary)] bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-1 py-px">{code}</span>}
+                        </div>
+                        <TallyButton
+                          isTallied={!!ts[cat]}
+                          onClick={() => handleCategoryTallyClick(entry, cat, !!ts[cat])}
+                          hasAmount={true}
+                          label={label}
+                          loading={!!updatingTally[key]}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Tally All button */}
+                {cats.length > 1 && (
+                  <button
+                    onClick={() => handleTallyAll(entry, !allTallied)}
+                    disabled={anyUpdating}
+                    className={`w-full flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-sm border transition-colors ${
+                      allTallied
+                        ? 'border-[var(--success)] text-[var(--success)] bg-[var(--success)]/5 hover:bg-[var(--success)]/10'
+                        : 'border-[var(--border-strong)] text-[var(--text-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]'
+                    } ${anyUpdating ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  >
+                    {anyUpdating ? <Spinner size={12} className="animate-spin" /> : (allTallied ? <Check size={12} weight="bold" /> : <Circle size={12} />)}
+                    {allTallied ? 'Tallied — tap to un-tally all' : 'Tally all'}
+                  </button>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-medium">{entry.ref}</span>
-                <span className="text-xs text-[var(--text-secondary)] truncate">{entry.name}</span>
-              </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--text-secondary)]">
-                {entry.fabric  > 0 && <span>Fabric ₹{fmt(entry.fabric)}</span>}
-                {entry.tailoring > 0 && <span>Tailoring ₹{fmt(entry.tailoring)}</span>}
-                {entry.embroidery > 0 && <span>Emb ₹{fmt(entry.embroidery)}</span>}
-                {entry.addon > 0 && <span>Add-on ₹{fmt(entry.addon)}</span>}
-                {entry.advance > 0 && <span>Adv ₹{fmt(entry.advance)}</span>}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         {/* Desktop table */}
         <div className="hidden md:block overflow-x-auto">

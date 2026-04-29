@@ -438,7 +438,7 @@ export default function NewBill() {
   };
 
   return (
-    <div data-testid="new-bill-page" className="space-y-6">
+    <div data-testid="new-bill-page" className="space-y-6 pb-24 lg:pb-0">
       <div>
         <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">New Bill</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">Create a new fabric sale entry</p>
@@ -486,7 +486,7 @@ export default function NewBill() {
               <div ref={nameWrapRef} className="relative">
                 <input ref={nameRef} data-testid="customer-name-input" value={customerName}
                   onChange={e => { setCustomerName(e.target.value); setShowSuggestions(true); }}
-                  onFocus={() => setShowSuggestions(true)}
+                  onFocus={e => { if (e.target.value.trim()) setShowSuggestions(true); }}
                   onKeyDown={e => { if (e.key === 'Escape') setShowSuggestions(false); else enterNav(e, dateRef); }}
                   maxLength={100} autoComplete="off"
                   className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" placeholder="Customer name" />
@@ -775,11 +775,11 @@ export default function NewBill() {
                   <thead>
                     <tr className="bg-[var(--bg)]">
                       <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Article</th>
-                    <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Qty</th>
-                    <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Add-ons</th>
-                    <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Total</th>
-                    <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Actions</th>
-                  </tr>
+                      <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Qty</th>
+                      <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Add-ons</th>
+                      <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Total</th>
+                      <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Actions</th>
+                    </tr>
                 </thead>
                 <tbody>
                   {items.map((item, idx) => (
@@ -1167,14 +1167,14 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
               <thead>
                 <tr className="bg-[var(--bg)]">
                   <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Apply</th>
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Article</th>
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Qty</th>
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Order No</th>
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Delivery</th>
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Article Type</th>
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Embroidery</th>
-                <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Actions</th>
-              </tr>
+                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Article</th>
+                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Qty</th>
+                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Order No</th>
+                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Delivery</th>
+                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Article Type</th>
+                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Embroidery</th>
+                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Actions</th>
+                </tr>
             </thead>
             <tbody>
               {items.map((item, idx) => (
