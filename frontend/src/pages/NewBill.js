@@ -97,9 +97,12 @@ export default function NewBill() {
   const setLastBillTotal   = (v) => updateUi("lastBillTotal", v);
   const nameWrapRef = useRef(null);
 
-  const nameSuggestions = customerName.trim()
-    ? customers.filter(c => c.toLowerCase().includes(customerName.trim().toLowerCase())).slice(0, 8)
-    : customers.slice(0, 6);
+  const nameSuggestions = useMemo(() => {
+    const q = customerName.trim().toLowerCase();
+    return q
+      ? customers.filter(c => c.toLowerCase().includes(q)).slice(0, 8)
+      : customers.slice(0, 6);
+  }, [customerName, customers]);
 
   useEffect(() => {
     const handleClick = (e) => { if (nameWrapRef.current && !nameWrapRef.current.contains(e.target)) setShowSuggestions(false); };

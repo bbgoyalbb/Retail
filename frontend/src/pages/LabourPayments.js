@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getLabourItems, getKarigars, payLabour, deleteLabourPayment, getSettings } from "@/api";
 import { dataEvents } from "@/lib/dataEvents";
 import { fmt } from "@/lib/fmt";
@@ -53,10 +53,10 @@ export default function LabourPayments() {
     else setSelected(items.map(i => i.id));
   };
 
-  const selectedSet = new Set(selected);
-  const selectedTotal = items.filter(i => selectedSet.has(i.id)).reduce((sum, i) => {
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const selectedTotal = useMemo(() => items.filter(i => selectedSet.has(i.id)).reduce((sum, i) => {
     return sum + (i.labour_type === "Tailoring" ? (i.labour_amount || 0) : (i.emb_labour_amount || 0));
-  }, 0);
+  }, 0), [items, selectedSet]);
 
   const toggleMode = (m) => setSelectedModes(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
 
@@ -85,7 +85,7 @@ export default function LabourPayments() {
     }
   };
 
-  const totalUnpaid = items.reduce((s, i) => s + (i.labour_type === "Tailoring" ? (i.labour_amount || 0) : (i.emb_labour_amount || 0)), 0);
+  const totalUnpaid = useMemo(() => items.reduce((s, i) => s + (i.labour_type === "Tailoring" ? (i.labour_amount || 0) : (i.emb_labour_amount || 0)), 0), [items]);
 
   // Track expanded states for 3-level hierarchy: date -> payment -> articles
   const [expandedDates, setExpandedDates] = useState({});
@@ -103,6 +103,7 @@ export default function LabourPayments() {
   };
 
   // Group paid items by date, then by payment_id
+  const groupedPaid = useMemo(() => {
   const groupPaidByDateAndPayment = (items) => {
     const dates = {};
     
@@ -147,6 +148,9 @@ export default function LabourPayments() {
       }))
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   };
+  return groupPaidByDateAndPayment(items);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   const startEditPayment = (payment) => {
     setEditingPayment(payment);
@@ -381,7 +385,7 @@ No paid entries`}
                     </tr>
                   </thead>
                   <tbody>
-                    {groupPaidByDateAndPayment(items).map((dateGroup, dateIdx) => (
+                    {groupedPaid.map((dateGroup, dateIdx) => (
                       <React.Fragment key={dateGroup.date}>
                         {/* Date Level */}
                         <tr

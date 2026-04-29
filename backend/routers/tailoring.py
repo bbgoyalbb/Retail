@@ -8,6 +8,7 @@ from datetime import datetime, timezone, date
 import uuid
 import re
 from bson import ObjectId
+from pymongo import UpdateOne
 from .deps import db, get_current_user_dep
 from data_quality import round_money, determine_payment_status, build_payment_mode_label
 import auth as auth_module
@@ -38,7 +39,6 @@ async def get_awaiting_orders(current_user: dict = Depends(get_current_user_dep)
 
 @router.post("/tailoring/assign")
 async def assign_tailoring(req: TailoringOrderRequest, current_user: dict = Depends(get_current_user_dep)):
-    from pymongo import UpdateOne
     item_ids = [a.get("item_id") for a in req.assignments]
     stored_settings, existing_items_list = await asyncio.gather(
         db.settings.find_one({"key": "app_settings"}, {"_id": 0}),
