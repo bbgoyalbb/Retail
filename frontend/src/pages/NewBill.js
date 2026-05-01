@@ -445,7 +445,7 @@ export default function NewBill() {
   };
 
   return (
-    <div data-testid="new-bill-page" className="space-y-6 pb-24 lg:pb-0">
+    <div data-testid="new-bill-page" className="space-y-6 pb-32 lg:pb-6">
       <div>
         <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">New Bill</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">Create a new fabric sale entry</p>
@@ -598,7 +598,10 @@ export default function NewBill() {
       </div>
 
       {/* Mobile sticky summary bar - visible only on small screens */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--surface)] border-t border-[var(--border-subtle)] p-3 shadow-lg z-40">
+      <div 
+        className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--surface)] border-t border-[var(--border-subtle)] p-3 shadow-lg z-50"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 12px))' }}
+      >
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">Grand Total</p>
@@ -647,8 +650,64 @@ export default function NewBill() {
               <button onClick={() => setShowAddonModal(false)} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm" aria-label="Close"><X size={16} /></button>
             </div>
             <div className="p-4 overflow-auto flex-1">
-              <div className="overflow-x-auto -mx-4 px-4">
-                <table className="w-full min-w-[600px] sm:min-w-[800px]">
+              {/* Mobile card view */}
+              <div className="sm:hidden space-y-3">
+                {items.map((item, idx) => (
+                  <div key={`addon-mobile-${idx}`} className="bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-medium">{item.barcode}</span>
+                        <span className="text-xs text-[var(--text-secondary)] ml-2">{item.qty}m</span>
+                      </div>
+                      <span className="text-sm font-mono">
+                        ₹{(item.addon?.items || []).reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0).toLocaleString()}
+                      </span>
+                    </div>
+                    
+                    {(item.addon?.items || []).length === 0 ? (
+                      <p className="text-sm text-[var(--text-secondary)] italic">No add-ons configured</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {(item.addon?.items || []).map((addon, addonIdx) => (
+                          <div key={addonIdx} className="flex items-center gap-2 bg-[var(--surface)] p-2 rounded-sm">
+                            <select
+                              value={addon.name}
+                              onChange={e => updateAddonItem(idx, addonIdx, { name: e.target.value })}
+                              className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm"
+                            >
+                              {addonItems.map(name => <option key={name} value={name}>{name}</option>)}
+                            </select>
+                            <input
+                              type="number"
+                              value={addon.amount}
+                              onChange={e => updateAddonItem(idx, addonIdx, { amount: e.target.value })}
+                              className="w-20 px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm"
+                              placeholder="₹"
+                            />
+                            <button
+                              onClick={() => removeAddonItem(idx, addonIdx)}
+                              className="p-1.5 text-[var(--error)] hover:bg-[var(--error)]/10 rounded-sm flex-shrink-0"
+                            >
+                              <Trash size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <button
+                      onClick={() => addAddonItem(idx)}
+                      className="w-full px-3 py-2 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] flex items-center justify-center gap-1"
+                    >
+                      <Plus size={12} /> Add Add-on
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table view */}
+              <div className="hidden sm:block overflow-x-auto -mx-4 px-4">
+                <table className="w-full min-w-[800px]">
                   <thead>
                     <tr className="bg-[var(--bg)]">
                       <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Article</th>
