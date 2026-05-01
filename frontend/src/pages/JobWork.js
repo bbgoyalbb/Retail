@@ -83,7 +83,8 @@ function StatusColumn({ title, items, color, onMove, moveLabel, onMoveBack, move
           ))}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto max-h-[400px] divide-y divide-[var(--border-subtle)]">
+      {/* Dynamic height: full viewport on mobile, calculated on desktop */}
+      <div className="flex-1 overflow-y-auto max-h-[60vh] lg:max-h-[calc(100vh-280px)] divide-y divide-[var(--border-subtle)]">
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 gap-2">
             <CheckSquare size={24} className="text-[var(--border-strong)]" weight="duotone" />
@@ -376,14 +377,15 @@ export default function JobWork() {
                 }`}>{col}</button>
             ))}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className={activeCol === "Pending" ? "block md:block" : "hidden md:block"}>
+          {/* Stack on mobile/tablet, side-by-side on lg+ */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className={activeCol === "Pending" ? "block lg:block" : "hidden lg:block"}>
               <StatusColumn title="Pending" items={sortedPending} color="var(--warning)" moveLabel="Stitched" onMove={(ids) => handleTailoringMove(ids, "Stitched")} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
             </div>
-            <div className={activeCol === "Stitched" ? "block md:block" : "hidden md:block"}>
+            <div className={activeCol === "Stitched" ? "block lg:block" : "hidden lg:block"}>
               <StatusColumn title="Stitched" items={sortedStitched} color="var(--info)" moveLabel="Delivered" onMove={(ids) => handleTailoringMove(ids, "Delivered")} onMoveBack={(ids) => handleTailoringMoveBack(ids, "Stitched")} moveBackLabel="to Pending" sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
             </div>
-            <div className={activeCol === "Delivered" ? "block md:block" : "hidden md:block"}>
+            <div className={activeCol === "Delivered" ? "block lg:block" : "hidden lg:block"}>
               <StatusColumn title="Delivered" items={sortedDelivered} color="var(--success)" onMoveBack={(ids) => handleTailoringMoveBack(ids, "Delivered")} moveBackLabel="to Stitched" sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
             </div>
           </div>
@@ -398,14 +400,15 @@ export default function JobWork() {
                 }`}>{col}</button>
             ))}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className={activeCol === "Required" ? "block md:block" : "hidden md:block"}>
+          {/* Stack on mobile/tablet, side-by-side on lg+ */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className={activeCol === "Required" ? "block lg:block" : "hidden lg:block"}>
               <StatusColumn title="Required" items={sortedRequired} color="var(--warning)" moveLabel="In Progress" onMove={handleEmbRequiredMove} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
             </div>
-            <div className={activeCol === "In Progress" ? "block md:block" : "hidden md:block"}>
+            <div className={activeCol === "In Progress" ? "block lg:block" : "hidden lg:block"}>
               <StatusColumn title="In Progress" items={sortedInProgress} color="var(--info)" moveLabel="Finished" onMove={handleEmbProgressMove} onMoveBack={(ids) => handleEmbMoveBack(ids, "In Progress")} moveBackLabel="to Required" onItemDoubleClick={handleEditInProgress} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
             </div>
-            <div className={activeCol === "Finished" ? "block md:block" : "hidden md:block"}>
+            <div className={activeCol === "Finished" ? "block lg:block" : "hidden lg:block"}>
               <StatusColumn title="Finished" items={sortedFinished} color="var(--success)" onMoveBack={(ids) => handleEmbMoveBack(ids, "Finished")} moveBackLabel="to In Progress" onItemDoubleClick={handleEditFinished} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
             </div>
           </div>
