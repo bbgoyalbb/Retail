@@ -189,9 +189,12 @@ export default function SettlementPanel({ orders: ordersProp, billRef, customer,
   return (
     <div className="fixed inset-0 bg-black/60 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <div
-        className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-t-lg sm:rounded-sm shadow-2xl w-full sm:max-w-xl max-h-[92vh] flex flex-col"
+        className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-t-lg sm:rounded-sm shadow-2xl w-full sm:max-w-xl max-h-[78vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
+        {/* Drag handle for mobile bottom sheet */}
+        <div className="w-8 h-1 rounded-full bg-[var(--border-strong)] mx-auto mt-2 mb-1 cursor-grab active:cursor-grabbing" />
+
         {/* ── Header ── */}
         <div className="px-5 py-4 border-b border-[var(--border-subtle)] flex items-start justify-between flex-shrink-0 bg-[#C86B4D08]">
           <div className="min-w-0">
@@ -232,7 +235,8 @@ export default function SettlementPanel({ orders: ordersProp, billRef, customer,
                   </p>
                   <span className="font-mono text-sm font-semibold text-[var(--warning)]">₹{fmt(totalPending)}</span>
                 </div>
-                <div className="grid grid-cols-4 gap-2">
+                {/* 2 columns on mobile, 4 on desktop */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     { label: "Fabric",    value: aggBalances.fabric,     color: "var(--warning)" },
                     { label: "Tailoring", value: aggBalances.tailoring,  color: "var(--info)" },
