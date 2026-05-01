@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/context/AuthContext";
@@ -77,6 +77,28 @@ export default function Sidebar({ open, setOpen }) {
     try { localStorage.setItem("sidebar_collapsed", String(next)); } catch {}
   };
 
+  // Keyboard navigation for sidebar
+  const handleNavKeyDown = (e, items, currentIndex) => {
+    const navItems = items.filter(item => item.type !== "section");
+    const currentNavIndex = navItems.findIndex(item => item.key === items[currentIndex]?.key);
+    
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const nextIndex = (currentNavIndex + 1) % navItems.length;
+      navigate(navItems[nextIndex].path);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevIndex = (currentNavIndex - 1 + navItems.length) % navItems.length;
+      navigate(navItems[prevIndex].path);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      navigate(navItems[0].path);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      navigate(navItems[navItems.length - 1].path);
+    }
+  };
+
   return (
     <>
       {/* Mobile overlay */}
@@ -122,16 +144,25 @@ export default function Sidebar({ open, setOpen }) {
         </div>
 
         {/* Nav */}
-        <nav className={`flex-1 py-3 overflow-y-auto overflow-x-hidden ${collapsed ? 'px-1.5 space-y-1' : 'px-3 space-y-0.5'}`}>
-          {NAV_ITEMS.filter(item => {
-            if (item.adminOnly && user?.role !== "admin") return false;
-            if (item.managerOnly && !["admin","manager"].includes(user?.role)) return false;
-            const allowed = user?.allowed_pages ?? [];
-            if (allowed.length > 0 && item.path && !allowed.includes(item.path)) return false;
-            return true;
-          }).map(item => {
+        <nav 
+          role="navigation" 
+          aria-label="Main navigation"
+          className={`flex-1 py-3 overflow-y-auto overflow-x-hidden ${collapsed ? 'px-1.5 space-y-1' : 'px-3 space-y-0.5'}`}
+        >
+          {(() => {
+            const filteredItems = NAV_ITEMS.filter(item => {
+              if (item.adminOnly && user?.role !== "admin") return false;
+              if (item.managerOnly && !["admin","manager"].includes(user?.role)) return false;
+              const allowed = user?.allowed_pages ?? [];
+              if (allowed.length > 0 && item.path && !allowed.includes(item.path)) return false;
+              return true;
+            });
+            return filteredItems.map((item, idx) => {
             if (item.type === "section") {
-              return collapsed ? null : (
+              return collapsed ? (
+                // Visual divider in collapsed mode instead of text label
+                <hr key={item.key} className="my-1 border-[var(--border-subtle)]" />
+              ) : (
                 <p key={item.key} className="px-3 pt-4 pb-1 text-[9px] uppercase tracking-[.18em] font-semibold text-[var(--border-strong)]">{item.label}</p>
               );
             }
@@ -141,10 +172,12 @@ export default function Sidebar({ open, setOpen }) {
               <button
                 key={item.key}
                 data-testid={`nav-${item.key}`}
-                title={collapsed ? item.label : undefined}
+                aria-label={item.label}
+                aria-current={isActive ? "page" : undefined}
                 onClick={() => { navigate(item.path); setOpen(false); }}
+                onKeyDown={(e) => handleNavKeyDown(e, filteredItems, idx)}
                 className={`
-                  relative w-full flex items-center text-sm rounded-sm transition-all duration-150 active:scale-[0.97]
+                  group relative w-full flex items-center text-sm rounded-sm transition-all duration-150 active:scale-[0.97]
                   ${collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2 text-left'}
                   ${isActive
                     ? 'bg-[var(--brand)] text-white font-medium'
@@ -152,6 +185,12 @@ export default function Sidebar({ open, setOpen }) {
                   }`}
               >
                 <Icon size={20} weight={isActive ? "fill" : "regular"} className="flex-shrink-0" />
+                {/* Custom tooltip for collapsed mode */}
+                {collapsed && (
+                  <span className="absolute left-full ml-2 px-2 py-1 bg-[var(--surface)] text-[var(--text-primary)] text-xs rounded border border-[var(--border-subtle)] shadow-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                    {item.label}
+                  </span>
+                )}
                 {!collapsed && <span className="truncate flex-1">{item.label}</span>}
                 {!collapsed && item.key === 'daybook' && daybookPending > 0 && (
                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none flex-shrink-0 ${
@@ -163,7 +202,8 @@ export default function Sidebar({ open, setOpen }) {
                 )}
               </button>
             );
-          })}
+          });
+          })()}
         </nav>
 
         {/* Footer: desktop collapse toggle + theme */}
