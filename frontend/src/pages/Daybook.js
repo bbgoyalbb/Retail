@@ -13,6 +13,19 @@ function SortableHeader({ label, sortKey, currentKey, dir, onSort }) {
   );
 }
 
+// Tally indicator component - visual only, for use inside larger hit targets
+function TallyIndicator({ isTallied }) {
+  return (
+    <span className={`w-11 h-11 md:w-6 md:h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+      isTallied
+        ? 'bg-[var(--success)] text-white'
+        : 'bg-[var(--border-subtle)] text-[var(--text-secondary)]'
+    }`}>
+      {isTallied ? <Check size={14} weight="bold" /> : <Circle size={14} />}
+    </span>
+  );
+}
+
 // Category tally button component
 function TallyButton({ isTallied, onClick, hasAmount, label, loading }) {
   if (!hasAmount) return <span className="w-11 h-11 md:w-6 md:h-6 inline-block flex-shrink-0" />;
@@ -225,7 +238,7 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
                   </div>
                   <span className="font-mono text-sm font-semibold whitespace-nowrap">₹{fmt(entry.total || 0)}</span>
                 </div>
-                {/* Per-category tally rows */}
+                {/* Per-category tally rows - wrapped in 44px hit targets for mobile */}
                 <div className="space-y-1">
                   {[
                     { cat: "fabric",     label: "Fabric",    amt: entry.fabric },
@@ -237,20 +250,20 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
                     const key = `${rowKey(entry)}:${cat}`;
                     const code = modeCode(modes[cat] || "");
                     return (
-                      <div key={cat} className="flex items-center justify-between gap-2">
+                      <button
+                        key={cat}
+                        onClick={() => handleCategoryTallyClick(entry, cat, !!ts[cat])}
+                        disabled={!!updatingTally[key]}
+                        className="w-full flex items-center justify-between gap-2 p-2 -m-2 rounded-sm hover:bg-[var(--bg)] active:bg-[var(--bg)] transition-colors disabled:opacity-50"
+                        aria-label={`${!!ts[cat] ? 'Un-tally' : 'Tally'} ${label}`}
+                      >
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="text-[11px] text-[var(--text-secondary)] w-16 flex-shrink-0">{label}</span>
                           <span className="font-mono text-xs">₹{fmt(amt)}</span>
                           {code && <span className="font-mono text-[9px] text-[var(--text-secondary)] bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm px-1 py-px">{code}</span>}
                         </div>
-                        <TallyButton
-                          isTallied={!!ts[cat]}
-                          onClick={() => handleCategoryTallyClick(entry, cat, !!ts[cat])}
-                          hasAmount={true}
-                          label={label}
-                          loading={!!updatingTally[key]}
-                        />
-                      </div>
+                        <TallyIndicator isTallied={!!ts[cat]} />
+                      </button>
                     );
                   })}
                 </div>
@@ -464,6 +477,43 @@ export default function Daybook() {
       <div>
         <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Daybook</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">Daily transaction reconciliation</p>
+      </div>
+
+      {/* Date pills - quick horizontal scroll for mobile/tablet */}
+      <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1">
+        <button
+          onClick={() => setDateFilter(todayStr)}
+          className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+            dateFilter === todayStr
+              ? 'bg-[var(--brand)] text-white border-[var(--brand)]'
+              : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:border-[var(--brand)]'
+          }`}
+        >
+          Today
+        </button>
+        {[...dates].sort().reverse().slice(0, 6).map(d => (
+          <button
+            key={d}
+            onClick={() => setDateFilter(d)}
+            className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+              dateFilter === d
+                ? 'bg-[var(--brand)] text-white border-[var(--brand)]'
+                : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:border-[var(--brand)]'
+            }`}
+          >
+            {new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+          </button>
+        ))}
+        <button
+          onClick={() => setDateFilter("All")}
+          className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+            dateFilter === "All"
+              ? 'bg-[var(--brand)] text-white border-[var(--brand)]'
+              : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:border-[var(--brand)]'
+          }`}
+        >
+          All
+        </button>
       </div>
 
       {/* Filters */}
