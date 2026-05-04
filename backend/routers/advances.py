@@ -52,7 +52,3 @@ async def delete_advance(advance_id: str, current_user: dict = Depends(get_curre
     await audit_log(db, "delete", current_user, "advance", advance_id, {})
     return {"message": "Advance deleted"}
 
-# ==========================================
-# ORDER NUMBERS
-# ==========================================
-

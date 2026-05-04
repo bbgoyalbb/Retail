@@ -112,7 +112,3 @@ async def mark_order_delivered(
         order_no, {"note": f"Marked as Delivered ({result.modified_count} items)"})
     return {"modified": result.modified_count}
 
-# ==========================================
-# ITEM EDIT & DELETE
-# ==========================================
-

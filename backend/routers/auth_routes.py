@@ -173,7 +173,6 @@ async def logout(request: Request, current_user: dict = Depends(get_current_user
                 "jti": jti,
                 "created_at": datetime.now(timezone.utc),
             })
-            auth_module.revoke_jti(jti)
     except Exception:
         pass
     return {"message": "Logged out"}
