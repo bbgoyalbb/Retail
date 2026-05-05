@@ -79,6 +79,15 @@ export default function Sidebar({ open, setOpen }) {
     try { localStorage.setItem("sidebar_collapsed", String(next)); } catch {}
   };
 
+  // On desktop: auto-collapse sidebar when a modal/edit panel opens
+  useEffect(() => {
+    const handler = () => {
+      if (window.innerWidth >= 1024) setCollapsed(true);
+    };
+    window.addEventListener("modal:open", handler);
+    return () => window.removeEventListener("modal:open", handler);
+  }, []);
+
   // Keyboard navigation for sidebar
   const handleNavKeyDown = (e, items, currentIndex) => {
     const navItems = items.filter(item => item.type !== "section");
