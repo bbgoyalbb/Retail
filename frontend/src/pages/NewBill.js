@@ -478,7 +478,7 @@ export default function NewBill() {
             { label: "Items",    icon: ShoppingCart },
             { label: "Payment", icon: CreditCard },
           ].map(({ label, icon: Icon }, idx) => (
-            <React.Fragment key={label}>
+            <div key={label} className="contents">
               <div className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
                 idx === billStep
                   ? "bg-[var(--brand)] text-white"
@@ -492,7 +492,7 @@ export default function NewBill() {
               {idx < 2 && (
                 <span className="flex items-center justify-center w-4 flex-shrink-0 text-[10px] text-[var(--border-strong)] bg-[var(--bg)] border-x border-[var(--border-subtle)]">›</span>
               )}
-            </React.Fragment>
+            </div>
           ))}
         </div>
       )}
