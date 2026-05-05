@@ -122,7 +122,7 @@ export default function LabourPayments() {
         dates[date] = { date, payments: {} };
       }
       
-      const key = paymentId || `single_${item.id}`;
+      const key = `${item.labour_type.toLowerCase()}_${paymentId || `single_${item.id}`}`;
       if (!dates[date].payments[key]) {
         dates[date].payments[key] = {
           payment_id: paymentId,
@@ -150,7 +150,6 @@ export default function LabourPayments() {
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   };
   return groupPaidByDateAndPayment(items);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
   const startEditPayment = (payment) => {

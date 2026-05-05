@@ -173,7 +173,7 @@ export default function AuditLogPage() {
           <p className="text-center text-sm text-[var(--text-secondary)] py-16">No audit logs found.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="bg-[var(--bg)] border-b border-[var(--border-subtle)]">
                   <th className="text-left px-4 py-3 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Timestamp</th>

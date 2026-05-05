@@ -37,8 +37,6 @@ function StatusPill({ label, value, tone }) {
   );
 }
 
-const TODAY = new Date().toISOString().split("T")[0];
-
 export default function OrderStatus() {
   const [rows, setRows] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -49,6 +47,7 @@ export default function OrderStatus() {
   const [loading, setLoading] = useState(false);
   const [delivering, setDelivering] = useState(null);
   const [message, setMessage] = useState(null);
+  const today = new Date().toISOString().split("T")[0];
 
   // Keep a ref to the latest filter values so loadData is stable
   const filtersRef = useRef({ customer, orderNo, fromDate, toDate });
@@ -81,6 +80,19 @@ export default function OrderStatus() {
 
   // Only load on mount; user clicks Apply to filter
   useEffect(() => { loadData(); }, [loadData]);
+
+  const handleDeliver = async (order_no) => {
+    setDelivering(order_no);
+    try {
+      await markOrderDelivered(order_no);
+      setMessage({ type: "success", text: `Order ${order_no} marked as Delivered` });
+      setTimeout(() => setMessage(null), 3000);
+      loadData();
+    } catch (err) {
+      setMessage({ type: "error", text: err.message || "Failed" });
+      setTimeout(() => setMessage(null), 3000);
+    } finally { setDelivering(null); }
+  };
 
   const summary = useMemo(() => {
     return rows.reduce(
@@ -191,7 +203,7 @@ export default function OrderStatus() {
           )}
           {!loading && rows.map((row) => {
             const hasUndelivered = (row.tailoring_pending || 0) + (row.tailoring_stitched || 0) > 0;
-            const isOverdue = hasUndelivered && row.latest_delivery_date && row.latest_delivery_date !== "N/A" && row.latest_delivery_date < TODAY;
+            const isOverdue = hasUndelivered && row.latest_delivery_date && row.latest_delivery_date !== "N/A" && row.latest_delivery_date < today;
             return (
               <div key={row._id || row.order_no} className={`p-4 space-y-2 ${isOverdue ? "bg-[#9E473D08] border-l-2 border-l-[var(--error)]" : ""}`}>
                 <div className="flex items-center justify-between">
@@ -213,18 +225,7 @@ export default function OrderStatus() {
                 {hasUndelivered && (
                   <button
                     disabled={delivering === row.order_no}
-                    onClick={async () => {
-                      setDelivering(row.order_no);
-                      try {
-                        await markOrderDelivered(row.order_no);
-                        setMessage({ type: "success", text: `Order ${row.order_no} marked as Delivered` });
-                        setTimeout(() => setMessage(null), 3000);
-                        loadData();
-                      } catch (err) {
-                        setMessage({ type: "error", text: err.message || "Failed" });
-                        setTimeout(() => setMessage(null), 3000);
-                      } finally { setDelivering(null); }
-                    }}
+                    onClick={() => handleDeliver(row.order_no)}
                     className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-[var(--success)] text-white rounded-sm hover:opacity-90 disabled:opacity-50">
                     <CheckCircle size={12} /> {delivering === row.order_no ? "…" : "Mark Delivered"}
                   </button>
@@ -263,7 +264,7 @@ export default function OrderStatus() {
 
               {!loading && rows.map((row) => {
                 const hasUndelivered = (row.tailoring_pending || 0) + (row.tailoring_stitched || 0) > 0;
-                const isOverdue = hasUndelivered && row.latest_delivery_date && row.latest_delivery_date !== "N/A" && row.latest_delivery_date < TODAY;
+                const isOverdue = hasUndelivered && row.latest_delivery_date && row.latest_delivery_date !== "N/A" && row.latest_delivery_date < today;
                 return (
                 <tr key={row._id || row.order_no} className={`border-t border-[var(--border-subtle)] align-top hover:bg-[#C86B4D06] ${isOverdue ? "bg-[#9E473D06] border-l-2 border-l-[var(--error)]" : ""}`}>
                   <td className="px-3 py-2 font-mono text-xs font-semibold sticky left-0 z-10 bg-[var(--surface)] border-r border-[var(--border-subtle)]">{row.order_no || "-"}</td>
@@ -291,18 +292,7 @@ export default function OrderStatus() {
                     {hasUndelivered && (
                       <button
                         disabled={delivering === row.order_no}
-                        onClick={async () => {
-                          setDelivering(row.order_no);
-                          try {
-                            await markOrderDelivered(row.order_no);
-                            setMessage({ type: "success", text: `Order ${row.order_no} marked as Delivered` });
-                            setTimeout(() => setMessage(null), 3000);
-                            loadData();
-                          } catch (err) {
-                            setMessage({ type: "error", text: err.message || "Failed" });
-                            setTimeout(() => setMessage(null), 3000);
-                          } finally { setDelivering(null); }
-                        }}
+                        onClick={() => handleDeliver(row.order_no)}
                         className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-[var(--success)] text-white rounded-sm hover:opacity-90 disabled:opacity-50 whitespace-nowrap">
                         <CheckCircle size={11} /> {delivering === row.order_no ? "…" : "Deliver"}
                       </button>

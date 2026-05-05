@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { createBill, getCustomers, getInvoiceUrl, getSettings, invalidateCustomersCache, getNextBillRef } from "@/api";
 import { invalidate } from "@/lib/dataEvents";
-import { Plus, FloppyDisk, Spinner, WifiSlash } from "@phosphor-icons/react";
+import { Plus, FloppyDisk, Spinner, WifiSlash, ArrowsSplit } from "@phosphor-icons/react";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { DatePickerInput } from "@/components/DatePickerInput";
 import BarcodeScanner from "@/components/BarcodeScanner";

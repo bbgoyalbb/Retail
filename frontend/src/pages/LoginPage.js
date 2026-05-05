@@ -53,7 +53,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex bg-[var(--bg)]">
       {/* Left side - Login form */}
-      <div className="flex-1 flex items-center justify-center p-4 lg:p-8">
+      <div className="relative flex-1 flex items-center justify-center p-4 lg:p-8">
         {/* Subtle background texture */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none lg:hidden">
           <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full opacity-[0.04]" style={{ background: "var(--brand)" }} />
