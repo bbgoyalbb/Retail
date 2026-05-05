@@ -9,7 +9,7 @@ import { fmt } from "@/lib/fmt";
 import { DatePickerInput } from "@/components/DatePickerInput";
 import {
   PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle,
-  CurrencyDollar, Scissors, Tag, Copy,
+  CurrencyDollar, Scissors, Tag, Copy, ArrowsClockwise,
 } from "@phosphor-icons/react";
 import { useToast } from "@/hooks/use-toast";
 import InvoiceModal from "@/components/InvoiceModal";
@@ -397,6 +397,7 @@ export default function ItemsManager() {
 
   // ─── Edit handlers ────────────────────────────────────────
   const startEdit = async (sectionKey, items, mode = "item") => {
+    window.dispatchEvent(new CustomEvent("modal:open"));
     setSelectedSection(sectionKey);
     setEditMode(mode);
     const itemList = Array.isArray(items) ? items : [items];
@@ -609,6 +610,10 @@ export default function ItemsManager() {
             {selectedRefs.size > 0 && (
               <button onClick={() => setSelectedRefs(new Set())} className="text-[10px] text-[var(--brand)] hover:underline flex-shrink-0">{selectedRefs.size} selected · clear</button>
             )}
+            <button onClick={() => { invalidateItemsCache(); invalidateAdvancesCache(); loadData(); }} title="Refresh"
+              className="p-1 text-[var(--text-secondary)] hover:text-[var(--brand)] hover:bg-[var(--brand)]/5 rounded-sm transition-colors flex-shrink-0">
+              <ArrowsClockwise size={13} className={loading ? "animate-spin" : ""} />
+            </button>
             {refs.length > 0 && (
               <button
                 onClick={() => {

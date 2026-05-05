@@ -2,7 +2,7 @@
 import { getLabourItems, getKarigars, payLabour, deleteLabourPayment, getSettings } from "@/api";
 import { dataEvents } from "@/lib/dataEvents";
 import { fmt } from "@/lib/fmt";
-import { UsersThree, CurrencyDollar, CheckCircle, Circle, CaretDown, CaretRight, Trash, PencilSimple, X } from "@phosphor-icons/react";
+import { UsersThree, CurrencyDollar, CheckCircle, Circle, CaretDown, CaretRight, Trash, PencilSimple, X, ArrowsClockwise } from "@phosphor-icons/react";
 import { DatePickerInput } from "@/components/DatePickerInput";
 import { useToast } from "@/hooks/use-toast";
 
@@ -251,9 +251,15 @@ export default function LabourPayments() {
 
   return (
     <div data-testid="labour-page" className="space-y-6 pb-20 lg:pb-0">
-      <div>
-        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Labour Payments</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">Pay tailoring and embroidery labour</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Labour Payments</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">Pay tailoring and embroidery labour</p>
+        </div>
+        <button onClick={() => loadData()} title="Refresh"
+          className="p-2 rounded-sm border border-[var(--border-subtle)] hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+          <ArrowsClockwise size={16} />
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

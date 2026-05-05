@@ -137,6 +137,17 @@ function AppShell() {
     try { localStorage.setItem("sidebar_open", String(v)); } catch {}
   };
 
+  // Auto-close sidebar on mobile whenever the route changes or a modal opens
+  useEffect(() => {
+    if (window.innerWidth < 768) setSidebarOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const handler = () => { if (window.innerWidth < 768) setSidebarOpen(false); };
+    window.addEventListener("modal:open", handler);
+    return () => window.removeEventListener("modal:open", handler);
+  }, []);
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-[var(--background)]">

@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getJobwork, moveJobwork, moveJobworkBack, moveJobworkEmb, editJobworkEmb, getJobworkFilters } from "@/api";
-import { ArrowRight, ArrowLeft, Funnel, X, PencilSimple, CheckSquare } from "@phosphor-icons/react";
+import { ArrowRight, ArrowLeft, Funnel, X, PencilSimple, CheckSquare, ArrowsClockwise } from "@phosphor-icons/react";
 
 function MoveDialog({ title, onConfirm, onCancel, fields }) {
   const [values, setValues] = useState({});
@@ -353,9 +353,15 @@ export default function JobWork() {
 
   return (
     <div data-testid="jobwork-page" className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Job Work Tracker</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">Track tailoring and embroidery progress</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Job Work Tracker</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">Track tailoring and embroidery progress</p>
+        </div>
+        <button onClick={() => loadData()} title="Refresh"
+          className="p-2 rounded-sm border border-[var(--border-subtle)] hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+          <ArrowsClockwise size={16} />
+        </button>
       </div>
 
       <div className="flex gap-1 border-b border-[var(--border-subtle)]">

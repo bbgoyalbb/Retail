@@ -1,4 +1,4 @@
-import { Check, FloppyDisk, Scissors } from "@phosphor-icons/react";
+import { Check, FloppyDisk } from "@phosphor-icons/react";
 import { DatePickerInput } from "@/components/DatePickerInput";
 
 /**
@@ -152,11 +152,7 @@ export default function PaymentSummaryPanel({
           onChange={(e) => onNeedsTailoringChange(e.target.checked)}
           className="w-4 h-4 accent-[var(--brand)]"
         />
-        <Scissors size={16} className="text-[var(--brand)] flex-shrink-0" />
         <span className="text-sm font-medium">Needs Tailoring</span>
-        <span className="text-xs text-[var(--text-secondary)] ml-auto">
-          Sets all items to Awaiting Order
-        </span>
       </label>
 
       {/* Settled Checkbox */}

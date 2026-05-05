@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getDaybook, getDaybookDates, tallyEntries, invalidateDaybookPendingCache } from "@/api";
 import { dataEvents } from "@/lib/dataEvents";
 import { fmt } from "@/lib/fmt";
-import { Check, Circle, Spinner } from "@phosphor-icons/react";
+import { Check, Circle, Spinner, ArrowsClockwise } from "@phosphor-icons/react";
 import { useToast } from "@/hooks/use-toast";
 
 function SortableHeader({ label, sortKey, currentKey, dir, onSort }) {
@@ -487,9 +487,15 @@ export default function Daybook() {
 
   return (
     <div data-testid="daybook-page" className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Daybook</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">Daily transaction reconciliation</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Daybook</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">Daily transaction reconciliation</p>
+        </div>
+        <button onClick={() => loadData()} title="Refresh"
+          className="p-2 rounded-sm border border-[var(--border-subtle)] hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+          <ArrowsClockwise size={16} />
+        </button>
       </div>
 
       {/* Date pills - quick horizontal scroll for mobile/tablet */}

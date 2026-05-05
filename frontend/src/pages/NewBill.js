@@ -425,6 +425,7 @@ export default function NewBill() {
       setMessage({ type: "error", text: "Add at least one article first" });
       return;
     }
+    window.dispatchEvent(new CustomEvent("modal:open"));
     setShowTailoringModal(true);
   };
 
@@ -433,6 +434,7 @@ export default function NewBill() {
       setMessage({ type: "error", text: "Add at least one article first" });
       return;
     }
+    window.dispatchEvent(new CustomEvent("modal:open"));
     setShowAddonModal(true);
   };
 

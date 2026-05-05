@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { getCustomers, getOrderStatus, markOrderDelivered, updateItem, getItems, invalidateOrderStatusCache } from "@/api";
 import { fmt } from "@/lib/fmt";
 import { DatePickerInput } from "@/components/DatePickerInput";
-import { ClipboardText, MagnifyingGlass, CheckCircle, Warning, PencilSimple } from "@phosphor-icons/react";
+import { ClipboardText, MagnifyingGlass, CheckCircle, Warning, PencilSimple, ArrowsClockwise } from "@phosphor-icons/react";
 import { useToast } from "@/hooks/use-toast";
 
 
@@ -133,9 +133,15 @@ export default function OrderStatus() {
 
   return (
     <div data-testid="order-status-page" className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Order Status</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">Master status board grouped by order number</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Order Status</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">Master status board grouped by order number</p>
+        </div>
+        <button onClick={() => { invalidateOrderStatusCache(); loadData(); }} disabled={loading} title="Refresh"
+          className="p-2 rounded-sm border border-[var(--border-subtle)] hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50">
+          <ArrowsClockwise size={16} className={loading ? "animate-spin" : ""} />
+        </button>
       </div>
 
       {overdueOnly && (
