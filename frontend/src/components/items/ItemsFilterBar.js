@@ -1,6 +1,9 @@
 import { useMemo } from "react";
-import { MagnifyingGlass, X, Funnel, CaretDown, CaretRight } from "@phosphor-icons/react";
+import { MagnifyingGlass, X, Funnel, CaretDown, CaretRight, ArrowsClockwise } from "@phosphor-icons/react";
 import { DatePickerInput } from "@/components/DatePickerInput";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const SEARCH_DATE_PRESETS = [
   { label: "Today",        from: new Date().toISOString().split("T")[0], to: new Date().toISOString().split("T")[0] },
@@ -17,42 +20,6 @@ const SETTLE_TABS = [
   { k: "all",       l: "All" },
 ];
 
-/**
- * ItemsFilterBar - Search, filter tabs, and advanced filters for ItemsManager
- * 
- * @param {Object} props
- * @param {string} props.nameFilter - Current search text
- * @param {Function} props.setNameFilter - Search text setter
- * @param {string} props.settleTab - Active tab key
- * @param {Function} props.setSettleTab - Tab setter
- * @param {Function} props.setSelectedRefs - Clear selection callback
- * @param {string} props.sortDir - "asc" or "desc"
- * @param {Function} props.setSortDir - Sort direction setter
- * @param {boolean} props.showFilters - Show advanced filters
- * @param {Function} props.setShowFilters - Toggle filters
- * @param {boolean} props.hasAdvancedFilters - Whether any advanced filter is active
- * @param {boolean} props.isSearchMode - Whether search results are showing
- * @param {Function} props.clearSearch - Clear search callback
- * @param {Object} props.message - {type, text} or null
- * @param {Object} props.searchRef - Ref for search input
- * 
- * Advanced filter props:
- * @param {string} props.searchDateFrom - Date from
- * @param {Function} props.setSearchDateFrom 
- * @param {string} props.searchDateTo - Date to
- * @param {Function} props.setSearchDateTo
- * @param {string} props.searchCustomer - Selected customer
- * @param {Function} props.setSearchCustomer
- * @param {string} props.searchStatus - Tailoring status filter
- * @param {Function} props.setSearchStatus
- * @param {string} props.searchPayment - Payment status filter
- * @param {Function} props.setSearchPayment
- * @param {string} props.searchMinAmt - Min amount
- * @param {Function} props.setSearchMinAmt
- * @param {string} props.searchMaxAmt - Max amount
- * @param {Function} props.setSearchMaxAmt
- * @param {string[]} props.customers - Customer list for dropdown
- */
 export default function ItemsFilterBar({
   nameFilter, setNameFilter,
   settleTab, setSettleTab, setSelectedRefs,
@@ -73,30 +40,34 @@ export default function ItemsFilterBar({
   const datePresets = useMemo(() => SEARCH_DATE_PRESETS, []);
 
   return (
-    <div className="flex-shrink-0 bg-[var(--surface)] border-b border-[var(--border-subtle)]">
+    <div className="flex-shrink-0 bg-background border-b border-border/50 backdrop-blur-md sticky top-0 z-20">
       {/* Row 1: sort left + tabs right */}
-      <div className="flex items-center gap-2 px-3 sm:px-4 py-2">
+      <div className="flex items-center gap-2 px-4 py-3">
         <div className="flex items-center gap-1 flex-shrink-0">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setSortDir(d => d === "desc" ? "asc" : "desc")}
-            className="flex items-center gap-1.5 px-2 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] transition-colors text-xs"
-            title="Toggle sort order"
+            className="h-8 text-[11px] font-medium tracking-tight"
           >
-            {sortDir === "desc" ? <CaretDown size={13} /> : <CaretRight size={13} className="-rotate-90" />}
+            {sortDir === "desc" ? <CaretDown className="w-3.5 h-3.5" /> : <CaretRight className="w-3.5 h-3.5 -rotate-90" />}
             <span className="hidden sm:inline">Order Date: {sortDir === "desc" ? "Newest" : "Oldest"}</span>
-          </button>
+          </Button>
         </div>
 
         <div className="flex-1" />
 
-        <div className="flex items-center gap-0.5 bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm p-0.5 overflow-x-auto no-scrollbar flex-shrink-0">
+        <div className="flex items-center gap-1 bg-muted/30 border border-border/50 rounded-full p-1 overflow-x-auto no-scrollbar flex-shrink-0">
           {SETTLE_TABS.map(t => (
             <button
               key={t.k}
               onClick={() => { setSettleTab(t.k); setSelectedRefs(new Set()); }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-sm transition-all whitespace-nowrap flex-shrink-0 ${
-                settleTab === t.k ? "bg-[var(--brand)] text-white shadow-sm" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)]"
-              }`}
+              className={cn(
+                "px-4 py-1 text-[11px] font-semibold rounded-full transition-all whitespace-nowrap flex-shrink-0",
+                settleTab === t.k 
+                  ? "bg-primary text-primary-foreground shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              )}
             >
               {t.l}
             </button>
@@ -105,62 +76,79 @@ export default function ItemsFilterBar({
       </div>
 
       {/* Row 2: search bar + filter toggle */}
-      <div className="flex items-center gap-2 px-3 sm:px-4 pb-2">
-        <div className="relative flex-1 min-w-0">
-          <MagnifyingGlass size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] pointer-events-none" />
+      <div className="flex items-center gap-3 px-4 pb-3">
+        <div className="relative flex-1 min-w-0 group">
+          <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors pointer-events-none" />
           <input
             ref={searchRef}
             type="text"
             value={nameFilter}
             onChange={e => setNameFilter(e.target.value)}
-            placeholder="Search by name, barcode, ref, article type, karigar…"
-            className="w-full pl-7 pr-6 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]"
+            placeholder="Search name, barcode, ref, article, karigar..."
+            className="w-full pl-9 pr-8 h-9 text-xs border border-border/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-muted/20 transition-all"
           />
           {nameFilter && (
-            <button onClick={() => setNameFilter("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-              <X size={11} />
+            <button 
+              onClick={() => setNameFilter("")} 
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full transition-colors"
+            >
+              <X size={12} />
             </button>
           )}
         </div>
-        <button
+        
+        <Button
+          variant={showFilters || hasAdvancedFilters ? "default" : "outline"}
+          size="sm"
           onClick={() => setShowFilters(f => !f)}
-          className={`flex items-center gap-1.5 px-2 py-1.5 text-xs border rounded-sm transition-colors flex-shrink-0 ${
-            (showFilters || hasAdvancedFilters) ? "bg-[var(--brand)] text-white border-[var(--brand)]" : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]"
-          }`}
+          className={cn(
+            "h-9 px-3 gap-2 text-xs",
+            hasAdvancedFilters && !showFilters && "border-primary text-primary"
+          )}
         >
-          <Funnel size={13} /><span className="hidden sm:inline">Filters{hasAdvancedFilters ? " ·" : ""}</span>
-        </button>
+          <Funnel className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Filters</span>
+          {hasAdvancedFilters && (
+            <span className="w-1.5 h-1.5 rounded-full bg-current ml-0.5 animate-pulse" />
+          )}
+        </Button>
+
         {isSearchMode && (
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={clearSearch}
-            className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--error)] border border-[var(--border-subtle)] rounded-sm flex-shrink-0"
-            title="Clear search"
+            className="h-9 w-9 text-destructive hover:bg-destructive/10"
+            title="Clear all filters"
           >
-            <X size={13} />
-          </button>
+            <X size={16} />
+          </Button>
         )}
+
         {message && (
-          <div className={`text-xs px-2.5 py-1.5 rounded-sm border flex-shrink-0 ${
-            message.type === "success" ? "bg-[#455D4A10] border-[var(--success)] text-[var(--success)]" : "bg-[#9E473D10] border-[var(--error)] text-[var(--error)]"
-          }`}>
+          <Badge 
+            variant={message.type === "success" ? "success" : "destructive"}
+            className="h-9 px-3 animate-in fade-in slide-in-from-right-2 duration-300"
+          >
             {message.text}
-          </div>
+          </Badge>
         )}
       </div>
 
       {/* Filter panel */}
       {showFilters && (
-        <div className="px-3 sm:px-4 pb-3 border-t border-[var(--border-subtle)] pt-2.5 space-y-2.5">
-          <div className="flex flex-wrap gap-1">
+        <div className="px-4 pb-4 border-t border-border/50 pt-3 space-y-4 animate-in slide-in-from-top-2 duration-200">
+          <div className="flex flex-wrap gap-1.5">
             {datePresets.map(p => (
               <button
                 key={p.label}
                 onClick={() => { setSearchDateFrom(p.from); setSearchDateTo(p.to); }}
-                className={`px-2.5 py-1 text-[10px] font-medium rounded-sm border transition-colors ${
+                className={cn(
+                  "px-3 py-1 text-[10px] font-bold rounded-md border transition-all uppercase tracking-wider",
                   searchDateFrom === p.from && searchDateTo === p.to
-                    ? "bg-[var(--brand)] text-white border-[var(--brand)]"
-                    : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]"
-                }`}
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "border-border/50 text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5"
+                )}
               >
                 {p.label}
               </button>
@@ -168,27 +156,90 @@ export default function ItemsFilterBar({
             {(searchDateFrom || searchDateTo) && (
               <button
                 onClick={() => { setSearchDateFrom(""); setSearchDateTo(""); }}
-                className="px-2.5 py-1 text-[10px] rounded-sm border border-[var(--border-subtle)] text-[var(--error)] hover:bg-[#9E473D08]"
+                className="px-3 py-1 text-[10px] font-bold rounded-md border border-destructive/30 text-destructive hover:bg-destructive/5 uppercase tracking-wider"
               >
-                Clear dates
+                Clear Dates
               </button>
             )}
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            <div>
-              <label className="text-[9px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Customer</label>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <FilterField label="Customer">
               <select
                 value={searchCustomer}
                 onChange={e => setSearchCustomer(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)]"
+                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
               >
-                <option value="All">All</option>
+                <option value="All">All Customers</option>
                 {customers.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-            </div>
-            <div>
-              <label className="text-[9px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Date From</label>
-              <DatePickerInput value={searchDateFrom} onChange={setSearchDateFrom} placeholder="From date" />
+            </FilterField>
+
+            <FilterField label="Date From">
+              <DatePickerInput value={searchDateFrom} onChange={setSearchDateFrom} placeholder="Select date" />
+            </FilterField>
+
+            <FilterField label="Date To">
+              <DatePickerInput value={searchDateTo} onChange={setSearchDateTo} placeholder="Select date" />
+            </FilterField>
+
+            <FilterField label="Tailoring Status">
+              <select
+                value={searchStatus}
+                onChange={e => setSearchStatus(e.target.value)}
+                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+              >
+                {["All", "N/A", "Awaiting Order", "Pending", "Stitched", "Delivered"].map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </FilterField>
+
+            <FilterField label="Payment">
+              <select
+                value={searchPayment}
+                onChange={e => setSearchPayment(e.target.value)}
+                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+              >
+                {["All", "Pending", "Settled"].map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </FilterField>
+
+            <FilterField label="Min Amount">
+              <input
+                type="number"
+                value={searchMinAmt}
+                onChange={e => setSearchMinAmt(e.target.value)}
+                placeholder="0"
+                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+              />
+            </FilterField>
+
+            <FilterField label="Max Amount">
+              <input
+                type="number"
+                value={searchMaxAmt}
+                onChange={e => setSearchMaxAmt(e.target.value)}
+                placeholder="∞"
+                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+              />
+            </FilterField>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilterField({ label, children }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/80 block px-0.5">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+ onChange={setSearchDateFrom} placeholder="From date" />
             </div>
             <div>
               <label className="text-[9px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1">Date To</label>

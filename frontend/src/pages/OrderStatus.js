@@ -3,8 +3,18 @@ import { useSearchParams } from "react-router-dom";
 import { getCustomers, getOrderStatus, markOrderDelivered, updateItem, getItems, invalidateOrderStatusCache } from "@/api";
 import { fmt } from "@/lib/fmt";
 import { DatePickerInput } from "@/components/DatePickerInput";
-import { ClipboardText, MagnifyingGlass, CheckCircle, Warning, PencilSimple, ArrowsClockwise } from "@phosphor-icons/react";
+import { 
+  ClipboardText, MagnifyingGlass, CheckCircle, Warning, 
+  PencilSimple, ArrowsClockwise, X, Info, Receipt, 
+  UsersThree, CalendarCheck, Package, Clock, Truck,
+  Scissors, Wallet, CaretDown
+} from "@phosphor-icons/react";
 import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 
 const STATUS_LABELS = {
@@ -20,22 +30,26 @@ const STATUS_LABELS = {
 
 function StatusPill({ label, value, tone }) {
   const tones = {
-    warning: "text-[var(--warning)] border-[#D4984233] bg-[#D498420f]",
-    info: "text-[var(--info)] border-[#5C8A9E33] bg-[#5C8A9E0f]",
-    success: "text-[var(--success)] border-[#455D4A33] bg-[#455D4A0f]",
-    muted: "text-[var(--text-secondary)] border-[var(--border-subtle)] bg-[var(--bg)]",
+    warning: "text-warning border-warning/20 bg-warning/10",
+    info: "text-info border-info/20 bg-info/10",
+    success: "text-success border-success/20 bg-success/10",
+    muted: "text-muted-foreground border-border/50 bg-muted/30",
   };
 
   const fullLabel = STATUS_LABELS[label] || label;
 
   return (
-    <span 
-      className={`inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-[10px] uppercase tracking-[0.1em] ${tones[tone] || tones.muted}`}
+    <Badge 
+      variant="outline" 
+      className={cn(
+        "inline-flex items-center gap-1.5 h-6 px-2 text-[9px] font-black uppercase tracking-widest border-none transition-all",
+        tones[tone] || tones.muted
+      )}
       title={fullLabel}
     >
-      <span>{label}</span>
-      <span className="font-mono font-semibold">{value}</span>
-    </span>
+      <span className="opacity-70">{label}</span>
+      <span className="font-mono font-black">{value}</span>
+    </Badge>
   );
 }
 
@@ -137,243 +151,361 @@ export default function OrderStatus() {
   }, [rows]);
 
   return (
-    <div data-testid="order-status-page" className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Order Status</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">Master status board grouped by order number</p>
+    <div data-testid="order-status-page" className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Order Status</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium truncate">Master tracking board for tailoring and delivery pipelines</p>
         </div>
-        <button onClick={() => { invalidateOrderStatusCache(); loadData(); }} disabled={loading} title="Refresh"
-          className="p-2 rounded-sm border border-[var(--border-subtle)] hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50">
-          <ArrowsClockwise size={16} className={loading ? "animate-spin" : ""} />
-        </button>
+        <Button variant="outline" size="icon" onClick={() => { invalidateOrderStatusCache(); loadData(); }} disabled={loading} className="rounded-full shadow-sm hover:rotate-180 transition-transform duration-500">
+          <ArrowsClockwise size={20} className={loading ? "animate-spin text-primary" : ""} />
+        </Button>
       </div>
 
       {overdueOnly && (
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-[#9E473D10] border border-[var(--error)] rounded-sm text-sm text-[var(--error)]">
-          <Warning size={15} weight="fill" />
-          Showing overdue orders only
-          <button onClick={() => { setOverdueOnly(false); setTimeout(loadData, 0); }} className="ml-auto text-xs underline hover:opacity-80">Clear</button>
+        <div className="flex items-center gap-3 p-4 bg-destructive/5 border border-destructive/20 rounded-2xl animate-in slide-in-from-top-4 duration-500">
+          <div className="p-2 rounded-full bg-destructive/10 text-destructive">
+            <Warning size={20} weight="fill" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-black uppercase tracking-widest text-destructive leading-none mb-1">Overdue Alert</p>
+            <p className="text-xs text-muted-foreground font-medium">Currently isolating orders that have breached their delivery timeline.</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => { setOverdueOnly(false); setTimeout(loadData, 0); }} className="text-destructive hover:bg-destructive/10 font-black uppercase tracking-widest text-[10px]">
+            Clear Filter
+          </Button>
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-3">
-          <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">Orders</p>
-          <p className="font-mono text-xl mt-1">{summary.orders}</p>
-        </div>
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-3">
-          <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">Items</p>
-          <p className="font-mono text-xl mt-1">{summary.items}</p>
-        </div>
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-3">
-          <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">Pending</p>
-          <p className="font-mono text-xl mt-1 text-[var(--warning)]">{summary.pending}</p>
-        </div>
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-3">
-          <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">Stitched</p>
-          <p className="font-mono text-xl mt-1 text-[var(--info)]">{summary.stitched}</p>
-        </div>
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-3">
-          <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">Delivered</p>
-          <p className="font-mono text-xl mt-1 text-[var(--success)]">{summary.delivered}</p>
-        </div>
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-3">
-          <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">Total Value</p>
-          <p className="font-mono text-xl mt-1">₹{fmt(summary.amount)}</p>
-        </div>
-      </div>
-
-      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div>
-            <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] flex items-center gap-1.5 mb-1.5">
-              Customer {customer && <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand)] inline-block" />}
-            </label>
-            <select value={customer} onChange={(e) => setCustomer(e.target.value)} className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-              <option value="">All Customers</option>
-              {[...customers].sort().map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] flex items-center gap-1.5 mb-1.5">
-              Order No. {orderNo && <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand)] inline-block" />}
-            </label>
-            <input value={orderNo} onChange={(e) => setOrderNo(e.target.value)} placeholder="Type order no" className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" />
-          </div>
-          <div>
-            <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">From</label>
-            <DatePickerInput value={fromDate} onChange={setFromDate} placeholder="From date" />
-          </div>
-          <div>
-            <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">To</label>
-            <DatePickerInput value={toDate} onChange={setToDate} placeholder="To date" />
-          </div>
-        </div>
-        <div className="mt-3">
-          <button data-testid="order-status-filter-btn" onClick={loadData} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] inline-flex items-center gap-1.5">
-            <MagnifyingGlass size={16} /> Apply Filters
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center gap-2">
-          <ClipboardText size={18} className="text-[var(--text-secondary)]" />
-          <h2 className="font-heading text-base font-medium">Order Status Grid</h2>
-          <span className="ml-auto text-xs text-[var(--text-secondary)]">{loading ? "Loading..." : `${rows.length} orders`}</span>
-        </div>
-
-        {/* Loading skeleton */}
-        {loading && (
-          <div className="p-4 space-y-2">
-            {[1,2,3,4,5].map(i => (
-              <div key={i} className="h-10 bg-[var(--bg)] animate-pulse rounded-sm" />
-            ))}
-          </div>
-        )}
-
-      {/* Mobile legend */}
-        <div className="md:hidden px-4 py-2 bg-[var(--bg)] border-b border-[var(--border-subtle)] flex flex-wrap gap-x-3 gap-y-1">
-          {[
-            ["Pnd","Pending"],["Stc","Stitched"],["Dlv","Delivered"],["Emb","Emb. In Progress"],["EFin","Emb. Finished"]
-          ].map(([abbr, full]) => (
-            <span key={abbr} className="text-[10px] text-[var(--text-secondary)]"><span className="font-mono font-semibold text-[var(--text-primary)]">{abbr}</span> = {full}</span>
-          ))}
-        </div>
-      {/* Mobile card view */}
-        <div className="md:hidden divide-y divide-[var(--border-subtle)]">
-          {!loading && rows.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">No orders found.</p>
-          )}
-          {!loading && rows.map((row) => {
-            const hasUndelivered = (row.tailoring_pending || 0) + (row.tailoring_stitched || 0) > 0;
-            const isOverdue = hasUndelivered && row.latest_delivery_date && row.latest_delivery_date !== "N/A" && row.latest_delivery_date < today;
-            return (
-              <div key={row._id || row.order_no} className={`p-4 space-y-2 ${isOverdue ? "bg-[#9E473D08] border-l-2 border-l-[var(--error)]" : ""}`}>
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-sm font-semibold">{row.order_no || "-"}</span>
-                  <span className="font-mono text-xs text-[var(--brand)]">₹{fmt(row.order_total || 0)}</span>
-                </div>
-                <p className="text-xs text-[var(--text-secondary)]">{(row.customers || []).join(", ") || "-"}</p>
-                <div className="flex flex-wrap gap-1 text-[10px]">
-                  <StatusPill label="Pnd" value={row.tailoring_pending || 0} tone="warning" />
-                  <StatusPill label="Stc" value={row.tailoring_stitched || 0} tone="info" />
-                  <StatusPill label="Dlv" value={row.tailoring_delivered || 0} tone="success" />
-                  <StatusPill label="Emb" value={row.emb_in_progress || 0} tone="info" />
-                  <StatusPill label="EFin" value={row.emb_finished || 0} tone="success" />
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)]">
-                  <span>Bill: {row.latest_bill_date || "-"}</span>
-                  <span className={isOverdue ? "text-[var(--error)] font-medium" : ""}>Delivery: {row.latest_delivery_date && row.latest_delivery_date !== "N/A" ? row.latest_delivery_date : "-"}{isOverdue ? " ⚠" : ""}</span>
-                </div>
-                {hasUndelivered && (
-                  <button
-                    disabled={delivering === row.order_no}
-                    onClick={() => handleDeliver(row.order_no)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-[var(--success)] text-white rounded-sm hover:opacity-90 disabled:opacity-50">
-                    <CheckCircle size={12} /> {delivering === row.order_no ? "…" : "Mark Delivered"}
-                  </button>
-                )}
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {[
+          { label: "Active Orders", value: summary.orders, icon: Package, color: "primary" },
+          { label: "Total Articles", value: summary.items, icon: Receipt, color: "primary" },
+          { label: "Pending Cut", value: summary.pending, icon: Clock, color: "warning" },
+          { label: "Stitched", value: summary.stitched, icon: Scissors, color: "info" },
+          { label: "Dispatched", value: summary.delivered, icon: Truck, color: "success" },
+          { label: "Board Value", value: `₹${fmt(summary.amount)}`, icon: Wallet, color: "primary", isCurrency: true },
+        ].map((stat, i) => (
+          <Card key={i} className="bg-card border-none shadow-lg shadow-black/5 overflow-hidden group hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-5 flex flex-col items-start gap-4">
+              <div className={cn(
+                "p-2.5 rounded-xl transition-transform group-hover:scale-110 duration-300",
+                stat.color === "primary" ? "bg-primary/10 text-primary" :
+                stat.color === "warning" ? "bg-warning/10 text-warning" :
+                stat.color === "info" ? "bg-info/10 text-info" : "bg-success/10 text-success"
+              )}>
+                <stat.icon size={20} weight="duotone" />
               </div>
-            );
-          })}
-        </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground opacity-60 leading-none mb-2">{stat.label}</p>
+                <p className={cn(
+                  "font-mono text-xl font-black tracking-tighter",
+                  stat.color === "warning" ? "text-warning" :
+                  stat.color === "info" ? "text-info" :
+                  stat.color === "success" ? "text-success" : "text-foreground"
+                )}>
+                  {stat.value}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-        <div className="hidden md:block overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-[var(--border-strong)]">
-          <table className="w-full min-w-[980px]">
-            <thead>
-              <tr className="bg-[var(--bg)]">
-                {[
-                  "Order #",
-                  "Customer(s)",
-                  "Reference(s)",
-                  "Items",
-                  "Tailoring",
-                  "Embroidery",
-                  "Value",
-                  "Latest Bill",
-                  "Latest Delivery",
-                  "Action",
-                ].map((h, hi) => (
-                  <th key={h} className={`text-left px-3 py-2 text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-secondary)] ${hi === 0 ? 'sticky left-0 z-10 bg-[var(--bg)]' : ''}`}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {!loading && rows.length === 0 && (
-                <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">No orders found for selected filters.</td>
-                </tr>
-              )}
+      {/* Filters Bar */}
+      <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden">
+        <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 flex items-center gap-2">
+                <UsersThree size={14} weight="bold" /> Client Identity
+              </label>
+              <div className="relative group">
+                <select 
+                  value={customer} 
+                  onChange={(e) => setCustomer(e.target.value)} 
+                  className="w-full h-11 pl-4 pr-10 text-xs font-bold bg-muted/30 border border-border/50 rounded-xl appearance-none focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer group-hover:border-primary/50"
+                >
+                  <option value="">Global Search (All Clients)</option>
+                  {[...customers].sort().map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <CaretDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none group-hover:text-primary transition-colors" />
+                {customer && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-primary border-2 border-background animate-pulse" />}
+              </div>
+            </div>
 
-              {!loading && rows.map((row) => {
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 flex items-center gap-2">
+                <Receipt size={14} weight="bold" /> Order Protocol
+              </label>
+              <div className="relative group">
+                <input 
+                  value={orderNo} 
+                  onChange={(e) => setOrderNo(e.target.value)} 
+                  placeholder="Order No. (e.g. 4502)" 
+                  className="w-full h-11 px-4 text-xs font-black font-mono bg-muted/30 border border-border/50 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all group-hover:border-primary/50" 
+                />
+                <MagnifyingGlass size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none group-hover:text-primary transition-colors" />
+                {orderNo && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-primary border-2 border-background animate-pulse" />}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 flex items-center gap-2">
+                <CalendarCheck size={14} weight="bold" /> From Date
+              </label>
+              <DatePickerInput value={fromDate} onChange={setFromDate} placeholder="Filter start date" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 flex items-center gap-2">
+                <CalendarCheck size={14} weight="bold" /> To Date
+              </label>
+              <DatePickerInput value={toDate} onChange={setToDate} placeholder="Filter end date" />
+            </div>
+          </div>
+          <div className="mt-8 flex justify-end border-t border-border/50 pt-6">
+            <Button 
+              data-testid="order-status-filter-btn" 
+              onClick={loadData} 
+              className="h-12 px-8 font-black uppercase tracking-[0.2em] text-xs shadow-lg shadow-primary/20 gap-3"
+            >
+              <MagnifyingGlass size={18} weight="bold" /> Execute Filter
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-none shadow-xl shadow-black/5 overflow-hidden bg-background min-h-[400px]">
+        <CardHeader className="px-6 py-4 border-b border-border/50 bg-background/50 backdrop-blur-md flex flex-row items-center justify-between space-y-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+              <ClipboardText size={18} weight="duotone" />
+            </div>
+            <div className="flex flex-col">
+              <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Master Status Board</CardTitle>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{loading ? "Synchronizing..." : `${rows.length} Active Orders`}</span>
+            </div>
+          </div>
+          <div className="hidden lg:flex items-center gap-6">
+            <div className="flex items-center gap-4">
+              {[
+                { label: "Pnd", full: "Pending" },
+                { label: "Stc", full: "Stitched" },
+                { label: "Dlv", full: "Delivered" },
+              ].map(leg => (
+                <div key={leg.label} className="flex items-center gap-2">
+                  <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">{leg.label}:</span>
+                  <span className="text-[9px] font-bold text-foreground opacity-60">{leg.full}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-6 space-y-4">
+              {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-in zoom-in-95 duration-500">
+              <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-6">
+                <Package size={40} className="text-muted-foreground opacity-40" weight="duotone" />
+              </div>
+              <h3 className="text-lg font-black uppercase tracking-[0.2em] text-foreground mb-2">No Records Found</h3>
+              <p className="text-sm text-muted-foreground font-medium max-w-[280px] leading-relaxed">
+                Adjust your filter protocols or timeline to visualize existing order pipelines.
+              </p>
+            </div>
+          ) : (
+            <>
+            {/* Mobile card view */}
+            <div className="md:hidden divide-y divide-border/30">
+              {rows.map((row) => {
                 const hasUndelivered = (row.tailoring_pending || 0) + (row.tailoring_stitched || 0) > 0;
                 const isOverdue = hasUndelivered && row.latest_delivery_date && row.latest_delivery_date !== "N/A" && row.latest_delivery_date < today;
                 return (
-                <tr key={row._id || row.order_no} className={`border-t border-[var(--border-subtle)] align-top hover:bg-[#C86B4D06] ${isOverdue ? "bg-[#9E473D06] border-l-2 border-l-[var(--error)]" : ""}`}>
-                  <td className="px-3 py-2 font-mono text-xs font-semibold sticky left-0 z-10 bg-[var(--surface)] border-r border-[var(--border-subtle)]">{row.order_no || "-"}</td>
-                  <td className="px-3 py-2 text-xs">{(row.customers || []).join(", ") || "-"}</td>
-                  <td className="px-3 py-2 text-xs">{(row.refs || []).join(", ") || "-"}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{row.item_count || 0}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex flex-wrap gap-1">
-                      <StatusPill label="Pnd" value={row.tailoring_pending || 0} tone="warning" />
-                      <StatusPill label="Stc" value={row.tailoring_stitched || 0} tone="info" />
-                      <StatusPill label="Dlv" value={row.tailoring_delivered || 0} tone="success" />
-                    </div>
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex flex-wrap gap-1">
-                      <StatusPill label="Req" value={row.emb_required || 0} tone="warning" />
-                      <StatusPill label="Prog" value={row.emb_in_progress || 0} tone="info" />
-                      <StatusPill label="Fin" value={row.emb_finished || 0} tone="success" />
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs">₹{fmt(row.order_total || 0)}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{row.latest_bill_date || "-"}</td>
-                  <td className="px-3 py-2">
-                    {editingDelivery?.order_no === row.order_no ? (
-                      <div className="flex items-center gap-1">
-                        <div className="w-32 flex-shrink-0">
-                          <DatePickerInput
-                            value={editingDelivery.value}
-                            onChange={v => setEditingDelivery(p => ({ ...p, value: v }))}
-                            onKeyDown={e => { if (e.key === "Enter") handleSaveDeliveryDate(); if (e.key === "Escape") setEditingDelivery(null); }}
-                          />
-                        </div>
-                        <button onClick={handleSaveDeliveryDate} disabled={savingDelivery} className="px-1.5 py-1 text-[10px] bg-[var(--brand)] text-white rounded-sm hover:opacity-90 disabled:opacity-50 whitespace-nowrap">{savingDelivery ? "…" : "Save"}</button>
-                        <button onClick={() => setEditingDelivery(null)} className="px-1.5 py-1 text-[10px] border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">✕</button>
+                  <div key={row._id || row.order_no} className={cn(
+                    "p-6 space-y-4 animate-in fade-in duration-300 relative",
+                    isOverdue && "bg-destructive/[0.02]"
+                  )}>
+                    {isOverdue && <div className="absolute top-0 left-0 w-1 h-full bg-destructive" />}
+                    
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <Badge variant="outline" className="w-fit font-mono text-[10px] h-5 px-1.5 font-bold text-primary border-primary/20 bg-primary/5">
+                          #{row.order_no}
+                        </Badge>
+                        <span className="text-sm font-black text-foreground uppercase tracking-tight">{(row.customers || []).join(", ")}</span>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => setEditingDelivery({ order_no: row.order_no, value: row.latest_delivery_date && row.latest_delivery_date !== "N/A" ? row.latest_delivery_date : "" })}
-                        className={`group flex items-center gap-1 font-mono text-xs hover:text-[var(--brand)] transition-colors ${isOverdue ? "text-[var(--error)] font-semibold" : ""}`}
-                        title="Click to edit delivery date"
-                      >
-                        {row.latest_delivery_date && row.latest_delivery_date !== "N/A" ? row.latest_delivery_date : "-"}{isOverdue ? " ⚠" : ""}
-                        <PencilSimple size={10} className="opacity-0 group-hover:opacity-60 transition-opacity flex-shrink-0" />
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {hasUndelivered && (
-                      <button
-                        disabled={delivering === row.order_no}
-                        onClick={() => handleDeliver(row.order_no)}
-                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-[var(--success)] text-white rounded-sm hover:opacity-90 disabled:opacity-50 whitespace-nowrap">
-                        <CheckCircle size={11} /> {delivering === row.order_no ? "…" : "Deliver"}
-                      </button>
-                    )}
-                  </td>
-                </tr>);
+                      <span className="font-mono text-base font-black text-foreground tracking-tighter">₹{fmt(row.order_total || 0)}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Tailoring Status</span>
+                        <div className="flex flex-wrap gap-1">
+                          <StatusPill label="Pnd" value={row.tailoring_pending || 0} tone="warning" />
+                          <StatusPill label="Stc" value={row.tailoring_stitched || 0} tone="info" />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Embroidery Status</span>
+                        <div className="flex flex-wrap gap-1">
+                          <StatusPill label="Prog" value={row.emb_in_progress || 0} tone="info" />
+                          <StatusPill label="Fin" value={row.emb_finished || 0} tone="success" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-muted/30 rounded-xl border border-border/50">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Timeline</span>
+                        <span className={cn("text-[10px] font-bold", isOverdue ? "text-destructive" : "text-muted-foreground")}>
+                          Del: {row.latest_delivery_date && row.latest_delivery_date !== "N/A" ? row.latest_delivery_date : "—"}
+                          {isOverdue && " (OVERDUE)"}
+                        </span>
+                      </div>
+                      {hasUndelivered && (
+                        <Button
+                          size="sm"
+                          disabled={delivering === row.order_no}
+                          onClick={() => handleDeliver(row.order_no)}
+                          className="h-8 px-4 font-black uppercase tracking-widest text-[9px] bg-success hover:bg-success/90 shadow-md shadow-success/10"
+                        >
+                          {delivering === row.order_no ? <ArrowsClockwise size={12} className="animate-spin" /> : <Truck size={12} className="mr-2" />} 
+                          Deliver
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+        <div className="hidden md:block overflow-x-auto custom-scrollbar">
+          <table className="w-full min-w-[1000px]">
+            <thead>
+              <tr className="bg-muted/30 border-b border-border/50">
+                <th className="sticky left-0 z-20 bg-muted/30 px-4 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Protocol #</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Client Entity</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Reference(s)</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Articles</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Tailoring Pipeline</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Embroidery Queue</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Valuation</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Timeline</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Delivery Goal</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Operations</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/30">
+              {rows.map((row) => {
+                const hasUndelivered = (row.tailoring_pending || 0) + (row.tailoring_stitched || 0) > 0;
+                const isOverdue = hasUndelivered && row.latest_delivery_date && row.latest_delivery_date !== "N/A" && row.latest_delivery_date < today;
+                return (
+                  <tr key={row._id || row.order_no} className={cn(
+                    "group transition-all duration-200 hover:bg-primary/[0.02]",
+                    isOverdue && "bg-destructive/[0.02]"
+                  )}>
+                    <td className="sticky left-0 z-10 bg-background group-hover:bg-muted/50 border-r border-border/50 px-4 py-4">
+                      <Badge variant="outline" className="font-mono text-[11px] font-black text-primary border-primary/20 bg-primary/5">
+                        #{row.order_no}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="text-xs font-black text-foreground uppercase tracking-tight">{(row.customers || []).join(", ") || "—"}</span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="text-[10px] font-bold text-muted-foreground opacity-60 uppercase tracking-widest">{(row.refs || []).join(", ") || "—"}</span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="font-mono text-xs font-black text-foreground">{row.item_count || 0}</span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        <StatusPill label="Pnd" value={row.tailoring_pending || 0} tone="warning" />
+                        <StatusPill label="Stc" value={row.tailoring_stitched || 0} tone="info" />
+                        <StatusPill label="Dlv" value={row.tailoring_delivered || 0} tone="success" />
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        <StatusPill label="Req" value={row.emb_required || 0} tone="warning" />
+                        <StatusPill label="Prog" value={row.emb_in_progress || 0} tone="info" />
+                        <StatusPill label="Fin" value={row.emb_finished || 0} tone="success" />
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <span className="font-mono text-xs font-black text-foreground">₹{fmt(row.order_total || 0)}</span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60 mb-1">Billing</span>
+                        <span className="font-mono text-[11px] font-bold text-foreground">{row.latest_bill_date || "—"}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      {editingDelivery?.order_no === row.order_no ? (
+                        <div className="flex items-center gap-2 animate-in zoom-in-95 duration-200">
+                          <div className="w-36">
+                            <DatePickerInput
+                              value={editingDelivery.value}
+                              onChange={v => setEditingDelivery(p => ({ ...p, value: v }))}
+                              onKeyDown={e => { if (e.key === "Enter") handleSaveDeliveryDate(); if (e.key === "Escape") setEditingDelivery(null); }}
+                            />
+                          </div>
+                          <Button size="icon" onClick={handleSaveDeliveryDate} disabled={savingDelivery} className="h-9 w-9 bg-primary shadow-md">
+                            <CheckCircle size={16} weight="bold" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => setEditingDelivery(null)} className="h-9 w-9 text-muted-foreground">
+                            <X size={16} weight="bold" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div 
+                          onClick={() => setEditingDelivery({ order_no: row.order_no, value: row.latest_delivery_date && row.latest_delivery_date !== "N/A" ? row.latest_delivery_date : "" })}
+                          className="flex flex-col cursor-pointer group/del"
+                        >
+                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60 mb-1 flex items-center gap-2">
+                            Delivery Goal <PencilSimple size="10" className="opacity-0 group-hover/del:opacity-100 transition-opacity" />
+                          </span>
+                          <span className={cn(
+                            "font-mono text-[11px] font-bold flex items-center gap-2",
+                            isOverdue ? "text-destructive" : "text-foreground group-hover/del:text-primary"
+                          )}>
+                            {row.latest_delivery_date && row.latest_delivery_date !== "N/A" ? row.latest_delivery_date : "—"}
+                            {isOverdue && <Warning size={14} weight="fill" className="animate-pulse" />}
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      {hasUndelivered && (
+                        <Button
+                          size="sm"
+                          disabled={delivering === row.order_no}
+                          onClick={() => handleDeliver(row.order_no)}
+                          className="h-9 px-4 font-black uppercase tracking-widest text-[10px] bg-success hover:bg-success/90 shadow-lg shadow-success/10"
+                        >
+                          {delivering === row.order_no ? <ArrowsClockwise size={14} className="animate-spin" /> : <Truck size={14} className="mr-2" />} 
+                          Deliver
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
               })}
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

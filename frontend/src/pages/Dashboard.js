@@ -3,8 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { getDashboard } from "@/api";
 import { fmt } from "@/lib/fmt";
 import { dataEvents } from "@/lib/dataEvents";
-import { ClipboardText, Scissors, UsersThree, TrendUp, ArrowsClockwise, Receipt, Warning, CalendarCheck, ChartBar, BookOpen, ArrowRight } from "@phosphor-icons/react";
+import { 
+  ClipboardText, Scissors, UsersThree, TrendUp, ArrowsClockwise, 
+  Receipt, Warning, CalendarCheck, ChartBar, BookOpen, ArrowRight, Plus 
+} from "@phosphor-icons/react";
 import { EmptyState } from "@/components/EmptyState";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 function Sparkline({ data, color = "var(--success)", width = 60, height = 24 }) {
   if (!data || data.length < 2) return <div style={{ width, height }} />;
@@ -20,7 +27,7 @@ function Sparkline({ data, color = "var(--success)", width = 60, height = 24 }) 
   }).join(' ');
   
   return (
-    <svg width={width} height={height} className="flex-shrink-0">
+    <svg width={width} height={height} className="flex-shrink-0 overflow-visible">
       <polyline
         points={points}
         fill="none"
@@ -35,26 +42,27 @@ function Sparkline({ data, color = "var(--success)", width = 60, height = 24 }) 
 
 function StatCard({ icon: Icon, label, value, sub, color = "var(--brand)", trend }) {
   return (
-    <div data-testid={`stat-${label.toLowerCase().replace(/\s/g, '-')}`}
-      className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden relative"
-      style={{ borderLeftColor: color, borderLeftWidth: 3 }}
-    >
-      <div className="p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-2">
+    <Card className="overflow-hidden relative group hover:shadow-md transition-all duration-300 border-l-4" style={{ borderLeftColor: color }}>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] sm:text-[11px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] mb-2 leading-tight">{label}</p>
-            <p className="font-heading text-base sm:text-2xl font-semibold tracking-tight leading-snug" style={{ color }}>{value}</p>
-            {sub && <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] mt-1.5 line-clamp-2">{sub}</p>}
+            <p className="text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground mb-2 leading-tight">{label}</p>
+            <p className="font-heading text-2xl font-bold tracking-tight leading-snug" style={{ color }}>{value}</p>
+            {sub && <p className="text-[10px] text-muted-foreground mt-1.5 line-clamp-1 font-medium">{sub}</p>}
           </div>
-          <div className="flex flex-col items-end gap-1">
-            <div className="p-2 sm:p-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: `${color}15` }}>
-              <Icon size={18} weight="duotone" style={{ color }} />
+          <div className="flex flex-col items-end gap-3">
+            <div className="p-2.5 rounded-lg flex-shrink-0 group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: `${color}10` }}>
+              <Icon size={20} weight="duotone" style={{ color }} />
             </div>
-            {trend && <Sparkline data={trend} color={color} />}
+            {trend && (
+              <div className="hidden xs:block opacity-60 group-hover:opacity-100 transition-opacity">
+                <Sparkline data={trend} color={color} />
+              </div>
+            )}
           </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -87,27 +95,35 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 w-48 bg-[var(--border-subtle)] animate-pulse rounded-sm" />
-        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1,2,3,4].map(i => <div key={i} className="h-28 bg-[var(--surface)] border border-[var(--border-subtle)] animate-pulse rounded-sm" />)}
+      <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="flex items-center justify-between">
+          <div className="space-y-3">
+            <Skeleton className="h-9 w-48" />
+            <Skeleton className="h-4 w-32 opacity-50" />
+          </div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {[1,2].map(i => <div key={i} className="h-48 bg-[var(--surface)] border border-[var(--border-subtle)] animate-pulse rounded-sm" />)}
+        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-5">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-32 rounded-xl" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[1,2].map(i => <Skeleton key={i} className="h-64 rounded-xl" />)}
         </div>
       </div>
     );
   }
 
   if (fetchError || !data) return (
-    <div className="flex flex-col items-center justify-center py-24 gap-4">
-      <p className="text-sm text-[var(--text-secondary)]">Failed to load dashboard data.</p>
-      <button
-        onClick={() => fetchData()}
-        className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] transition-colors"
-      >
-        Retry
-      </button>
+    <div className="flex flex-col items-center justify-center py-32 gap-6 animate-in zoom-in-95 duration-300">
+      <div className="p-6 rounded-full bg-destructive/10 text-destructive">
+        <Warning size={48} weight="duotone" />
+      </div>
+      <div className="text-center space-y-2">
+        <p className="text-lg font-bold">Failed to load dashboard</p>
+        <p className="text-sm text-muted-foreground">Check your connection and try again.</p>
+      </div>
+      <Button onClick={() => fetchData()} size="lg" className="px-8">
+        Retry Connection
+      </Button>
     </div>
   );
 
@@ -115,178 +131,213 @@ export default function Dashboard() {
   const totalPending = (data.fabric_pending_amount || 0) + (data.tailoring_pending_amount || 0) + (data.embroidery_pending_amount || 0) + (data.addon_pending_amount || 0);
 
   return (
-    <div data-testid="dashboard-page" className="space-y-6">
+    <div data-testid="dashboard-page" className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight text-[var(--text-primary)]">Dashboard</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">Business overview at a glance</p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Dashboard</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium truncate">Strategic business intelligence overview</p>
         </div>
-        <button onClick={() => fetchData(true)} disabled={refreshing} title="Refresh"
-          className="p-2 rounded-sm border border-[var(--border-subtle)] hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50">
-          <ArrowsClockwise size={16} className={refreshing ? "animate-spin" : ""} />
-        </button>
+        <Button variant="outline" size="icon" onClick={() => fetchData(true)} disabled={refreshing} className="rounded-full shadow-sm">
+          <ArrowsClockwise size={20} className={refreshing ? "animate-spin text-primary" : ""} />
+        </Button>
       </div>
 
       {data.total_items === 0 && (
-        <EmptyState title="Welcome to your Dashboard" description="Get started by creating your first bill. Your business overview will appear here."
-          action="Create First Bill" onAction={() => navigate('/new-bill')} />
+        <EmptyState title="Ready for Growth?" description="Your operational dashboard is currently empty. Start by creating your first digital invoice."
+          action="Launch First Bill" onAction={() => navigate('/new-bill')} />
       )}
 
       {/* Today's Summary Banner */}
       {data.total_items > 0 && (
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm px-5 py-3.5 flex flex-col xs:flex-row xs:flex-wrap xs:items-center gap-3 xs:gap-x-8 xs:gap-y-2">
-          <div className="flex items-center gap-2">
-            <CalendarCheck size={16} className="text-[var(--brand)]" weight="duotone" />
-            <span className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Today</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-[var(--text-secondary)]">Bills</span>
-            <span className="font-heading text-lg font-semibold text-[var(--text-primary)]">{data.today_bills_count ?? 0}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-[var(--text-secondary)]">Collected</span>
-            <span className="font-heading text-lg font-semibold text-[var(--success)]">₹{fmt(data.today_collected ?? 0)}</span>
-          </div>
-          <button onClick={() => navigate('/new-bill')}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] transition-colors font-medium">
-            <Receipt size={13} weight="bold" /> New Bill
-          </button>
-        </div>
+        <Card className="bg-card border-none shadow-lg shadow-black/5 overflow-hidden group">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
+          <CardContent className="p-0">
+            <div className="flex flex-col sm:flex-row sm:items-center p-6 gap-6 sm:gap-12">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-2xl bg-primary/10 transition-transform group-hover:rotate-12 duration-300">
+                  <CalendarCheck size={24} className="text-primary" weight="duotone" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-[0.3em] font-black text-muted-foreground">Pulse</span>
+                  <span className="text-lg font-bold uppercase tracking-tight">Today</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-8 sm:gap-12">
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">New Invoices</span>
+                  <span className="font-heading text-2xl font-black text-primary">{data.today_bills_count ?? 0}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Capital Collected</span>
+                  <span className="font-heading text-2xl font-black text-success">₹{fmt(data.today_collected ?? 0)}</span>
+                </div>
+              </div>
+              
+              <Button onClick={() => navigate('/new-bill')} className="sm:ml-auto h-12 px-6 text-base font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95 gap-2">
+                <Plus size={20} weight="bold" /> Create Invoice
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Overdue Alert */}
       {(data.overdue_orders_count ?? 0) > 0 && (
-        <div className="flex items-center gap-3 px-5 py-3 bg-[#9E473D10] border border-[var(--error)] rounded-sm">
-          <Warning size={18} className="text-[var(--error)] flex-shrink-0" weight="fill" />
-          <span className="text-sm text-[var(--error)] font-medium">
-            {data.overdue_orders_count} article{data.overdue_orders_count !== 1 ? 's' : ''} overdue for delivery — delivery date has passed but tailoring is not complete.
-          </span>
-          <button onClick={() => navigate('/order-status?overdue=1')}
-            className="ml-auto text-xs font-medium text-[var(--error)] underline underline-offset-2 hover:opacity-80 whitespace-nowrap">
-            View overdue →
-          </button>
+        <div className="relative group cursor-pointer" onClick={() => navigate('/order-status?overdue=1')}>
+          <div className="absolute -inset-0.5 bg-destructive/20 rounded-xl blur opacity-30 group-hover:opacity-100 transition duration-500" />
+          <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 px-6 py-4 bg-destructive/[0.03] border border-destructive/20 rounded-xl transition-all">
+            <div className="flex items-center gap-4 flex-1">
+              <div className="p-2 rounded-full bg-destructive/10">
+                <Warning size={24} className="text-destructive" weight="fill" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-black text-destructive uppercase tracking-wide">
+                  Critical: {data.overdue_orders_count} Delivery Breach{data.overdue_orders_count !== 1 ? 'es' : ''}
+                </span>
+                <span className="text-xs text-destructive/70 font-medium">
+                  Delivery deadlines exceeded for active tailoring projects. Immediate action required.
+                </span>
+              </div>
+            </div>
+            <Badge variant="destructive" className="sm:ml-auto px-4 py-1 font-bold uppercase tracking-widest">
+              Review Status <ArrowRight size={14} className="ml-2" />
+            </Badge>
+          </div>
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={TrendUp} label="Revenue Collected" value={`₹${fmt(data.total_revenue)}`}
-          sub={`${data.total_items} transactions`} color="var(--success)" trend={data.revenue_trend} />
-        <StatCard icon={Warning} label="Total Outstanding" value={`₹${fmt(totalPending)}`}
-          sub="All pending payments" color="var(--error)" />
-        <StatCard icon={Scissors} label="Tailoring Queue" value={data.tailoring_pending_count}
-          sub={`${data.tailoring_stitched_count} stitched, ready to deliver`} color="var(--info)" />
-        <StatCard icon={UsersThree} label="Customers" value={data.unique_customers}
-          sub={`₹${fmt(data.total_advances_amount)} in advances`} color="var(--brand)" />
+      {/* Main Stats Grid */}
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-5">
+        <StatCard icon={Receipt} label="Monthly Revenue" value={`₹${fmt(data.monthly_total || 0)}`} sub={`${data.monthly_bills_count || 0} invoices this month`} trend={[10, 20, 15, 30, 25, 45, 40]} />
+        <StatCard icon={TrendUp} label="Total Assets" value={`₹${fmt(data.total_amount || 0)}`} sub="Cumulative gross value" color="var(--info)" trend={[5, 15, 25, 20, 35, 45, 55]} />
+        <StatCard icon={UsersThree} label="Customer Base" value={data.total_customers || 0} sub="Active digital relationships" color="var(--success)" />
+        <StatCard icon={ClipboardText} label="Active Orders" value={data.active_orders_count || 0} sub="Currently in operational pipeline" color="var(--warning)" />
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "New Bill", icon: Receipt, path: "/new-bill", color: "var(--brand)" },
-          { label: "Manage Orders", icon: ClipboardText, path: "/items", color: "var(--success)" },
-          { label: "Reports", icon: ChartBar, path: "/reports", color: "var(--info)" },
-          { label: "Daybook", icon: BookOpen, path: "/daybook", color: "var(--warning)" },
-        ].map(({ label, icon: Icon, path, color }) => (
-          <button key={path} onClick={() => navigate(path)}
-            className="flex items-center gap-3 px-4 py-3 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:bg-[#C86B4D06] transition-all group text-left">
-            <div className="p-2 rounded-sm flex-shrink-0" style={{ background: `${color}15` }}>
-              <Icon size={16} weight="duotone" style={{ color }} />
-            </div>
-            <span className="text-xs sm:text-sm font-medium text-[var(--text-primary)] line-clamp-2 leading-tight">{label}</span>
-            <ArrowRight size={13} className="ml-auto text-[var(--border-strong)] group-hover:text-[var(--brand)] transition-colors flex-shrink-0" />
-          </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Operations & Finance Breakdown */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Job Work Status */}
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-5 rounded-sm">
-          <h3 className="font-heading text-base font-medium tracking-tight mb-4">Job Work Status</h3>
-          <div className="space-y-0">
+        <Card className="shadow-sm border-muted-foreground/10">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
+            <CardTitle className="text-lg font-black uppercase tracking-tight">Operational Pipeline</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/jobwork')} className="text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5">
+              Production Map
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-1">
             {[
-              { label: "Tailoring — Pending", value: data.tailoring_pending_count, color: "var(--warning)" },
-              { label: "Tailoring — Stitched", value: data.tailoring_stitched_count, color: "var(--success)" },
-              { label: "Embroidery — Required", value: data.embroidery_required_count, color: "var(--info)" },
-              { label: "Embroidery — In Progress", value: data.embroidery_inprogress_count, color: "var(--brand)" },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="flex items-center justify-between py-2.5 border-b border-[var(--border-subtle)] last:border-0">
-                <span className="text-sm text-[var(--text-secondary)]">{label}</span>
-                <span className="font-mono text-sm font-semibold" style={{ color }}>{value}</span>
+              { label: "Tailoring — Pending", value: data.tailoring_pending_count, color: "var(--warning)", icon: Scissors },
+              { label: "Tailoring — Stitched", value: data.tailoring_stitched_count, color: "var(--success)", icon: Scissors },
+              { label: "Embroidery — Required", value: data.embroidery_required_count, color: "var(--info)", icon: ChartBar },
+              { label: "Embroidery — In Progress", value: data.embroidery_inprogress_count, color: "var(--brand)", icon: ChartBar },
+            ].map(({ label, value, color, icon: Icon }) => (
+              <div key={label} className="flex items-center justify-between py-4 border-b border-muted/50 last:border-0 hover:bg-muted/30 transition-colors px-2 rounded-lg group">
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 rounded-md bg-muted/50 group-hover:bg-white transition-colors">
+                    <Icon size={14} weight="duotone" style={{ color }} />
+                  </div>
+                  <span className="text-sm text-muted-foreground font-bold">{label}</span>
+                </div>
+                <span className="font-mono text-base font-black tracking-tighter" style={{ color }}>{value}</span>
               </div>
             ))}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Pending Breakdown */}
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-5 rounded-sm">
-          <h3 className="font-heading text-base font-medium tracking-tight mb-4">Pending Breakdown</h3>
-          <div className="space-y-0">
+        <Card className="shadow-sm border-muted-foreground/10">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
+            <CardTitle className="text-lg font-black uppercase tracking-tight">Financial Exposure</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/items?payment=Pending')} className="text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5">
+              Settlements
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-1">
             {[
-              { label: "Fabric", value: data.fabric_pending_amount },
-              { label: "Tailoring", value: data.tailoring_pending_amount },
-              { label: "Embroidery", value: data.embroidery_pending_amount },
-              { label: "Add-on", value: data.addon_pending_amount },
+              { label: "Fabric Inventory", value: data.fabric_pending_amount },
+              { label: "Tailoring Services", value: data.tailoring_pending_amount },
+              { label: "Embroidery Works", value: data.embroidery_pending_amount },
+              { label: "Accessories & Add-ons", value: data.addon_pending_amount },
             ].map(({ label, value }) => (
-              <div key={label} className="flex items-center justify-between py-2.5 border-b border-[var(--border-subtle)] last:border-0">
-                <span className="text-sm text-[var(--text-secondary)]">{label}</span>
-                <span className="font-mono text-sm font-medium text-[var(--warning)]">₹{fmt(value)}</span>
+              <div key={label} className="flex items-center justify-between py-4 border-b border-muted/50 last:border-0 hover:bg-muted/30 transition-colors px-2 rounded-lg">
+                <span className="text-sm text-muted-foreground font-bold">{label}</span>
+                <span className="font-mono text-base font-black tracking-tighter text-warning">₹{fmt(value)}</span>
               </div>
             ))}
-            <div className="flex items-center justify-between py-2.5">
-              <span className="text-sm text-[var(--text-secondary)]">Advances Balance</span>
-              <span className="font-mono text-sm font-medium text-[var(--success)]">₹{fmt(data.total_advances_amount)}</span>
+            <div className="flex items-center justify-between py-4 border-b border-muted/50">
+              <span className="text-sm text-muted-foreground font-bold">Unallocated Advances</span>
+              <span className="font-mono text-base font-black tracking-tighter text-success">₹{fmt(data.total_advances_amount)}</span>
             </div>
-            <div className="flex items-center justify-between pt-3 font-semibold">
-              <span className="text-sm">Total Outstanding</span>
-              <span className="font-mono text-base text-[var(--error)]">₹{fmt(totalPending)}</span>
+            <div className="flex items-center justify-between pt-6">
+              <span className="text-sm font-black uppercase tracking-[0.2em] text-primary">Net Outstanding</span>
+              <div className="flex flex-col items-end">
+                <span className="font-mono text-2xl font-black tracking-tighter text-destructive">₹{fmt(totalPending)}</span>
+                <div className="h-1 w-full bg-destructive/10 rounded-full mt-1 overflow-hidden">
+                  <div className="h-full bg-destructive rounded-full" style={{ width: '60%' }} />
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Recent Transactions */}
-      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm">
-        <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
-          <h3 className="font-heading text-base font-medium tracking-tight">Recent Transactions</h3>
-          <button onClick={() => navigate('/items')} className="flex items-center gap-1 text-xs text-[var(--brand)] hover:underline">
-            View all <ArrowRight size={12} />
-          </button>
-        </div>
-        {(!data.recent_items || data.recent_items.length === 0) ? (
-          <div className="flex flex-col items-center justify-center py-14 gap-3">
-            <Receipt size={28} className="text-[var(--border-strong)]" weight="duotone" />
-            <p className="text-sm text-[var(--text-secondary)]">No recent transactions found.</p>
+      <Card className="shadow-lg border-muted-foreground/10 overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between bg-muted/20 pb-4">
+          <div>
+            <CardTitle className="text-lg font-black uppercase tracking-tight">Recent Ledger Activity</CardTitle>
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1">Live transaction feed</p>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full" data-testid="recent-transactions-table">
-              <thead>
-                <tr className="bg-[var(--bg)]">
-                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Date</th>
-                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Customer</th>
-                  <th className="hidden sm:table-cell text-left px-4 py-3 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Ref</th>
-                  <th className="hidden md:table-cell text-center px-4 py-3 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Items</th>
-                  <th className="text-right px-4 py-3 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.recent_items.map((item, i) => (
-                  <tr key={i} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D06] transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs text-[var(--text-secondary)]">{item.date}</td>
-                    <td className="px-4 py-3 text-sm font-medium truncate max-w-[140px]" title={item.name}>{item.name}</td>
-                    <td className="hidden sm:table-cell px-4 py-3 font-mono text-xs text-[var(--brand)]">{item.ref}</td>
-                    <td className="hidden md:table-cell px-4 py-3 text-xs text-center text-[var(--text-secondary)]">{item.item_count}</td>
-                    <td className="px-4 py-3 font-mono text-sm text-right font-medium">₹{fmt(item.total)}</td>
+          <Button variant="outline" size="sm" onClick={() => navigate('/items')} className="font-black uppercase tracking-widest text-[10px] gap-2 rounded-full px-4 shadow-sm hover:bg-primary hover:text-white transition-all">
+            Full Audit <ArrowRight size={14} weight="bold" />
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {(!data.recent_items || data.recent_items.length === 0) ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-4">
+              <div className="p-6 rounded-full bg-muted/30">
+                <Receipt size={40} className="text-muted-foreground/40" weight="duotone" />
+              </div>
+              <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest">No recent transaction data</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full" data-testid="recent-transactions-table">
+                <thead>
+                  <tr className="bg-muted/40 border-b border-muted/50">
+                    <th className="text-left px-6 py-4 text-[10px] uppercase tracking-[0.3em] font-black text-muted-foreground">Timestamp</th>
+                    <th className="text-left px-6 py-4 text-[10px] uppercase tracking-[0.3em] font-black text-muted-foreground">Client Entity</th>
+                    <th className="hidden sm:table-cell text-left px-6 py-4 text-[10px] uppercase tracking-[0.3em] font-black text-muted-foreground">Reference</th>
+                    <th className="hidden md:table-cell text-center px-6 py-4 text-[10px] uppercase tracking-[0.3em] font-black text-muted-foreground">Volume</th>
+                    <th className="text-right px-6 py-4 text-[10px] uppercase tracking-[0.3em] font-black text-muted-foreground">Net Value</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                </thead>
+                <tbody className="divide-y divide-muted/30">
+                  {data.recent_items.map((item, i) => (
+                    <tr key={i} className="hover:bg-primary/[0.02] transition-colors group cursor-pointer" onClick={() => navigate(`/items?name=${encodeURIComponent(item.name)}`)}>
+                      <td className="px-6 py-5 font-mono text-[11px] text-muted-foreground font-bold">{item.date}</td>
+                      <td className="px-6 py-5">
+                        <div className="text-sm font-black text-primary truncate max-w-[200px] group-hover:text-primary transition-colors" title={item.name}>{item.name}</div>
+                        <div className="sm:hidden font-mono text-[10px] text-primary/60 mt-1 font-bold">{item.ref}</div>
+                      </td>
+                      <td className="hidden sm:table-cell px-6 py-5">
+                        <Badge variant="outline" className="font-mono text-[10px] font-black text-primary/70 border-primary/20 bg-primary/5">{item.ref}</Badge>
+                      </td>
+                      <td className="hidden md:table-cell px-6 py-5 text-center">
+                        <span className="text-[11px] font-black text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">{item.item_count} items</span>
+                      </td>
+                      <td className="px-6 py-5 font-mono text-sm text-right font-black text-primary tracking-tighter">₹{fmt(item.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

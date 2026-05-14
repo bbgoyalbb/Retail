@@ -1,20 +1,39 @@
-﻿import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { listAuditLogs, listUsers } from "@/api";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowClockwise, Funnel, X } from "@phosphor-icons/react";
+import { 
+  ArrowClockwise, Funnel, X, ShieldCheck, 
+  User, Activity, Clock, Info, CaretDown,
+  ArrowLeft, ArrowRight
+} from "@phosphor-icons/react";
 import { DatePickerInput } from "@/components/DatePickerInput";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 const ACTION_COLORS = {
-  create: "text-[var(--success)] bg-[#455D4A10]",
-  update: "text-[var(--info)] bg-[#5C8A9E10]",
-  delete: "text-[var(--error)] bg-[#9E473D10]",
-  login:  "text-[var(--brand)] bg-[#C86B4D10]",
-  logout: "text-[var(--text-secondary)] bg-[var(--bg)]",
+  create: "text-success bg-success/10 border-success/20",
+  update: "text-info bg-info/10 border-info/20",
+  delete: "text-destructive bg-destructive/10 border-destructive/20",
+  login:  "text-primary bg-primary/10 border-primary/20",
+  logout: "text-muted-foreground bg-muted/30 border-border/50",
 };
 
-function badge(action = "") {
+function ActionBadge({ action = "" }) {
   const key = Object.keys(ACTION_COLORS).find(k => action.toLowerCase().includes(k)) || "update";
-  return `inline-block px-2 py-0.5 rounded-sm text-[10px] font-semibold uppercase tracking-wider ${ACTION_COLORS[key]}`;
+  return (
+    <Badge 
+      variant="outline" 
+      className={cn(
+        "px-2 py-0.5 text-[9px] font-black uppercase tracking-widest border-none transition-all",
+        ACTION_COLORS[key]
+      )}
+    >
+      {action}
+    </Badge>
+  );
 }
 
 const ACTION_TYPES = ["create", "update", "delete", "login", "logout"];
@@ -84,153 +103,214 @@ export default function AuditLogPage() {
   const goPage = (n) => { setPage(n); fetchLogs(n); };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight text-[var(--text-primary)]">Audit Log</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">All actions performed in the system</p>
+        <div className="min-w-0">
+          <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Security Audit</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium truncate">Comprehensive ledger of all system interactions and modifications</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
+        <div className="flex items-center gap-3">
+          <Button
+            variant={showFilters ? "default" : "outline"}
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-3 py-2 text-sm border rounded-sm transition-colors ${showFilters ? 'bg-[var(--brand)] text-white border-[var(--brand)]' : 'border-[var(--border-subtle)] hover:bg-[var(--bg)] text-[var(--text-secondary)]'}`}
+            className={cn(
+              "h-10 px-4 font-black uppercase tracking-widest text-[10px] rounded-xl transition-all",
+              showFilters && "shadow-lg shadow-primary/20"
+            )}
           >
-            <Funnel size={15} />
-            Filters {(filterUser || filterAction || filterDateFrom || filterDateTo) && <span className="ml-1 w-2 h-2 bg-[var(--warning)] rounded-full" />}
-          </button>
-          <button
+            <Funnel size={16} weight="bold" className="mr-2" />
+            Filters {(filterUser || filterAction || filterDateFrom || filterDateTo) && <span className="ml-2 w-2 h-2 bg-warning rounded-full animate-pulse" />}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
             onClick={() => { setPage(0); fetchLogs(0); }}
-            className="flex items-center gap-2 px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] text-[var(--text-secondary)] transition-colors"
+            className="h-10 w-10 rounded-full shadow-sm hover:rotate-180 transition-transform duration-500"
           >
-            <ArrowClockwise size={15} className={loading ? "animate-spin" : ""} />
-            Refresh
-          </button>
+            <ArrowClockwise size={18} weight="bold" className={loading ? "animate-spin text-primary" : ""} />
+          </Button>
         </div>
       </div>
 
       {/* Filter Panel */}
       {showFilters && (
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">User</label>
-              <select 
-                value={filterUser} 
-                onChange={e => setFilterUser(e.target.value)}
-                className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)] min-w-[140px]"
+        <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden animate-in slide-in-from-top-4 duration-300">
+          <div className="absolute top-0 left-0 w-full h-1 bg-primary" />
+          <CardContent className="p-6 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Agent Identity</label>
+                <div className="relative group">
+                  <select 
+                    value={filterUser} 
+                    onChange={e => setFilterUser(e.target.value)}
+                    className="w-full h-11 pl-4 pr-10 text-xs font-bold bg-muted/30 border border-border/50 rounded-xl appearance-none focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer group-hover:border-primary/50"
+                  >
+                    <option value="">Global (All Agents)</option>
+                    {users.map(u => <option key={u.username} value={u.username}>{u.full_name} ({u.username})</option>)}
+                  </select>
+                  <CaretDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none group-hover:text-primary transition-colors" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Operation Type</label>
+                <div className="relative group">
+                  <select 
+                    value={filterAction} 
+                    onChange={e => setFilterAction(e.target.value)}
+                    className="w-full h-11 pl-4 pr-10 text-xs font-bold bg-muted/30 border border-border/50 rounded-xl appearance-none focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer group-hover:border-primary/50"
+                  >
+                    <option value="">Global (All Operations)</option>
+                    {ACTION_TYPES.map(a => <option key={a} value={a}>{a.charAt(0).toUpperCase() + a.slice(1)}</option>)}
+                  </select>
+                  <CaretDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none group-hover:text-primary transition-colors" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">From Timeline</label>
+                <DatePickerInput value={filterDateFrom} onChange={setFilterDateFrom} placeholder="Start date" />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">To Timeline</label>
+                <DatePickerInput value={filterDateTo} onChange={setFilterDateTo} placeholder="End date" />
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between gap-4 pt-4 border-t border-border/50">
+              <Button
+                variant="ghost"
+                onClick={clearFilters}
+                className="h-10 px-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground hover:text-destructive hover:bg-destructive/5"
               >
-                <option value="">All Users</option>
-                {users.map(u => <option key={u.username} value={u.username}>{u.full_name} ({u.username})</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Action</label>
-              <select 
-                value={filterAction} 
-                onChange={e => setFilterAction(e.target.value)}
-                className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)] min-w-[140px]"
+                <X size={14} weight="bold" className="mr-2" /> Reset Engine
+              </Button>
+              <Button
+                onClick={() => { setPage(0); fetchLogs(0); }}
+                className="h-10 px-8 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20"
               >
-                <option value="">All Actions</option>
-                {ACTION_TYPES.map(a => <option key={a} value={a}>{a.charAt(0).toUpperCase() + a.slice(1)}</option>)}
-              </select>
+                Execute Protocol
+              </Button>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">From Date</label>
-              <DatePickerInput value={filterDateFrom} onChange={setFilterDateFrom} placeholder="From date" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">To Date</label>
-              <DatePickerInput value={filterDateTo} onChange={setFilterDateTo} placeholder="To date" />
-            </div>
-          </div>
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              onClick={clearFilters}
-              className="flex items-center gap-1 px-3 py-2 text-xs text-[var(--text-secondary)] hover:text-[var(--error)] transition-colors"
-            >
-              <X size={14} /> Clear
-            </button>
-            <button
-              onClick={() => { setPage(0); fetchLogs(0); }}
-              className="flex items-center gap-1 px-4 py-2 text-xs bg-[var(--brand)] text-white rounded-sm hover:opacity-90 transition-opacity"
-            >
-              Apply Filters
-            </button>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
-      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
-        {loading ? (
-          <div className="divide-y divide-[var(--border-subtle)]">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4 px-4 py-3 animate-pulse">
-                <div className="h-4 w-24 bg-[var(--border-subtle)] rounded-sm" />
-                <div className="h-4 w-16 bg-[var(--border-subtle)] rounded-sm" />
-                <div className="h-4 flex-1 bg-[var(--border-subtle)] rounded-sm" />
+      <Card className="border-none shadow-xl shadow-black/5 overflow-hidden bg-background min-h-[400px]">
+        <CardHeader className="px-6 py-4 border-b border-border/50 bg-background/50 backdrop-blur-md flex flex-row items-center justify-between space-y-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+              <ShieldCheck size={18} weight="duotone" />
+            </div>
+            <div className="flex flex-col">
+              <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Audit Sequence</CardTitle>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{loading ? "Querying Database..." : `${totalLogs} Total Events Logged`}</span>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-6 space-y-4">
+              {[1,2,3,4,5,6,7,8].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-in zoom-in-95 duration-500">
+              <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-6">
+                <Activity size={40} className="text-muted-foreground opacity-40" weight="duotone" />
               </div>
-            ))}
-          </div>
-        ) : logs.length === 0 ? (
-          <p className="text-center text-sm text-[var(--text-secondary)] py-16">No audit logs found.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="bg-[var(--bg)] border-b border-[var(--border-subtle)]">
-                  <th className="text-left px-4 py-3 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">Timestamp</th>
-                  <th className="text-left px-4 py-3 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">User</th>
-                  <th className="text-left px-4 py-3 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Action</th>
-                  <th className="text-left px-4 py-3 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Details</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-subtle)]">
-                {logs.map((log) => (
-                  <tr key={log._id} className="hover:bg-[var(--bg)] transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs text-[var(--text-secondary)] whitespace-nowrap">
-                      {log.timestamp ? new Date(log.timestamp).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
-                    </td>
-                    <td className="px-4 py-3 font-medium whitespace-nowrap">{log.username || log.user || "—"}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className={badge(log.action)}>{log.action || "—"}</span>
-                    </td>
-                    <td className="px-4 py-3 text-[var(--text-secondary)] max-w-xs truncate" title={
-                      log.details && typeof log.details === "object"
-                        ? Object.entries(log.details).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" | ")
-                        : (log.details || log.message || "")
-                    }>
-                      {log.details && typeof log.details === "object"
-                        ? Object.entries(log.details).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" | ") || "—"
-                        : (log.details || log.message || "—")}
-                    </td>
+              <h3 className="text-lg font-black uppercase tracking-[0.2em] text-foreground mb-2">No Sequence Detected</h3>
+              <p className="text-sm text-muted-foreground font-medium max-w-[280px] leading-relaxed">
+                The current audit filters returned zero operational sequences. Try expanding your timeline.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full min-w-[800px]">
+                <thead>
+                  <tr className="bg-muted/30 border-b border-border/50">
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left"><div className="flex items-center gap-2"><Clock size={12} weight="bold" /> Temporal Stamp</div></th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left"><div className="flex items-center gap-2"><User size={12} weight="bold" /> Operational Agent</div></th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left"><div className="flex items-center gap-2"><Activity size={12} weight="bold" /> Execution Action</div></th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Protocol Details</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                </thead>
+                <tbody className="divide-y divide-border/30">
+                  {logs.map((log) => (
+                    <tr key={log._id} className="hover:bg-primary/[0.01] transition-colors group">
+                      <td className="px-6 py-4">
+                        <span className="font-mono text-[11px] font-black text-muted-foreground group-hover:text-primary transition-colors">
+                          {log.timestamp ? new Date(log.timestamp).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <Badge variant="outline" className="font-black uppercase tracking-widest text-[10px] border-border/50 bg-muted/30 px-2 py-0.5 group-hover:border-primary/20 group-hover:bg-primary/5 transition-all">
+                          {log.username || log.user || "—"}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4">
+                        <ActionBadge action={log.action} />
+                      </td>
+                      <td className="px-6 py-4 max-w-md">
+                        <div 
+                          className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors truncate cursor-help flex items-center gap-2"
+                          title={
+                            log.details && typeof log.details === "object"
+                              ? Object.entries(log.details).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" | ")
+                              : (log.details || log.message || "")
+                          }
+                        >
+                          <Info size={14} className="opacity-40 group-hover:opacity-100 transition-opacity" weight="duotone" />
+                          <span className="truncate">
+                            {log.details && typeof log.details === "object"
+                              ? Object.entries(log.details).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" | ") || "—"
+                              : (log.details || log.message || "—")}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Pagination */}
       {!loading && (logs.length > 0 || page > 0) && (
-        <div className="flex items-center justify-between gap-2">
-          <button
+        <div className="flex items-center justify-between gap-4 animate-in fade-in duration-700">
+          <Button
+            variant="outline"
             disabled={page === 0}
             onClick={() => goPage(page - 1)}
-            className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] disabled:opacity-40 transition-colors"
+            className="h-10 px-6 font-black uppercase tracking-widest text-[10px] rounded-xl border-border/50 hover:border-primary/50 transition-all disabled:opacity-20"
           >
-            ← Previous
-          </button>
-          <span className="text-sm text-[var(--text-secondary)]">
-            Page {page + 1} {totalLogs > 0 && <span className="text-[var(--text-secondary)]/60">({totalLogs} total)</span>}
-          </span>
-          <button
+            <ArrowLeft size={14} weight="bold" className="mr-2" /> Previous Sequence
+          </Button>
+          
+          <div className="flex items-center gap-3">
+            <Badge variant="secondary" className="h-10 px-6 rounded-full bg-muted/50 border-border/50 font-mono text-xs font-black">
+              Page {page + 1}
+            </Badge>
+            {totalLogs > 0 && (
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-40">
+                {totalLogs} Records Synchronized
+              </span>
+            )}
+          </div>
+
+          <Button
+            variant="outline"
             disabled={!hasMore}
             onClick={() => goPage(page + 1)}
-            className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] disabled:opacity-40 transition-colors"
+            className="h-10 px-6 font-black uppercase tracking-widest text-[10px] rounded-xl border-border/50 hover:border-primary/50 transition-all disabled:opacity-20"
           >
-            Next →
-          </button>
+            Next Sequence <ArrowRight size={14} weight="bold" className="ml-2" />
+          </Button>
         </div>
       )}
     </div>

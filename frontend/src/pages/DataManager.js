@@ -1,11 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
 import { importExcel, exportExcelUrl, backupUrl, restoreBackup, getDbStats, getDbAudit, normalizeDbData, repairDbData } from "@/api";
-import { Upload, DownloadSimple, Database, ArrowsClockwise, Warning, CheckCircle, FileXls, FileCsv } from "@phosphor-icons/react";
+import { 
+  Upload, DownloadSimple, Database, ArrowsClockwise, 
+  Warning, CheckCircle, FileXls, FileCsv, Info, 
+  Trash, ShieldCheck, Activity, ChartBar, FileJson, X
+} from "@phosphor-icons/react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 export default function DataManager() {
+  const { toast } = useToast();
   const [tab, setTab] = useState("import");
   const [stats, setStats] = useState(null);
-  const [message, setMessage] = useState(null);
   const [importing, setImporting] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [auditing, setAuditing] = useState(false);
@@ -34,8 +44,9 @@ export default function DataManager() {
     try {
       const res = await getDbAudit({ limit: 100 });
       setAudit(res.data);
+      toast({ title: "Audit Complete", description: "Database consistency scan finished successfully." });
     } catch (err) {
-      setMessage({ type: "error", text: err.response?.data?.detail || "Audit failed" });
+      toast({ title: "Audit Failed", description: err.response?.data?.detail || "Operation failed", variant: "destructive" });
     } finally {
       setAuditing(false);
     }
@@ -43,17 +54,16 @@ export default function DataManager() {
 
   const runNormalization = async () => {
     setNormalizing(true);
-    setMessage(null);
     try {
       const res = await normalizeDbData({ limit: 100 });
       setNormalizationResult(res.data);
       setAudit(res.data.audit_after);
-      setMessage({
-        type: "success",
-        text: `Normalization applied. Updated ${res.data.items_updated || 0} items and ${res.data.advances_updated || 0} advances.`,
+      toast({ 
+        title: "Normalization Applied", 
+        description: `Updated ${res.data.items_updated || 0} items and ${res.data.advances_updated || 0} advances.` 
       });
     } catch (err) {
-      setMessage({ type: "error", text: err.response?.data?.detail || "Normalization failed" });
+      toast({ title: "Normalization Failed", description: err.response?.data?.detail || "Operation failed", variant: "destructive" });
     } finally {
       setNormalizing(false);
     }
@@ -61,17 +71,16 @@ export default function DataManager() {
 
   const runRepair = async () => {
     setRepairing(true);
-    setMessage(null);
     try {
       const res = await repairDbData({ limit: 100 });
       setRepairResult(res.data);
       setAudit(res.data.audit_after);
-      setMessage({
-        type: "success",
-        text: `Repair applied. Updated ${res.data.items_updated || 0} items and created ${res.data.advances_created || 0} carry-forward advances.`,
+      toast({ 
+        title: "Repair Applied", 
+        description: `Updated ${res.data.items_updated || 0} items and created ${res.data.advances_created || 0} carry-forward advances.` 
       });
     } catch (err) {
-      setMessage({ type: "error", text: err.response?.data?.detail || "Repair failed" });
+      toast({ title: "Repair Failed", description: err.response?.data?.detail || "Operation failed", variant: "destructive" });
     } finally {
       setRepairing(false);
     }
@@ -80,20 +89,19 @@ export default function DataManager() {
   const handleImport = async (file) => {
     if (!file) return;
     if (!file.name.match(/\.(xlsm|xlsx|xls)$/i)) {
-      setMessage({ type: "error", text: "Please upload an Excel file (.xlsm or .xlsx)" });
+      toast({ title: "Invalid File", description: "Please upload an Excel file (.xlsm or .xlsx)", variant: "destructive" });
       return;
     }
 
     setImporting(true);
-    setMessage(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
       const res = await importExcel(formData, importMode);
-      setMessage({ type: "success", text: res.data.message });
+      toast({ title: "Import Successful", description: res.data.message });
       loadStats();
     } catch (err) {
-      setMessage({ type: "error", text: err.response?.data?.detail || "Import failed" });
+      toast({ title: "Import Failed", description: err.response?.data?.detail || "Operation failed", variant: "destructive" });
     } finally {
       setImporting(false);
     }
@@ -102,7 +110,7 @@ export default function DataManager() {
   const handleRestore = async (file) => {
     if (!file) return;
     if (!file.name.endsWith('.json')) {
-      setMessage({ type: "error", text: "Please upload a .json backup file" });
+      toast({ title: "Invalid File", description: "Please upload a .json backup file", variant: "destructive" });
       return;
     }
     if (!restoreConfirm) {
@@ -114,15 +122,14 @@ export default function DataManager() {
     setPendingRestoreFile(null);
 
     setRestoring(true);
-    setMessage(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
       const res = await restoreBackup(formData);
-      setMessage({ type: "success", text: res.data.message });
+      toast({ title: "Restore Successful", description: res.data.message });
       loadStats();
     } catch (err) {
-      setMessage({ type: "error", text: err.response?.data?.detail || "Restore failed" });
+      toast({ title: "Restore Failed", description: err.response?.data?.detail || "Operation failed", variant: "destructive" });
     } finally {
       setRestoring(false);
     }
@@ -143,424 +150,523 @@ export default function DataManager() {
   };
 
   return (
-    <div data-testid="data-manager-page" className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Data Manager</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">Import Excel data, export records, and backup/restore your database</p>
+    <div data-testid="data-manager-page" className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Data Management</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium truncate">Control information flow, synchronization, and database integrity</p>
+        </div>
+        <Button variant="outline" size="icon" onClick={loadStats} className="rounded-full shadow-sm hover:rotate-180 transition-transform duration-500">
+          <ArrowsClockwise size={20} className="text-primary" />
+        </Button>
       </div>
 
-      {/* DB Stats */}
-      {stats && (
-        <div className="flex gap-4">
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] px-5 py-3 rounded-sm flex items-center gap-3">
-            <Database size={20} weight="duotone" className="text-[var(--brand)]" />
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">Database</p>
-              <p className="font-mono text-sm font-medium">{stats.items_count} items, {stats.advances_count} advances</p>
+      {/* DB Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-card border-none shadow-lg shadow-black/5 overflow-hidden group hover:shadow-xl transition-all duration-300">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 transition-transform duration-300">
+              <Database size={24} weight="duotone" />
             </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground opacity-60 leading-none mb-2">Items Tracked</p>
+              <p className="font-mono text-xl font-black tracking-tighter">{stats?.items_count || 0}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-none shadow-lg shadow-black/5 overflow-hidden group hover:shadow-xl transition-all duration-300">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-success/10 text-success group-hover:scale-110 transition-transform duration-300">
+              <Activity size={24} weight="duotone" />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground opacity-60 leading-none mb-2">Advances Tracked</p>
+              <p className="font-mono text-xl font-black tracking-tighter">{stats?.advances_count || 0}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-primary text-primary-foreground border-none shadow-xl shadow-primary/10 overflow-hidden relative">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <ChartBar size={64} weight="duotone" />
           </div>
-        </div>
-      )}
-
-      {message && (
-        <div data-testid="data-message" className={`p-4 border rounded-sm text-sm flex items-center gap-3 ${message.type === 'success' ? 'bg-[#455D4A10] border-[var(--success)] text-[var(--success)]' : 'bg-[#9E473D10] border-[var(--error)] text-[var(--error)]'}`}>
-          {message.type === 'success' ? <CheckCircle size={20} /> : <Warning size={20} />}
-          {message.text}
-        </div>
-      )}
+          <CardContent className="p-5 flex items-center gap-4 relative">
+            <div className="p-3 rounded-2xl bg-white/10 text-white">
+              <ShieldCheck size={24} weight="duotone" />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-widest font-black opacity-60 leading-none mb-2">System Integrity</p>
+              <p className="font-heading text-xl font-black tracking-tight">Optimized</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-[var(--border-subtle)] overflow-x-auto [&::-webkit-scrollbar]:hidden">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 px-1">
         {[
           { key: "import", label: "Import Excel", icon: Upload },
           { key: "export", label: "Export Data", icon: DownloadSimple },
-          { key: "backup", label: "Backup & Restore", icon: ArrowsClockwise },
-          { key: "audit", label: "Data Audit", icon: Warning },
+          { key: "backup", label: "Cloud Backup", icon: ArrowsClockwise },
+          { key: "audit", label: "Data Integrity", icon: Warning },
         ].map(t => (
-          <button
+          <Button
             key={t.key}
-            data-testid={`data-tab-${t.key}`}
+            variant={tab === t.key ? "default" : "outline"}
+            size="sm"
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap flex-shrink-0
-              ${tab === t.key ? 'border-[var(--brand)] text-[var(--brand)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+            className={cn(
+              "flex-shrink-0 h-10 px-6 rounded-full text-[10px] font-black uppercase tracking-widest transition-all",
+              tab === t.key ? "shadow-lg shadow-primary/20" : "bg-card border-border/50 hover:border-primary/50"
+            )}
           >
-            <t.icon size={14} /> {t.label}
-          </button>
+            <t.icon size={16} weight="bold" className="mr-2" />
+            {t.label}
+          </Button>
         ))}
       </div>
 
-      {/* Import Tab */}
-      {tab === "import" && (
-        <div className="max-w-2xl space-y-4">
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
-            <h3 className="font-heading text-base font-medium">Import from Excel</h3>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Upload your <code className="bg-[var(--bg)] px-1.5 py-0.5 rounded text-xs font-mono">New Retail Book.xlsm</code> file.
-              The file must have <strong>"Item Details"</strong> and <strong>"Advances"</strong> sheets with the same column structure.
-            </p>
-
-            {/* Import Mode */}
-            <div className="space-y-2">
-              <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Import Mode</label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="importMode" value="replace" checked={importMode === "replace"} onChange={() => setImportMode("replace")} className="accent-[var(--brand)]" />
-                  <span className="text-sm">Replace all data</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="importMode" value="append" checked={importMode === "append"} onChange={() => setImportMode("append")} className="accent-[var(--brand)]" />
-                  <span className="text-sm">Append to existing</span>
-                </label>
+      <div className="grid grid-cols-1 gap-8">
+        {/* Import Tab */}
+        {tab === "import" && (
+          <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
+            <CardHeader className="p-8 pb-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-2xl bg-primary/10 text-primary">
+                  <FileXls size={24} weight="duotone" />
+                </div>
+                <div className="flex flex-col">
+                  <CardTitle className="text-xl font-black uppercase tracking-tight">Excel Synchronization</CardTitle>
+                  <p className="text-sm text-muted-foreground font-medium">Synchronize legacy workbook data with the cloud database</p>
+                </div>
               </div>
-              {importMode === "replace" && (
-                <p className="text-xs text-[var(--warning)] flex items-center gap-1"><Warning size={14} /> This will delete all existing data before importing</p>
-              )}
-            </div>
+            </CardHeader>
+            <CardContent className="p-8 pt-4 space-y-8">
+              <div className="flex items-start gap-4 p-5 bg-muted/30 rounded-2xl border border-border/50">
+                <Info size={20} className="text-primary mt-1" weight="duotone" />
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-foreground">Format Requirement</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Upload your <code className="bg-primary/5 text-primary px-1.5 py-0.5 rounded font-mono font-bold">New Retail Book.xlsm</code>. 
+                    Ensure <span className="text-foreground font-bold">"Item Details"</span> and <span className="text-foreground font-bold">"Advances"</span> sheets maintain their original column protocol.
+                  </p>
+                </div>
+              </div>
 
-            {/* Drop Zone */}
-            <div
-              data-testid="import-drop-zone"
-              className={`border-2 border-dashed rounded-sm p-10 text-center transition-colors cursor-pointer
-                ${dragActive ? 'border-[var(--brand)] bg-[#C86B4D08]' : 'border-[var(--border-strong)] hover:border-[var(--brand)]'}`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={(e) => handleDrop(e, handleImport)}
-              onClick={() => document.getElementById('import-file-input')?.click()}
-            >
-              <FileXls size={40} weight="duotone" className="mx-auto text-[var(--brand)] mb-3" />
-              <p className="text-sm font-medium text-[var(--text-primary)]">
-                {importing ? "Importing..." : "Drag & drop your Excel file here"}
-              </p>
-              <p className="text-xs text-[var(--text-secondary)] mt-1">or click to browse (.xlsm, .xlsx)</p>
-              <input
-                id="import-file-input"
-                data-testid="import-file-input"
-                type="file"
-                accept=".xlsm,.xlsx,.xls"
-                className="hidden"
-                onChange={(e) => handleImport(e.target.files?.[0])}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+              <div className="space-y-4">
+                <label className="text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground ml-1">Execution Mode</label>
+                <div className="flex flex-wrap gap-4">
+                  {[
+                    { id: "replace", label: "Replace Data", desc: "Flush existing records & re-initialize", icon: Trash },
+                    { id: "append", label: "Append Data", desc: "Integrate new records with existing", icon: Plus }
+                  ].map(mode => (
+                    <label 
+                      key={mode.id}
+                      className={cn(
+                        "flex-1 min-w-[240px] flex items-center gap-4 p-5 rounded-2xl border transition-all cursor-pointer select-none",
+                        importMode === mode.id ? "bg-primary/5 border-primary shadow-sm" : "bg-background border-border/50 hover:border-primary/30"
+                      )}
+                    >
+                      <input type="radio" name="importMode" value={mode.id} checked={importMode === mode.id} onChange={() => setImportMode(mode.id)} className="hidden" />
+                      <div className={cn(
+                        "p-2.5 rounded-xl transition-colors",
+                        importMode === mode.id ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+                      )}>
+                        <mode.icon size={18} weight="bold" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black uppercase tracking-tight">{mode.label}</span>
+                        <span className="text-[10px] text-muted-foreground font-medium">{mode.desc}</span>
+                      </div>
+                      <div className={cn(
+                        "ml-auto w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+                        importMode === mode.id ? "border-primary bg-primary" : "border-border"
+                      )}>
+                        {importMode === mode.id && <CheckCircle size={12} weight="bold" className="text-white" />}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                {importMode === "replace" && (
+                  <p className="text-[10px] text-destructive font-black uppercase tracking-widest flex items-center gap-2 animate-pulse px-1">
+                    <Warning size={14} weight="fill" /> Critical: This operation will permanently discard all current operational data.
+                  </p>
+                )}
+              </div>
 
-      {/* Export Tab */}
-      {tab === "export" && (
-        <div className="max-w-2xl space-y-4">
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
-            <h3 className="font-heading text-base font-medium">Export to Excel</h3>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Download all your data as an Excel file with the same column structure as your original workbook.
-              Contains "Item Details" and "Advances" sheets.
-            </p>
-            <div className="flex gap-3">
-              <a
-                href={exportExcelUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid="export-excel-btn"
-                className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] transition-all duration-200 hover:translate-y-[-1px]"
+              <div
+                data-testid="import-drop-zone"
+                className={cn(
+                  "relative border-2 border-dashed rounded-[2rem] p-16 text-center transition-all duration-500 group cursor-pointer overflow-hidden",
+                  dragActive ? 'border-primary bg-primary/5 scale-[0.99]' : 'border-border hover:border-primary/50 hover:bg-muted/30'
+                )}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={(e) => handleDrop(e, handleImport)}
+                onClick={() => document.getElementById('import-file-input')?.click()}
               >
-                <FileXls size={18} weight="bold" /> Download Excel (.xlsx)
-              </a>
-            </div>
-            <p className="text-xs text-[var(--text-secondary)]">
-              {stats && `Will export ${stats.items_count} items and ${stats.advances_count} advances`}
-            </p>
-          </div>
-        </div>
-      )}
+                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative z-10 space-y-4">
+                  <div className="w-20 h-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-500">
+                    <FileXls size={40} weight="duotone" />
+                  </div>
+                  <h4 className="text-xl font-black uppercase tracking-tight text-foreground">
+                    {importing ? "Processing Protocol..." : "Deploy Excel Asset"}
+                  </h4>
+                  <p className="text-sm text-muted-foreground font-medium max-w-xs mx-auto leading-relaxed">
+                    Drag & drop your workbook here or click to browse your local file system.
+                  </p>
+                  <Badge variant="secondary" className="mt-4 px-4 py-1 text-[9px] font-black uppercase tracking-widest rounded-full bg-primary/10 text-primary border-none">
+                    Supported: .XLSM, .XLSX
+                  </Badge>
+                </div>
+                <input
+                  id="import-file-input"
+                  data-testid="import-file-input"
+                  type="file"
+                  accept=".xlsm,.xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => handleImport(e.target.files?.[0])}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Backup & Restore Tab */}
-      {tab === "backup" && (
-        <div className="max-w-2xl space-y-4">
-          {/* Backup */}
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
-            <h3 className="font-heading text-base font-medium">Create Backup</h3>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Download a complete backup of your database as a JSON file. You can restore from this file later.
-            </p>
-            <a
-              href={backupUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-testid="backup-btn"
-              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-[var(--success)] text-white rounded-sm hover:opacity-90 transition-all duration-200 hover:translate-y-[-1px]"
-            >
-              <DownloadSimple size={18} weight="bold" /> Download Backup (.json)
-            </a>
-          </div>
+        {/* Export Tab */}
+        {tab === "export" && (
+          <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-success" />
+            <CardHeader className="p-8 pb-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-2xl bg-success/10 text-success">
+                  <DownloadSimple size={24} weight="duotone" />
+                </div>
+                <div className="flex flex-col">
+                  <CardTitle className="text-xl font-black uppercase tracking-tight">Data Extraction</CardTitle>
+                  <p className="text-sm text-muted-foreground font-medium">Generate a professional Excel report of the entire database</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-8 pt-4 space-y-8">
+              <div className="flex items-start gap-4 p-5 bg-success/5 rounded-2xl border border-success/10">
+                <Info size={20} className="text-success mt-1" weight="duotone" />
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-foreground">Export Protocol</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    The generated file will replicate the original <span className="text-foreground font-bold">New Retail Book.xlsm</span> structure, including all "Item Details" and "Advances" entries.
+                  </p>
+                </div>
+              </div>
 
-          {/* Restore */}
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
-            <h3 className="font-heading text-base font-medium">Restore from Backup</h3>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Upload a previously downloaded backup file to restore your data.
-            </p>
-            <p className="text-xs text-[var(--error)] flex items-center gap-1">
-              <Warning size={14} /> This will replace ALL existing data with the backup
-            </p>
-            <div
-              data-testid="restore-drop-zone"
-              className={`border-2 border-dashed rounded-sm p-8 text-center transition-colors cursor-pointer
-                ${dragActive ? 'border-[var(--warning)] bg-[#D4984208]' : 'border-[var(--border-strong)] hover:border-[var(--warning)]'}`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={(e) => handleDrop(e, handleRestore)}
-              onClick={() => document.getElementById('restore-file-input')?.click()}
-            >
-              <ArrowsClockwise size={32} weight="duotone" className="mx-auto text-[var(--warning)] mb-2" />
-              <p className="text-sm font-medium">{restoring ? "Restoring..." : "Drop backup .json file here"}</p>
-              <p className="text-xs text-[var(--text-secondary)] mt-1">or click to browse</p>
-              <input
-                id="restore-file-input"
-                data-testid="restore-file-input"
-                type="file"
-                accept=".json"
-                className="hidden"
-                onChange={(e) => handleRestore(e.target.files?.[0])}
-              />
-            </div>
-            {restoreConfirm && (
-              <div className="p-4 bg-[#9E473D10] border border-[var(--error)] rounded-sm space-y-3">
-                <p className="text-sm font-semibold text-[var(--error)] flex items-center gap-2"><Warning size={16} weight="fill" /> Confirm Restore</p>
-                <p className="text-xs text-[var(--text-secondary)]">
-                  This will permanently overwrite <strong>ALL current data</strong> with <strong>{pendingRestoreFile?.name}</strong>. This cannot be undone.
+              <div className="flex flex-col items-center py-12 space-y-6">
+                <div className="w-24 h-24 rounded-[2rem] bg-success/10 text-success flex items-center justify-center shadow-lg shadow-success/10 animate-bounce-slow">
+                  <FileXls size={48} weight="duotone" />
+                </div>
+                <div className="text-center space-y-2">
+                  <h4 className="text-lg font-black uppercase tracking-tight">Ready for Extraction</h4>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    {stats ? `Compiling ${stats.items_count} items and ${stats.advances_count} advances...` : "Preparing data package..."}
+                  </p>
+                </div>
+                <Button 
+                  asChild 
+                  className="h-14 px-12 text-sm font-black uppercase tracking-[0.2em] bg-success hover:bg-success/90 shadow-xl shadow-success/20 gap-3"
+                >
+                  <a href={exportExcelUrl()} target="_blank" rel="noopener noreferrer">
+                    <DownloadSimple size={20} weight="bold" /> Initialize Download
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Backup & Restore Tab */}
+        {tab === "backup" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Backup */}
+            <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-success" />
+              <CardHeader className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-success/10 text-success">
+                    <DownloadSimple size={20} weight="duotone" />
+                  </div>
+                  <CardTitle className="text-lg font-black uppercase tracking-tight text-foreground">Cloud Snapshot</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6 pt-0 space-y-6">
+                <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+                  Generate a complete JSON-formatted architectural snapshot of your operational database for local archiving.
                 </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleRestore(pendingRestoreFile)}
-                    disabled={restoring}
-                    className="px-4 py-2 text-sm bg-red-500 text-white rounded-sm hover:bg-red-600 disabled:opacity-50"
+                <div className="p-6 rounded-2xl bg-muted/30 border border-border/50 flex flex-col items-center gap-4">
+                  <FileJson size={40} className="text-success opacity-40" weight="duotone" />
+                  <Button asChild className="w-full h-12 text-[10px] font-black uppercase tracking-widest bg-success hover:bg-success/90 shadow-lg shadow-success/10">
+                    <a href={backupUrl()} target="_blank" rel="noopener noreferrer">
+                      <DownloadSimple size={16} weight="bold" className="mr-2" /> Download JSON Backup
+                    </a>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Restore */}
+            <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden relative">
+              <div className="absolute top-0 left-0 w-full h-1 bg-warning" />
+              <CardHeader className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-warning/10 text-warning">
+                    <ArrowsClockwise size={20} weight="duotone" />
+                  </div>
+                  <CardTitle className="text-lg font-black uppercase tracking-tight text-foreground">Data Restoration</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6 pt-0 space-y-6">
+                <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+                  Restore your entire operational state from a previously generated JSON snapshot. <span className="text-destructive font-black uppercase">Warning: Overwrites current state.</span>
+                </p>
+                
+                <div
+                  data-testid="restore-drop-zone"
+                  className={cn(
+                    "border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer group",
+                    dragActive ? 'border-warning bg-warning/5' : 'border-border hover:border-warning/50 hover:bg-muted/30'
+                  )}
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={(e) => handleDrop(e, handleRestore)}
+                  onClick={() => document.getElementById('restore-file-input')?.click()}
+                >
+                  <div className="w-12 h-12 rounded-xl bg-warning/10 text-warning flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-500">
+                    <ArrowsClockwise size={24} weight="duotone" className={restoring ? "animate-spin" : ""} />
+                  </div>
+                  <p className="text-xs font-black uppercase tracking-tight text-foreground">
+                    {restoring ? "Synchronizing..." : "Deploy JSON Snapshot"}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-1">or click to browse</p>
+                  <input
+                    id="restore-file-input"
+                    data-testid="restore-file-input"
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={(e) => handleRestore(e.target.files?.[0])}
+                  />
+                </div>
+
+                {restoreConfirm && (
+                  <div className="p-4 bg-destructive/5 border border-destructive/20 rounded-2xl space-y-4 animate-in shake duration-500">
+                    <div className="flex items-center gap-3">
+                      <Warning size={18} className="text-destructive" weight="fill" />
+                      <p className="text-[11px] font-black uppercase tracking-widest text-destructive">Destructive Operation Confirm</p>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-medium leading-relaxed">
+                      You are about to permanently overwrite <span className="text-destructive font-bold">ALL current records</span> with <span className="text-foreground font-bold">{pendingRestoreFile?.name}</span>. This sequence is irreversible.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="destructive"
+                        onClick={() => handleRestore(pendingRestoreFile)}
+                        disabled={restoring}
+                        className="flex-1 h-9 text-[9px] font-black uppercase tracking-widest"
+                      >
+                        {restoring ? "Restoring..." : "Yes, Execute Protocol"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => { setRestoreConfirm(false); setPendingRestoreFile(null); }}
+                        className="flex-1 h-9 text-[9px] font-black uppercase tracking-widest"
+                      >
+                        Abort
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Audit Tab */}
+        {tab === "audit" && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-warning" />
+              <CardHeader className="p-8 pb-4">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-2xl bg-warning/10 text-warning">
+                      <ShieldCheck size={24} weight="duotone" />
+                    </div>
+                    <div className="flex flex-col">
+                      <CardTitle className="text-xl font-black uppercase tracking-tight">Integrity Protocol</CardTitle>
+                      <p className="text-sm text-muted-foreground font-medium">Scans accounting records for consistency and anomalies</p>
+                    </div>
+                  </div>
+                  <Button
+                    data-testid="run-audit-btn"
+                    onClick={loadAudit}
+                    disabled={auditing}
+                    className="h-12 px-8 font-black uppercase tracking-[0.15em] text-xs shadow-lg shadow-warning/20 gap-3"
                   >
-                    {restoring ? "Restoring..." : "Yes, Restore Now"}
-                  </button>
-                  <button
-                    onClick={() => { setRestoreConfirm(false); setPendingRestoreFile(null); }}
-                    className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]"
-                  >
-                    Cancel
-                  </button>
+                    {auditing ? <ArrowsClockwise size={18} className="animate-spin" /> : <Activity size={18} weight="bold" />}
+                    {auditing ? "Scanning Engine..." : "Initialize Audit"}
+                  </Button>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+              </CardHeader>
+              <CardContent className="p-8 pt-4 space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center justify-between gap-4 p-5 bg-muted/30 rounded-2xl border border-border/50 hover:border-primary/30 transition-all group">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black uppercase tracking-tight text-foreground">Normalization Protocol</p>
+                      <p className="text-[10px] text-muted-foreground font-medium mt-1 leading-relaxed">Fixes low-risk derived field issues & rounding mismatches.</p>
+                    </div>
+                    <Button
+                      data-testid="run-normalize-btn"
+                      variant="outline"
+                      onClick={runNormalization}
+                      disabled={normalizing}
+                      className="h-10 px-4 text-[10px] font-black uppercase tracking-widest border-border/50 hover:bg-success/10 hover:text-success hover:border-success/30 group-hover:shadow-md transition-all"
+                    >
+                      {normalizing ? <ArrowsClockwise size={14} className="animate-spin" /> : "Execute"}
+                    </Button>
+                  </div>
 
-      {tab === "audit" && (
-        <div className="space-y-4">
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="font-heading text-base font-medium">Data Consistency Audit</h3>
-                <p className="text-sm text-[var(--text-secondary)] mt-1">
-                  Scans items and advances for accounting inconsistencies like received amounts exceeding totals,
-                  mismatched payment states, negative balances, and related anomalies.
-                </p>
-              </div>
-              <button
-                data-testid="run-audit-btn"
-                onClick={loadAudit}
-                disabled={auditing}
-                className="px-5 py-2.5 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50"
-              >
-                {auditing ? "Running..." : "Run Audit"}
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between gap-4 p-4 bg-[var(--bg)] rounded-sm">
-              <div>
-                <p className="text-sm font-medium text-[var(--text-primary)]">Low-risk normalization</p>
-                <p className="text-xs text-[var(--text-secondary)] mt-1">
-                  Fixes derived field issues like mismatched payment mode labels and tiny rounding mismatches.
-                  It does not invent business data or rewrite personalized settings.
-                </p>
-              </div>
-              <button
-                data-testid="run-normalize-btn"
-                onClick={runNormalization}
-                disabled={normalizing}
-                className="px-5 py-2.5 text-sm font-medium bg-[var(--success)] text-white rounded-sm hover:opacity-90 disabled:opacity-50"
-              >
-                {normalizing ? "Applying..." : "Normalize Low-Risk Issues"}
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between gap-4 p-4 bg-[#D4984208] border border-[var(--warning)] rounded-sm">
-              <div>
-                <p className="text-sm font-medium text-[var(--text-primary)]">Repair remaining overpayment issues</p>
-                <p className="text-xs text-[var(--text-secondary)] mt-1">
-                  Repairs genuine accounting errors (pending exceeds total, mode label out of sync).
-                  Intentional over-payments and credit balances are preserved untouched.
-                </p>
-              </div>
-              <button
-                data-testid="run-repair-btn"
-                onClick={runRepair}
-                disabled={repairing}
-                className="px-5 py-2.5 text-sm font-medium bg-[var(--warning)] text-white rounded-sm hover:opacity-90 disabled:opacity-50"
-              >
-                {repairing ? "Repairing..." : "Repair Remaining Issues"}
-              </button>
-            </div>
-
-            {audit && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-[var(--bg)] rounded-sm">
-                  <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">Scanned</p>
-                  <p className="font-mono text-sm mt-1">{audit.scanned?.items || 0} items / {audit.scanned?.advances || 0} advances</p>
+                  <div className="flex items-center justify-between gap-4 p-5 bg-warning/[0.03] border border-warning/20 rounded-2xl hover:border-warning transition-all group">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black uppercase tracking-tight text-foreground">Advanced Repair Cycle</p>
+                      <p className="text-[10px] text-muted-foreground font-medium mt-1 leading-relaxed">Repairs genuine accounting errors while preserving credit balances.</p>
+                    </div>
+                    <Button
+                      data-testid="run-repair-btn"
+                      variant="warning"
+                      onClick={runRepair}
+                      disabled={repairing}
+                      className="h-10 px-4 text-[10px] font-black uppercase tracking-widest shadow-md group-hover:shadow-warning/20 transition-all"
+                    >
+                      {repairing ? <ArrowsClockwise size={14} className="animate-spin" /> : "Initialize Repair"}
+                    </Button>
+                  </div>
                 </div>
-                <div className="p-4 bg-[var(--bg)] rounded-sm">
-                  <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">Issues Found</p>
-                  <p className="font-heading text-2xl font-light tracking-tight mt-1 text-[var(--warning)]">{audit.total_issues || 0}</p>
-                </div>
-                <div className="p-4 bg-[var(--bg)] rounded-sm">
-                  <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)]">Issue Types</p>
-                  <p className="font-mono text-sm mt-1">{Object.keys(audit.issue_counts || {}).length}</p>
-                </div>
-              </div>
-            )}
 
-            {normalizationResult && (
-              <div className="p-4 bg-[#455D4A10] border border-[var(--success)] rounded-sm space-y-2">
-                <p className="text-sm font-medium text-[var(--success)]">Last normalization result</p>
-                <p className="text-xs text-[var(--text-secondary)]">
-                  Updated {normalizationResult.items_updated || 0} items and {normalizationResult.advances_updated || 0} advances.
-                </p>
-              </div>
-            )}
-
-            {repairResult && (
-              <div className="p-4 bg-[#D4984208] border border-[var(--warning)] rounded-sm space-y-2">
-                <p className="text-sm font-medium text-[var(--warning)]">Last repair result</p>
-                <p className="text-xs text-[var(--text-secondary)]">
-                  Updated {repairResult.items_updated || 0} items and created {repairResult.advances_created || 0} carry-forward advance entries.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {audit && (
-            <>
-              <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-3">
-                <h3 className="font-heading text-base font-medium">Issue Breakdown</h3>
-                {Object.keys(audit.issue_counts || {}).length === 0 ? (
-                  <p className="text-sm text-[var(--success)]">No issues detected in the current audit sample.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {Object.entries(audit.issue_counts || {}).map(([type, count]) => (
-                      <div key={type} className="px-3 py-1.5 text-xs bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm">
-                        <span className="font-medium">{type}</span>: {count}
+                {audit && (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[
+                      { label: "Scanned Items", value: audit.scanned?.items || 0, icon: Package },
+                      { label: "Scanned Advances", value: audit.scanned?.advances || 0, icon: Wallet },
+                      { label: "Issues Detected", value: audit.total_issues || 0, icon: Warning, color: "warning" },
+                      { label: "Distinct Types", value: Object.keys(audit.issue_counts || {}).length, icon: Info },
+                    ].map((st, i) => (
+                      <div key={i} className="p-5 rounded-2xl bg-muted/20 border border-border/50 flex flex-col gap-3">
+                        <div className={cn(
+                          "w-8 h-8 rounded-lg flex items-center justify-center",
+                          st.color === "warning" ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary"
+                        )}>
+                          <st.icon size={16} weight="duotone" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60 leading-none mb-1.5">{st.label}</span>
+                          <span className={cn("font-mono text-xl font-black tracking-tighter", st.color === "warning" ? "text-warning" : "text-foreground")}>{st.value}</span>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {audit && (
+              <div className="space-y-8">
+                <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden">
+                  <CardHeader className="p-6 pb-2">
+                    <CardTitle className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground">Issue Classification</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 pt-0">
+                    {Object.keys(audit.issue_counts || {}).length === 0 ? (
+                      <div className="flex items-center gap-3 p-4 bg-success/5 border border-success/10 rounded-xl">
+                        <CheckCircle size={18} className="text-success" weight="fill" />
+                        <p className="text-xs font-bold text-success">Optimal Integrity: No issues detected in current sequence.</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(audit.issue_counts || {}).map(([type, count]) => (
+                          <Badge 
+                            key={type} 
+                            variant="outline" 
+                            className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest bg-warning/5 border-warning/20 text-warning rounded-xl"
+                          >
+                            {type}: <span className="ml-1 font-mono text-xs">{count}</span>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-xl shadow-black/5 overflow-hidden bg-background">
+                  <CardHeader className="px-6 py-4 border-b border-border/50 bg-background/50 backdrop-blur-md">
+                    <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Sequence Anomalies</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {audit.issues?.length ? (
+                      <div className="overflow-x-auto custom-scrollbar">
+                        <table className="w-full min-w-[1000px]">
+                          <thead>
+                            <tr className="bg-muted/30 border-b border-border/50">
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Protocol Type</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Ref ID</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Client Identity</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Anomaly Details</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Accounting State</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/30">
+                            {audit.issues.map((issue, idx) => (
+                              <tr key={idx} className="hover:bg-warning/[0.01] transition-colors group">
+                                <td className="px-6 py-4">
+                                  <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest border-none bg-warning/10 text-warning px-2 py-0.5 rounded-md">
+                                    {issue.type}
+                                  </Badge>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="font-mono text-xs font-black text-primary">#{issue.ref || "—"}</span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="text-xs font-bold text-foreground uppercase tracking-tight">{issue.name || "—"}</span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-start gap-2 max-w-sm">
+                                    <Info size={14} className="text-muted-foreground mt-0.5 opacity-40 group-hover:opacity-100 transition-opacity" />
+                                    <p className="text-[11px] font-medium text-muted-foreground leading-relaxed group-hover:text-foreground transition-colors">{issue.message}</p>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex flex-col items-end gap-1">
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-40 leading-none">Pnd: ₹{fmt(issue.pending ?? 0)}</span>
+                                    <span className="font-mono text-xs font-black text-foreground">Total: ₹{fmt(issue.total ?? 0)}</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="py-20 text-center">
+                        <p className="text-sm text-muted-foreground font-medium italic">Run the integrity protocol to visualize detected anomalies.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-
-              <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
-                <div className="p-4 border-b border-[var(--border-subtle)]">
-                  <h3 className="font-heading text-base font-medium">Sample Issues</h3>
-                </div>
-                {audit.issues?.length ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full" data-testid="audit-results-table">
-                      <thead>
-                        <tr className="bg-[var(--bg)]">
-                          {["Type", "Category", "Ref", "Name", "Message", "Total", "Received", "Pending", "Mode"].map(h => (
-                            <th key={h} className="text-left px-4 py-2.5 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {audit.issues.map((issue, idx) => (
-                          <tr key={`${issue.type}-${issue.item_id || issue.ref || idx}`} className="border-b border-[var(--border-subtle)] align-top">
-                            <td className="px-4 py-2.5 text-xs font-medium">{issue.type}</td>
-                            <td className="px-4 py-2.5 text-xs">{issue.category || "-"}</td>
-                            <td className="px-4 py-2.5 font-mono text-xs">{issue.ref || "-"}</td>
-                            <td className="px-4 py-2.5 text-xs">{issue.name || "-"}</td>
-                            <td className="px-4 py-2.5 text-xs max-w-[320px]">{issue.message}</td>
-                            <td className="px-4 py-2.5 font-mono text-xs">{issue.total ?? "-"}</td>
-                            <td className="px-4 py-2.5 font-mono text-xs">{issue.received ?? "-"}</td>
-                            <td className="px-4 py-2.5 font-mono text-xs">{issue.pending ?? "-"}</td>
-                            <td className="px-4 py-2.5 text-xs">{issue.mode || "-"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="p-8 text-sm text-[var(--text-secondary)]">Run the audit to inspect sample issues.</div>
-                )}
-              </div>
-
-              {normalizationResult?.changes?.length ? (
-                <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
-                  <div className="p-4 border-b border-[var(--border-subtle)]">
-                    <h3 className="font-heading text-base font-medium">Sample Normalization Changes</h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full" data-testid="normalization-results-table">
-                      <thead>
-                        <tr className="bg-[var(--bg)]">
-                          {["Kind", "Ref", "Name", "Identifier", "Updates"].map(h => (
-                            <th key={h} className="text-left px-4 py-2.5 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {normalizationResult.changes.map((change, idx) => (
-                          <tr key={`${change.kind}-${change.item_id || change.advance_id || idx}`} className="border-b border-[var(--border-subtle)] align-top">
-                            <td className="px-4 py-2.5 text-xs">{change.kind}</td>
-                            <td className="px-4 py-2.5 font-mono text-xs">{change.ref || "-"}</td>
-                            <td className="px-4 py-2.5 text-xs">{change.name || "-"}</td>
-                            <td className="px-4 py-2.5 font-mono text-xs">{change.item_id || change.advance_id || change.barcode || "-"}</td>
-                            <td className="px-4 py-2.5 text-xs font-mono">{JSON.stringify(change.updates)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : null}
-
-              {repairResult?.changes?.length ? (
-                <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
-                  <div className="p-4 border-b border-[var(--border-subtle)]">
-                    <h3 className="font-heading text-base font-medium">Sample Repair Changes</h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full" data-testid="repair-results-table">
-                      <thead>
-                        <tr className="bg-[var(--bg)]">
-                          {["Kind", "Ref", "Name", "Identifier", "Category", "Updates / Amount"].map(h => (
-                            <th key={h} className="text-left px-4 py-2.5 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] whitespace-nowrap">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {repairResult.changes.map((change, idx) => (
-                          <tr key={`${change.kind}-${change.item_id || change.ref || idx}`} className="border-b border-[var(--border-subtle)] align-top">
-                            <td className="px-4 py-2.5 text-xs">{change.kind}</td>
-                            <td className="px-4 py-2.5 font-mono text-xs">{change.ref || "-"}</td>
-                            <td className="px-4 py-2.5 text-xs">{change.name || "-"}</td>
-                            <td className="px-4 py-2.5 font-mono text-xs">{change.item_id || "-"}</td>
-                            <td className="px-4 py-2.5 text-xs">{change.category || "-"}</td>
-                            <td className="px-4 py-2.5 text-xs font-mono">{change.updates ? JSON.stringify(change.updates) : change.amount || "-"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : null}
-            </>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

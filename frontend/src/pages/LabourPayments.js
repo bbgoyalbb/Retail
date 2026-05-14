@@ -2,9 +2,18 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getLabourItems, getKarigars, payLabour, deleteLabourPayment, getSettings } from "@/api";
 import { dataEvents } from "@/lib/dataEvents";
 import { fmt } from "@/lib/fmt";
-import { UsersThree, CurrencyDollar, CheckCircle, Circle, CaretDown, CaretRight, Trash, PencilSimple, X, ArrowsClockwise } from "@phosphor-icons/react";
+import { 
+  UsersThree, CurrencyDollar, CheckCircle, Circle, CaretDown, CaretRight, 
+  Trash, PencilSimple, X, ArrowsClockwise, Scissors, PaintBrush, 
+  CalendarCheck, Info, Receipt, Warning
+} from "@phosphor-icons/react";
 import { DatePickerInput } from "@/components/DatePickerInput";
 import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 export default function LabourPayments() {
   const { toast } = useToast();
@@ -17,9 +26,11 @@ export default function LabourPayments() {
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
   const [selectedModes, setSelectedModes] = useState(["Cash"]);
   const [paymentModes, setPaymentModes] = useState(["Cash", "PhonePe", "Google Pay [E]", "Google Pay [S]", "Bank Transfer"]);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
     const params = { 
       filter_type: filterType, 
       filter_karigar: filterKarigar,
@@ -27,7 +38,8 @@ export default function LabourPayments() {
     };
     getLabourItems(params)
       .then(res => setItems(res.data))
-      .catch(err => toast({ title: "Error", description: err.message || "Failed to load labour items", variant: "destructive" }));
+      .catch(err => toast({ title: "Error", description: err.message || "Failed to load labour items", variant: "destructive" }))
+      .finally(() => setLoading(false));
   }, [filterType, filterKarigar, viewMode, toast]);
 
   useEffect(() => {
@@ -255,394 +267,584 @@ export default function LabourPayments() {
   };
 
   return (
-    <div data-testid="labour-page" className="space-y-6 pb-20 lg:pb-0">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Labour Payments</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">Pay tailoring and embroidery labour</p>
+    <div data-testid="labour-page" className="space-y-8 pb-24 lg:pb-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Labour Payments</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium truncate">Settle accounts for tailoring and embroidery services</p>
         </div>
-        <button onClick={() => loadData()} title="Refresh"
-          className="p-2 rounded-sm border border-[var(--border-subtle)] hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-          <ArrowsClockwise size={16} />
-        </button>
+        <Button variant="outline" size="icon" onClick={() => loadData(true)} disabled={loading} className="rounded-full shadow-sm hover:rotate-180 transition-transform duration-500">
+          <ArrowsClockwise size={20} className={loading ? "animate-spin text-primary" : ""} />
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Filters & Table */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm flex flex-wrap gap-2 sm:gap-3 items-center">
-            <div className="flex items-center gap-1 bg-[var(--bg)] rounded-sm p-0.5">
-              <button
-                onClick={() => setViewMode("unpaid")}
-                className={`px-3 py-1.5 text-xs font-medium rounded-sm transition-colors flex items-center gap-1 ${
-                  viewMode === "unpaid" 
-                    ? 'bg-[var(--surface)] text-[var(--brand)] shadow-sm' 
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                <Circle size={14} /> Pending
-              </button>
-              <button
-                onClick={() => setViewMode("paid")}
-                className={`px-3 py-1.5 text-xs font-medium rounded-sm transition-colors flex items-center gap-1 ${
-                  viewMode === "paid" 
-                    ? 'bg-[var(--surface)] text-[var(--brand)] shadow-sm' 
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                <CheckCircle size={14} /> Paid
-              </button>
-            </div>
-            
-            <div className="relative">
-              <select data-testid="labour-type-filter" value={filterType} onChange={e => setFilterType(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-                <option value="All">All Types</option>
-                <option value="Tailoring Labour">Tailoring</option>
-                <option value="Embroidery Labour">Embroidery</option>
-              </select>
-              {filterType !== "All" && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--brand)] pointer-events-none" />}
-            </div>
-            {filterType !== "Tailoring Labour" && (
-              <div className="relative">
-                <select data-testid="labour-karigar-filter" value={filterKarigar} onChange={e => setFilterKarigar(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-                  <option value="All">All Karigars</option>
-                  {karigars.map(k => <option key={k} value={k}>{k}</option>)}
-                </select>
-                {filterKarigar !== "All" && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--brand)] pointer-events-none" />}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Main Workspace */}
+        <div className="lg:col-span-3 space-y-6">
+          {/* Filters Bar */}
+          <Card className="bg-card border-none shadow-lg shadow-black/5 overflow-hidden">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
+            <CardContent className="p-4 flex flex-wrap gap-4 items-center">
+              <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl">
+                <Button
+                  variant={viewMode === "unpaid" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("unpaid")}
+                  className={cn(
+                    "h-9 px-4 text-xs font-black uppercase tracking-widest rounded-lg transition-all",
+                    viewMode === "unpaid" ? "shadow-md" : "text-muted-foreground"
+                  )}
+                >
+                  <Circle size={14} weight={viewMode === "unpaid" ? "fill" : "bold"} className="mr-2" /> Pending
+                </Button>
+                <Button
+                  variant={viewMode === "paid" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("paid")}
+                  className={cn(
+                    "h-9 px-4 text-xs font-black uppercase tracking-widest rounded-lg transition-all",
+                    viewMode === "paid" ? "shadow-md" : "text-muted-foreground"
+                  )}
+                >
+                  <CheckCircle size={14} weight={viewMode === "paid" ? "fill" : "bold"} className="mr-2" /> Settled
+                </Button>
               </div>
-            )}
-            
-            <div className="w-full sm:w-auto sm:ml-auto flex flex-wrap gap-3 sm:gap-4 text-sm">
-              {viewMode === "unpaid" ? (
-                <>
-                  <span className="text-[var(--text-secondary)]">Unpaid: <span className="font-mono font-medium text-[var(--warning)]">₹{fmt(totalUnpaid)}</span></span>
-                  <span className="text-[var(--text-secondary)]">Selected: <span className="font-mono font-medium text-[var(--brand)]">₹{fmt(selectedTotal)}</span></span>
-                </>
-              ) : (
-                <span className="text-[var(--text-secondary)]">Paid Entries: <span className="font-mono font-medium text-[var(--success)]">{items.length}</span></span>
-              )}
-            </div>
-          </div>
+              
+              <div className="flex flex-wrap gap-3 items-center">
+                <div className="relative group">
+                  <select 
+                    data-testid="labour-type-filter" 
+                    value={filterType} 
+                    onChange={e => setFilterType(e.target.value)} 
+                    className="h-10 pl-4 pr-10 text-[11px] font-black uppercase tracking-widest bg-background border border-border/50 rounded-xl appearance-none focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer group-hover:border-primary/50"
+                  >
+                    <option value="All">All Disciplines</option>
+                    <option value="Tailoring Labour">Tailoring</option>
+                    <option value="Embroidery Labour">Embroidery</option>
+                  </select>
+                  <CaretDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none group-hover:text-primary transition-colors" />
+                  {filterType !== "All" && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-primary border-2 border-background animate-pulse" />}
+                </div>
 
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm">
-            {items.length === 0 ? (
-              <div className="p-12 text-center">
-                <pre className="text-[var(--border-strong)] text-xs mb-4 font-mono">
-{viewMode === "unpaid" ? `  .--.
- /    \\
-|  OK  |
- \\    /
-  '--'
-All paid!` : `  .--.
- /    \\
-|  N/A |
- \\    /
-  '--'
-No paid entries`}
-                </pre>
-                <p className="text-[var(--text-secondary)] text-sm">
-                  {viewMode === "unpaid" ? "No pending labour payments" : "No paid labour entries"}
-                </p>
-              </div>
-            ) : viewMode === "unpaid" ? (
-              <div className="overflow-x-auto">
-                <table className="w-full" data-testid="labour-items-table">
-                  <thead>
-                    <tr className="bg-[var(--bg)]">
-                      <th className="px-3 py-2 w-10">
-                        <label className="flex items-center justify-center w-10 h-10 cursor-pointer">
-                          <input type="checkbox" checked={selected.length === items.length && items.length > 0} onChange={selectAll} className="w-4 h-4 accent-[var(--brand)]" />
-                        </label>
-                      </th>
-                      <th className="text-left px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Order</th>
-                      <th className="text-left px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Article</th>
-                      {filterType !== "Tailoring Labour" && <th className="text-left px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Karigar</th>}
-                      <th className="text-right px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Amount</th>
-                      <th className="text-left px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Type</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((item, i) => {
-                      const amount = item.labour_type === "Tailoring" ? item.labour_amount : item.emb_labour_amount;
-                      return (
-                        <tr key={i} className={`border-b border-[var(--border-subtle)] transition-colors cursor-pointer ${selected.includes(item.id) ? 'bg-[#C86B4D08]' : 'hover:bg-[#C86B4D05]'}`}
-                          onClick={() => toggleSelect(item.id)}>
-                          <td className="px-3 py-2.5">
-                            <input type="checkbox" checked={selected.includes(item.id)} readOnly className="w-3.5 h-3.5 accent-[var(--brand)]" />
-                          </td>
-                          <td className="px-3 py-2.5 font-mono text-xs">{item.order_no}</td>
-                          <td className="px-3 py-2.5 text-sm">{item.article_type}</td>
-                          {filterType !== "Tailoring Labour" && <td className="px-3 py-2.5 text-sm text-[var(--text-secondary)]">{item.labour_type === "Embroidery" && item.karigar !== "N/A" ? item.karigar : "-"}</td>}
-                          <td className="px-3 py-2.5 font-mono text-sm text-right font-medium">₹{fmt(amount)}</td>
-                          <td className="px-3 py-2.5">
-                            <span className={`text-xs font-medium uppercase tracking-wider ${item.labour_type === "Tailoring" ? 'text-[var(--info)]' : 'text-[var(--brand)]'}`}>
-                              {item.labour_type}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              // Paid View - 3-Level Hierarchy: Date -> Payment Entry -> Articles
-              <div className="overflow-x-auto">
-                <table className="w-full" data-testid="labour-paid-table">
-                  <thead>
-                    <tr className="bg-[var(--bg)]">
-                      <th className="w-8"></th>
-                      <th className="text-left px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Date</th>
-                      <th className="text-right px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Payments</th>
-                      <th className="text-right px-3 py-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">Total</th>
-                      <th className="w-16"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {groupedPaid.map((dateGroup, dateIdx) => (
-                      <React.Fragment key={dateGroup.date}>
-                        {/* Date Level */}
-                        <tr
-                          className="border-b border-[var(--border-subtle)] bg-[#C86B4D08] hover:bg-[#C86B4D12] cursor-pointer"
-                          onClick={() => toggleDateExpand(dateGroup.date)}
-                        >
-                          <td className="px-3 py-2.5">
-                            {expandedDates[dateGroup.date] ? (
-                              <CaretDown size={16} className="text-[var(--brand)]" />
-                            ) : (
-                              <CaretRight size={16} className="text-[var(--text-secondary)]" />
-                            )}
-                          </td>
-                          <td className="px-3 py-2.5 font-mono text-sm font-medium">{dateGroup.date}</td>
-                          <td className="px-3 py-2.5 font-mono text-sm text-right">{dateGroup.payments.length}</td>
-                          <td className="px-3 py-2.5 font-mono text-sm text-right font-medium text-[var(--success)]">
-                            ₹{fmt(dateGroup.payments.reduce((s, p) => s + p.total, 0))}
-                          </td>
-                          <td></td>
-                        </tr>
-                        
-                        {/* Payment Entries under this date */}
-                        {expandedDates[dateGroup.date] && dateGroup.payments.map((payment, payIdx) => (
-                          <React.Fragment key={payment.payment_id || `${dateGroup.date}_${payIdx}`}>
-                            <tr
-                              className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D05] cursor-pointer"
-                              onClick={() => togglePaymentExpand(payment.payment_id || `${dateGroup.date}_${payIdx}`)}
-                            >
-                              <td className="px-3 py-2 pl-8">
-                                {expandedPayments[payment.payment_id || `${dateGroup.date}_${payIdx}`] ? (
-                                  <CaretDown size={14} className="text-[var(--info)]" />
-                                ) : (
-                                  <CaretRight size={14} className="text-[var(--text-secondary)]" />
-                                )}
-                              </td>
-                              <td className="px-3 py-2" colSpan={2}>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono text-sm font-medium">₹{fmt(payment.total)}</span>
-                                  <span className="text-xs text-[var(--text-secondary)]">({payment.items.length} items)</span>
-                                  <span className={`text-xs font-medium uppercase ${payment.type === "Tailoring" ? 'text-[var(--info)]' : 'text-[var(--brand)]'}`}>
-                                    {payment.type}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-3 py-2 font-mono text-sm text-right font-medium">₹{fmt(payment.total)}</td>
-                              <td className="px-3 py-2 text-center">
-                                <div className="flex items-center justify-center gap-1">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      startEditPayment(payment);
-                                    }}
-                                    disabled={saving}
-                                    className="p-1.5 text-[var(--info)] hover:bg-[var(--bg)] rounded-sm transition-colors"
-                                    title="Edit payment"
-                                  >
-                                    <PencilSimple size={14} />
-                                  </button>
-                                  {deleteConfirm?.payment_id === payment.payment_id ? (
-                                    <span className="flex items-center gap-1">
-                                      <button onClick={(e) => { e.stopPropagation(); handleDeletePayment(payment); }} className="px-1.5 py-0.5 bg-red-500 text-white rounded-sm text-[10px] hover:bg-red-600">Delete</button>
-                                      <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null); }} className="px-1.5 py-0.5 border border-[var(--border-subtle)] rounded-sm text-[10px] hover:bg-[var(--bg)]">Cancel</button>
-                                    </span>
-                                  ) : (
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); handleDeletePayment(payment); }}
-                                      disabled={saving}
-                                      className="p-1.5 text-[var(--error)] hover:bg-[var(--bg)] rounded-sm transition-colors"
-                                      title="Delete payment"
-                                    >
-                                      <Trash size={14} />
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                            
-                            {/* Articles under this payment */}
-                            {expandedPayments[payment.payment_id || `${dateGroup.date}_${payIdx}`] && (
-                              <tr className="bg-[var(--bg)]">
-                                <td colSpan={5} className="px-0 py-0">
-                                  <div className="px-4 py-2">
-                                    <table className="w-full">
-                                      <thead>
-                                        <tr className="border-b border-[var(--border-subtle)]">
-                                          <th className="text-left py-1.5 text-xs text-[var(--text-secondary)] font-medium pl-4">Order</th>
-                                          <th className="text-left py-1.5 text-xs text-[var(--text-secondary)] font-medium">Article</th>
-                                          <th className="text-left py-1.5 text-xs text-[var(--text-secondary)] font-medium">Karigar</th>
-                                          <th className="text-right py-1.5 text-xs text-[var(--text-secondary)] font-medium">Amount</th>
-                                          <th className="text-left py-1.5 text-xs text-[var(--text-secondary)] font-medium pl-2">Mode</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {payment.items.map((item, idx) => (
-                                          <tr key={idx} className="border-b border-[var(--border-subtle)] last:border-0">
-                                            <td className="py-1.5 font-mono text-xs text-[var(--text-secondary)] pl-4">{item.order_no}</td>
-                                            <td className="py-1.5 text-sm">{item.article_type}</td>
-                                            <td className="py-1.5 text-sm text-[var(--text-secondary)]">{item.karigar !== "N/A" ? item.karigar : "-"}</td>
-                                            <td className="py-1.5 font-mono text-sm text-right">₹{fmt(item.labour_type === "Tailoring" ? (item.labour_amount || 0) : (item.emb_labour_amount || 0))}</td>
-                                            <td className="py-1.5 text-xs text-[var(--text-secondary)] pl-2">{payment.mode || "Cash"}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
-                        ))}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
-                
-                {/* Edit Payment Modal */}
-                {editingPayment && (
-                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onKeyDown={e => e.key === "Escape" && cancelEditPayment()}>
-                    <div className="bg-[var(--surface)] rounded-sm shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
-                      <div className="p-4 border-b border-[var(--border-subtle)] flex justify-between items-center">
-                        <h3 className="font-heading text-lg">Edit Payment - {editingPayment.ref}</h3>
-                        <button onClick={cancelEditPayment} className="p-1 hover:bg-[var(--bg)] rounded">
-                          <X size={20} />
-                        </button>
-                      </div>
-                      <div className="p-4 overflow-y-auto flex-1">
-                        <p className="text-sm text-[var(--text-secondary)] mb-4">
-                          Uncheck items to remove them from this payment. Removed items will become unpaid.
-                        </p>
-                        <table className="w-full">
-                          <thead className="bg-[var(--bg)] sticky top-0">
-                            <tr>
-                              <th className="text-left px-3 py-2 text-xs font-medium">Select</th>
-                              <th className="text-left px-3 py-2 text-xs font-medium">Order</th>
-                              <th className="text-left px-3 py-2 text-xs font-medium">Article</th>
-                              <th className="text-left px-3 py-2 text-xs font-medium">Karigar</th>
-                              <th className="text-right px-3 py-2 text-xs font-medium">Amount</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {editingPayment.items.map((item) => (
-                              <tr 
-                                key={item.id} 
-                                className={`border-b border-[var(--border-subtle)] cursor-pointer ${editSelectedItems.includes(item.id) ? '' : 'opacity-50 bg-[var(--bg)]'}`}
-                                onClick={() => toggleEditItem(item.id)}
-                              >
-                                <td className="px-3 py-2">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={editSelectedItems.includes(item.id)} 
-                                    readOnly
-                                    className="w-4 h-4 accent-[var(--brand)]"
-                                  />
-                                </td>
-                                <td className="px-3 py-2 font-mono text-xs">{item.order_no}</td>
-                                <td className="px-3 py-2 text-sm">{item.article_type}</td>
-                                <td className="px-3 py-2 text-sm">{item.karigar !== "N/A" ? item.karigar : "-"}</td>
-                                <td className="px-3 py-2 font-mono text-sm text-right">
-                                  ₹{fmt(item.labour_type === "Tailoring" ? (item.labour_amount || 0) : (item.emb_labour_amount || 0))}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className="p-4 border-t border-[var(--border-subtle)] space-y-3">
-                        {editSelectedItems.length === 0 && (
-                          <div className="px-3 py-2 text-xs text-[var(--error)] bg-[#9E473D10] border border-[var(--error)] rounded-sm">
-                            ⚠ All items deselected — saving will <strong>delete this entire payment</strong> and mark all items as unpaid.
-                          </div>
-                        )}
-                        <div className="flex justify-end gap-3">
-                          <button
-                            onClick={cancelEditPayment}
-                            className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={saveEditPayment}
-                            disabled={saving}
-                            className={`px-4 py-2 text-sm text-white rounded-sm disabled:opacity-50 ${editSelectedItems.length === 0 ? 'bg-[var(--error)] hover:bg-[var(--error)]/90' : 'bg-[var(--brand)] hover:bg-[var(--brand-hover)]'}`}
-                          >
-                            {saving ? 'Saving...' : editSelectedItems.length === 0 ? 'Delete Payment' : `Save Changes (${editSelectedItems.length} items)`}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                {filterType !== "Tailoring Labour" && (
+                  <div className="relative group">
+                    <select 
+                      data-testid="labour-karigar-filter" 
+                      value={filterKarigar} 
+                      onChange={e => setFilterKarigar(e.target.value)} 
+                      className="h-10 pl-4 pr-10 text-[11px] font-black uppercase tracking-widest bg-background border border-border/50 rounded-xl appearance-none focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer group-hover:border-primary/50"
+                    >
+                      <option value="All">All Artisans</option>
+                      {karigars.map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                    <UsersThree size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none group-hover:text-primary transition-colors" />
+                    {filterKarigar !== "All" && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-primary border-2 border-background animate-pulse" />}
                   </div>
                 )}
               </div>
-            )}
-          </div>
+              
+              <div className="sm:ml-auto flex items-center gap-6">
+                {viewMode === "unpaid" ? (
+                  <>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-black opacity-60 leading-none mb-1">Total Outstanding</span>
+                      <span className="font-mono text-base font-black text-warning tracking-tighter">₹{fmt(totalUnpaid)}</span>
+                    </div>
+                    <div className="flex flex-col items-end border-l border-border/50 pl-6">
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-black opacity-60 leading-none mb-1">Selected Allocation</span>
+                      <span className="font-mono text-base font-black text-primary tracking-tighter">₹{fmt(selectedTotal)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-black opacity-60 leading-none mb-1">Processed Batches</span>
+                    <Badge variant="secondary" className="font-mono text-sm font-black px-3 py-0.5 rounded-lg text-success bg-success/10 border-success/20">
+                      {items.length} Entries
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-xl shadow-black/5 overflow-hidden bg-background min-h-[400px]">
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="p-6 space-y-4">
+                  {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+                </div>
+              ) : items.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-in zoom-in-95 duration-500">
+                  <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-6">
+                    {viewMode === "unpaid" ? <CheckCircle size={40} className="text-success opacity-40" weight="duotone" /> : <Warning size={40} className="text-muted-foreground opacity-40" weight="duotone" />}
+                  </div>
+                  <h3 className="text-lg font-black uppercase tracking-[0.2em] text-foreground mb-2">
+                    {viewMode === "unpaid" ? "Operational Excellence" : "No Records Found"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-medium max-w-[280px] leading-relaxed">
+                    {viewMode === "unpaid" ? "All labour accounts are currently settled. No pending payments found." : "Your archive is currently empty for the selected filters."}
+                  </p>
+                </div>
+              ) : viewMode === "unpaid" ? (
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full" data-testid="labour-items-table">
+                    <thead>
+                      <tr className="bg-muted/30 border-b border-border/50">
+                        <th className="px-4 py-4 w-12">
+                          <div className="flex items-center justify-center">
+                            <input 
+                              type="checkbox" 
+                              checked={selected.length === items.length && items.length > 0} 
+                              onChange={selectAll} 
+                              className="w-4 h-4 rounded border-border/50 text-primary focus:ring-primary/20 accent-primary cursor-pointer transition-all" 
+                            />
+                          </div>
+                        </th>
+                        <th className="text-left px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Order Ref</th>
+                        <th className="text-left px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Article Description</th>
+                        {filterType !== "Tailoring Labour" && <th className="text-left px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Artisan</th>}
+                        <th className="text-right px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Settlement Amt</th>
+                        <th className="text-left px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Discipline</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/30">
+                      {items.map((item, i) => {
+                        const amount = item.labour_type === "Tailoring" ? item.labour_amount : item.emb_labour_amount;
+                        const isSelected = selected.includes(item.id);
+                        return (
+                          <tr 
+                            key={i} 
+                            className={cn(
+                              "group transition-all duration-200 cursor-pointer",
+                              isSelected ? "bg-primary/[0.04]" : "hover:bg-muted/30"
+                            )}
+                            onClick={() => toggleSelect(item.id)}
+                          >
+                            <td className="px-4 py-4">
+                              <div className="flex items-center justify-center">
+                                <input 
+                                  type="checkbox" 
+                                  checked={isSelected} 
+                                  readOnly 
+                                  className="w-4 h-4 rounded border-border/50 text-primary focus:ring-primary/20 accent-primary transition-all" 
+                                />
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex flex-col">
+                                <span className="font-mono text-xs font-black text-primary">#{item.order_no}</span>
+                                <span className="text-[10px] font-bold text-muted-foreground opacity-60 uppercase tracking-tighter">{item.ref}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{item.article_type}</span>
+                            </td>
+                            {filterType !== "Tailoring Labour" && (
+                              <td className="px-4 py-4">
+                                <div className="flex items-center gap-2">
+                                  {item.karigar !== "N/A" ? (
+                                    <>
+                                      <div className="p-1.5 rounded-md bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                                        <UsersThree size={14} weight="duotone" />
+                                      </div>
+                                      <span className="text-xs font-bold text-muted-foreground">{item.karigar}</span>
+                                    </>
+                                  ) : (
+                                    <span className="text-xs font-medium text-muted-foreground/30">—</span>
+                                  )}
+                                </div>
+                              </td>
+                            )}
+                            <td className="px-4 py-4 text-right">
+                              <span className="font-mono text-sm font-black text-foreground group-hover:text-primary transition-colors">₹{fmt(amount)}</span>
+                            </td>
+                            <td className="px-4 py-4">
+                              <Badge 
+                                variant="outline" 
+                                className={cn(
+                                  "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 border-none",
+                                  item.labour_type === "Tailoring" ? "bg-info/10 text-info" : "bg-primary/10 text-primary"
+                                )}
+                              >
+                                {item.labour_type === "Tailoring" ? <Scissors size={10} className="mr-1" weight="bold" /> : <PaintBrush size={10} className="mr-1" weight="bold" />}
+                                {item.labour_type}
+                              </Badge>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+            ) : (
+              // Paid View - 3-Level Hierarchy: Date -> Payment Entry -> Articles
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full" data-testid="labour-paid-table">
+                    <thead>
+                      <tr className="bg-muted/30 border-b border-border/50">
+                        <th className="w-12"></th>
+                        <th className="text-left px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Settlement Date</th>
+                        <th className="text-right px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Batch Count</th>
+                        <th className="text-right px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Volume Total</th>
+                        <th className="w-24"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/30">
+                      {groupedPaid.map((dateGroup, dateIdx) => (
+                        <React.Fragment key={dateGroup.date}>
+                          {/* Date Level */}
+                          <tr
+                            className="bg-muted/10 hover:bg-muted/20 cursor-pointer transition-colors group"
+                            onClick={() => toggleDateExpand(dateGroup.date)}
+                          >
+                            <td className="px-4 py-4 text-center">
+                              <div className={cn(
+                                "p-1.5 rounded-full bg-background border border-border/50 text-muted-foreground transition-all duration-300",
+                                expandedDates[dateGroup.date] && "rotate-90 bg-primary/10 text-primary border-primary/20"
+                              )}>
+                                <CaretRight size={14} weight="bold" />
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-background text-primary shadow-sm">
+                                  <CalendarCheck size={18} weight="duotone" />
+                                </div>
+                                <span className="font-mono text-sm font-black text-foreground">{dateGroup.date}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 font-mono text-sm text-right font-bold text-muted-foreground">{dateGroup.payments.length} Settlements</td>
+                            <td className="px-4 py-4 text-right">
+                              <span className="font-mono text-base font-black text-success tracking-tighter">
+                                ₹{fmt(dateGroup.payments.reduce((s, p) => s + p.total, 0))}
+                              </span>
+                            </td>
+                            <td></td>
+                          </tr>
+                          
+                          {/* Payment Entries under this date */}
+                          {expandedDates[dateGroup.date] && dateGroup.payments.map((payment, payIdx) => {
+                            const pKey = payment.payment_id || `${dateGroup.date}_${payIdx}`;
+                            const isExpanded = expandedPayments[pKey];
+                            return (
+                              <React.Fragment key={pKey}>
+                                <tr
+                                  className={cn(
+                                    "hover:bg-muted/30 cursor-pointer transition-colors border-l-4 border-l-transparent",
+                                    isExpanded && "bg-muted/20 border-l-primary"
+                                  )}
+                                  onClick={() => togglePaymentExpand(pKey)}
+                                >
+                                  <td className="px-4 py-3 pl-12">
+                                    <div className={cn(
+                                      "p-1 rounded-md bg-muted text-muted-foreground transition-all",
+                                      isExpanded && "rotate-90 bg-primary/10 text-primary"
+                                    )}>
+                                      <CaretRight size={12} weight="bold" />
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3" colSpan={2}>
+                                    <div className="flex items-center gap-3">
+                                      <Badge variant="outline" className="font-mono text-[10px] font-black uppercase tracking-widest bg-background border-border/50 text-muted-foreground px-2 py-0.5">
+                                        {payment.ref}
+                                      </Badge>
+                                      <span className="text-xs font-bold text-muted-foreground">({payment.items.length} Articles)</span>
+                                      <Badge 
+                                        variant="outline" 
+                                        className={cn(
+                                          "text-[9px] font-black uppercase tracking-widest px-2 py-0 border-none",
+                                          payment.type === "Tailoring" ? "bg-info/10 text-info" : "bg-primary/10 text-primary"
+                                        )}
+                                      >
+                                        {payment.type}
+                                      </Badge>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <span className="font-mono text-sm font-black text-foreground tracking-tighter">₹{fmt(payment.total)}</span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => startEditPayment(payment)}
+                                        disabled={saving}
+                                        className="h-8 w-8 text-info hover:bg-info/10"
+                                      >
+                                        <PencilSimple size={14} weight="bold" />
+                                      </Button>
+                                      {deleteConfirm?.payment_id === payment.payment_id ? (
+                                        <div className="flex items-center gap-1 animate-in slide-in-from-right-2">
+                                          <Button variant="destructive" size="sm" onClick={() => handleDeletePayment(payment)} className="h-7 px-2 text-[10px] font-black uppercase tracking-widest">Delete</Button>
+                                          <Button variant="outline" size="sm" onClick={() => setDeleteConfirm(null)} className="h-7 px-2 text-[10px] font-black uppercase tracking-widest">Cancel</Button>
+                                        </div>
+                                      ) : (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => handleDeletePayment(payment)}
+                                          disabled={saving}
+                                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                        >
+                                          <Trash size={14} weight="bold" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                                
+                                {/* Articles under this payment */}
+                                {isExpanded && (
+                                  <tr className="bg-muted/5">
+                                    <td colSpan={5} className="p-0">
+                                      <div className="px-16 py-4 border-b border-border/20">
+                                        <table className="w-full text-xs">
+                                          <thead>
+                                            <tr className="border-b border-border/30">
+                                              <th className="text-left py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Order Ref</th>
+                                              <th className="text-left py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Article</th>
+                                              <th className="text-left py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Artisan</th>
+                                              <th className="text-right py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Net Amount</th>
+                                              <th className="text-right py-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 pr-2">Channel</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-border/20">
+                                            {payment.items.map((item, idx) => (
+                                              <tr key={idx} className="hover:bg-background/50 transition-colors">
+                                                <td className="py-2.5 font-mono text-[11px] font-black text-primary">#{item.order_no}</td>
+                                                <td className="py-2.5 font-bold text-foreground">{item.article_type}</td>
+                                                <td className="py-2.5 text-muted-foreground font-medium">{item.karigar !== "N/A" ? item.karigar : "—"}</td>
+                                                <td className="py-2.5 font-mono text-[11px] font-black text-right">₹{fmt(item.labour_type === "Tailoring" ? (item.labour_amount || 0) : (item.emb_labour_amount || 0))}</td>
+                                                <td className="py-2.5 text-right pr-2">
+                                                  <Badge variant="secondary" className="text-[8px] font-black uppercase tracking-tighter px-1.5 py-0 rounded-md bg-muted/50 text-muted-foreground">
+                                                    {payment.mode || "Cash"}
+                                                  </Badge>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {/* Edit Payment Modal */}
+                {editingPayment && (
+                  <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300" onKeyDown={e => e.key === "Escape" && cancelEditPayment()}>
+                    <Card className="max-w-2xl w-full shadow-2xl border-border/50 animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-border/50">
+                        <div className="space-y-1">
+                          <CardTitle className="text-lg font-black uppercase tracking-[0.2em]">Edit Settlement</CardTitle>
+                          <Badge variant="outline" className="text-[10px] h-5 px-2 font-bold uppercase tracking-widest bg-primary/5 text-primary border-primary/20">
+                            Batch: {editingPayment.ref}
+                          </Badge>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={cancelEditPayment} className="h-9 w-9 rounded-full"><X size={20}/></Button>
+                      </CardHeader>
+                      <CardContent className="p-0 overflow-y-auto custom-scrollbar flex-1">
+                        <div className="p-6 bg-muted/5 space-y-4">
+                          <div className="flex items-start gap-3 p-4 bg-primary/5 border border-primary/10 rounded-xl">
+                            <Info size={18} className="text-primary mt-0.5" weight="duotone" />
+                            <p className="text-xs font-medium text-muted-foreground leading-relaxed">
+                              Deselect articles to remove them from this settlement. Removed articles will return to the <span className="text-primary font-bold">Pending</span> queue for future processing.
+                            </p>
+                          </div>
+                          <div className="overflow-hidden border border-border/50 rounded-xl bg-background shadow-sm">
+                            <table className="w-full text-xs">
+                              <thead className="bg-muted/30 sticky top-0">
+                                <tr>
+                                  <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Select</th>
+                                  <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Order Ref</th>
+                                  <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description</th>
+                                  {editingPayment.labour_type === "embroidery" && <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Artisan</th>}
+                                  <th className="text-right px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border/30">
+                                {editingPayment.items.map((item) => {
+                                  const isSelected = editSelectedItems.includes(item.id);
+                                  return (
+                                    <tr 
+                                      key={item.id} 
+                                      className={cn(
+                                        "cursor-pointer transition-colors",
+                                        isSelected ? "hover:bg-muted/30" : "opacity-40 grayscale bg-muted/10"
+                                      )}
+                                      onClick={() => toggleEditItem(item.id)}
+                                    >
+                                      <td className="px-4 py-3">
+                                        <input 
+                                          type="checkbox" 
+                                          checked={isSelected} 
+                                          readOnly
+                                          className="w-4 h-4 rounded border-border/50 text-primary focus:ring-primary/20 accent-primary"
+                                        />
+                                      </td>
+                                      <td className="px-4 py-3 font-mono text-xs font-black text-primary">#{item.order_no}</td>
+                                      <td className="px-4 py-3 font-bold text-foreground">{item.article_type}</td>
+                                      {editingPayment.labour_type === "embroidery" && <td className="px-4 py-3 text-muted-foreground font-medium">{item.karigar !== "N/A" ? item.karigar : "—"}</td>}
+                                      <td className="px-4 py-3 font-mono text-sm text-right font-black">
+                                        ₹{fmt(item.labour_type === "Tailoring" ? (item.labour_amount || 0) : (item.emb_labour_amount || 0))}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </CardContent>
+                      <div className="p-6 border-t border-border/50 bg-background/80 backdrop-blur-md space-y-4">
+                        {editSelectedItems.length === 0 && (
+                          <div className="flex items-center gap-3 p-3 bg-destructive/5 border border-destructive/20 rounded-lg animate-in shake duration-500">
+                            <Warning size={16} className="text-destructive" weight="fill" />
+                            <p className="text-[11px] font-bold text-destructive leading-tight">
+                              Critical: No items selected. Saving will <span className="uppercase">delete</span> this settlement record entirely.
+                            </p>
+                          </div>
+                        )}
+                        <div className="flex justify-end gap-3">
+                          <Button variant="ghost" onClick={cancelEditPayment} className="h-10 px-6 font-black uppercase tracking-widest text-[10px]">Cancel</Button>
+                          <Button
+                            onClick={saveEditPayment}
+                            disabled={saving}
+                            variant={editSelectedItems.length === 0 ? "destructive" : "default"}
+                            className="h-10 px-8 font-black uppercase tracking-widest text-[10px] shadow-lg"
+                          >
+                            {saving ? (
+                              <div className="flex items-center gap-2">Processing <ArrowsClockwise size={14} className="animate-spin" /></div>
+                            ) : editSelectedItems.length === 0 ? (
+                              <div className="flex items-center gap-2"><Trash size={14} weight="bold" /> Void Settlement</div>
+                            ) : (
+                              <div className="flex items-center gap-2"><CheckCircle size={14} weight="bold" /> Save Updates</div>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Payment Panel */}
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4 h-fit">
-          <h3 className="font-heading text-base font-medium">Process Payment</h3>
+        {/* Action Panel */}
+        <div className="space-y-6">
+          <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden sticky top-8">
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-primary" />
+            <CardHeader className="pb-4 pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                  <Receipt size={20} weight="duotone" />
+                </div>
+                <CardTitle className="text-lg font-black uppercase tracking-tight">Settlement Engine</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Execution Date</label>
+                  <DatePickerInput data-testid="labour-pay-date" value={payDate} onChange={setPayDate} placeholder="Payment date" />
+                </div>
 
-          <div>
-            <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Payment Date</label>
-            <DatePickerInput data-testid="labour-pay-date" value={payDate} onChange={setPayDate} placeholder="Payment date" />
-          </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Payment Channel</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {paymentModes.map(m => {
+                      const isActive = selectedModes.includes(m);
+                      return (
+                        <Button 
+                          key={m} 
+                          variant={isActive ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => toggleMode(m)} 
+                          className={cn(
+                            "h-10 px-2 text-[10px] font-black uppercase tracking-tight border-border/50 transition-all truncate",
+                            isActive ? "shadow-md bg-primary" : "bg-muted/30 text-muted-foreground hover:bg-primary/5 hover:text-primary hover:border-primary/30"
+                          )}
+                          title={m}
+                        >
+                          {m}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
 
-          <div>
-            <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-2">Payment Mode</label>
-            <div className="flex flex-wrap gap-2">
-              {paymentModes.map(m => (
-                <button key={m} onClick={() => toggleMode(m)} className={`px-3 py-2 text-xs font-medium rounded-sm border transition-all min-h-[36px] ${selectedModes.includes(m) ? 'bg-[var(--brand)] text-white border-[var(--brand)]' : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border-subtle)]'}`}>
-                  {m}
-                </button>
-              ))}
+              <div className="p-5 bg-muted/30 rounded-2xl border border-border/50 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                  <CurrencyDollar size={64} weight="duotone" className="text-primary" />
+                </div>
+                <p className="text-[10px] uppercase tracking-[0.3em] font-black text-muted-foreground opacity-60 leading-none">Net Allocation</p>
+                <p className="font-heading text-3xl font-black tracking-tighter text-primary mt-2">₹{fmt(selectedTotal)}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="secondary" className="text-[9px] font-black px-2 py-0.5 rounded-md bg-primary/10 text-primary border-none">
+                    {selected.length} Articles Selected
+                  </Badge>
+                </div>
+              </div>
+
+              <Button 
+                data-testid="pay-labour-btn" 
+                onClick={handlePay} 
+                disabled={saving || selected.length === 0} 
+                className="w-full h-14 text-sm font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 transition-all active:scale-95 gap-3"
+              >
+                {saving ? (
+                  <div className="flex items-center gap-2">Processing <ArrowsClockwise size={20} className="animate-spin" /></div>
+                ) : (
+                  <><CurrencyDollar size={20} weight="bold" /> Settle Accounts</>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Quick Stats or Info */}
+          <Card className="bg-muted/20 border-none p-5 space-y-4">
+            <div className="flex items-center gap-3">
+              <Info size={18} className="text-muted-foreground" weight="duotone" />
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Settlement Protocol</p>
             </div>
-          </div>
-
-          <div className="p-3 bg-[var(--bg)] rounded-sm">
-            <p className="text-xs uppercase tracking-[0.15em] text-[var(--text-secondary)]">Selected Amount</p>
-            <p className="font-heading text-2xl font-light tracking-tight text-[var(--brand)] mt-1">₹{fmt(selectedTotal)}</p>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">{selected.length} items selected</p>
-          </div>
-
-          <button data-testid="pay-labour-btn" onClick={handlePay} disabled={saving || selected.length === 0} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 transition-all">
-            {saving ? "Processing..." : <><CurrencyDollar size={18} weight="bold" /> Pay Labour</>}
-          </button>
+            <p className="text-[11px] font-medium text-muted-foreground/70 leading-relaxed">
+              Batch processing allows for multiple article settlements under a single transaction reference. All selected items will be marked as paid and moved to the settled archive.
+            </p>
+          </Card>
         </div>
       </div>
 
-      {/* Mobile sticky pay bar — shows when items are selected in unpaid view */}
+      {/* Mobile Sticky Action Bar */}
       {viewMode === "unpaid" && selected.length > 0 && (
-        <div className="lg:hidden fixed bottom-14 md:bottom-0 left-0 right-0 bg-[var(--surface)] border-t border-[var(--border-subtle)] px-4 py-3 shadow-lg z-40 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">Selected</p>
-            <p className="text-base font-semibold text-[var(--brand)] leading-tight">₹{fmt(selectedTotal)}</p>
-            <p className="text-[11px] text-[var(--text-secondary)]">{selected.length} item{selected.length !== 1 ? 's' : ''}</p>
-          </div>
-          <button
-            onClick={handlePay}
-            disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 whitespace-nowrap"
-          >
-            <CurrencyDollar size={16} weight="bold" />
-            {saving ? "Processing…" : "Pay Labour"}
-          </button>
+        <div className="lg:hidden fixed bottom-[72px] left-4 right-4 z-40 animate-in slide-in-from-bottom-8 duration-500">
+          <Card className="bg-background/80 backdrop-blur-xl border-primary/20 shadow-2xl overflow-hidden">
+            <div className="p-4 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[9px] uppercase tracking-[0.2em] font-black text-muted-foreground opacity-60">Net Allocation</p>
+                <p className="text-xl font-black text-primary tracking-tighter leading-none mt-1">₹{fmt(selectedTotal)}</p>
+                <p className="text-[10px] font-bold text-muted-foreground mt-1">{selected.length} articles</p>
+              </div>
+              <Button
+                onClick={handlePay}
+                disabled={saving}
+                className="h-12 px-6 font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/20 gap-2"
+              >
+                <CurrencyDollar size={18} weight="bold" />
+                {saving ? "..." : "Settle"}
+              </Button>
+            </div>
+          </Card>
         </div>
       )}
     </div>

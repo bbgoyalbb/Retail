@@ -4,7 +4,11 @@ import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/components/ThemeProvider";
 import { getPublicSettings, BACKEND_URL } from "@/api";
 import { useToast } from "@/hooks/use-toast";
-import { Scissors, Eye, EyeSlash } from "@phosphor-icons/react";
+import { Scissors, Eye, EyeSlash, Lock, User, ArrowsClockwise, ShieldCheck } from "@phosphor-icons/react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export default function LoginPage() {
   const { login, sessionExpired } = useAuth();
@@ -51,126 +55,155 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-[var(--bg)]">
+    <div className="min-h-screen flex bg-background overflow-hidden selection:bg-primary/20">
       {/* Left side - Login form */}
-      <div className="relative flex-1 flex items-center justify-center p-4 lg:p-8">
-        {/* Subtle background texture */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none lg:hidden">
-          <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full opacity-[0.04]" style={{ background: "var(--brand)" }} />
-          <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full opacity-[0.04]" style={{ background: "var(--brand)" }} />
+      <div className="relative flex-1 flex items-center justify-center p-6 lg:p-12 z-10">
+        {/* Subtle background decoration */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+          <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl" />
         </div>
 
-        <div className="relative w-full max-w-sm">
+        <div className="relative w-full max-w-sm space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
           {/* Brand mark */}
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-24 h-24 rounded-sm flex items-center justify-center mb-4 shadow-sm overflow-hidden" style={{ background: activeLogo ? "transparent" : "var(--brand)" }}>
-              {activeLogo
-                ? <img src={activeLogo} alt={firmName} className="w-full h-full object-contain" style={{ borderRadius: "6px" }} />
-                : <span className="text-white font-serif font-bold text-4xl leading-none">{firmName.charAt(0).toUpperCase()}</span>
-              }
+          <div className="flex flex-col items-center text-center">
+            <div className="w-24 h-24 rounded-3xl bg-primary/5 p-1 mb-6 shadow-2xl shadow-primary/10 border border-primary/10 transition-transform hover:scale-105 duration-500 overflow-hidden flex items-center justify-center">
+              {activeLogo ? (
+                <img src={activeLogo} alt={firmName} className="w-full h-full object-contain p-2" />
+              ) : (
+                <div className="w-full h-full bg-primary flex items-center justify-center">
+                  <span className="text-white font-black text-4xl">{firmName.charAt(0).toUpperCase()}</span>
+                </div>
+              )}
             </div>
-            <h1 className="font-heading text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+            <h1 className="font-heading text-3xl font-black tracking-tighter text-foreground mb-1">
               {firmName}
             </h1>
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-secondary)] mt-1 flex items-center gap-1.5">
-              <Scissors size={10} /> Fabric &amp; Tailoring
+            <p className="text-[10px] uppercase tracking-[0.4em] font-black text-muted-foreground/60 flex items-center gap-2">
+              <Scissors size={12} weight="bold" /> Fabric & Tailoring
             </p>
           </div>
 
-          {/* Card */}
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm shadow-sm p-8 space-y-6">
-          {sessionExpired && (
-            <div className="px-4 py-3 rounded-sm bg-[#D4984210] border border-[var(--warning)] text-[var(--warning)] text-sm text-center">
-              ⏱ Your session has expired. Please sign in again.
-            </div>
-          )}
-
-          <div>
-            <h2 className="font-heading text-base font-medium text-[var(--text-primary)]">Sign in</h2>
-            <p className="text-xs text-[var(--text-secondary)] mt-0.5">Enter your credentials to continue</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="username" className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">
-                Username
-              </label>
-              <input
-                id="username"
-                type="text"
-                placeholder="Enter username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
-                inputMode="text"
-                className="w-full px-3 py-2.5 text-sm border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)] focus:border-[var(--brand)] transition-colors"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPwd ? "text" : "password"}
-                  placeholder="Enter password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  className="w-full px-3 py-2.5 pr-10 text-sm border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)] focus:border-[var(--brand)] transition-colors"
-                />
-                <button type="button" onClick={() => setShowPwd(p => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-                  {showPwd ? <EyeSlash size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={busy || !username || !password}
-              className={`w-full py-2.5 text-sm font-semibold rounded-sm transition-all duration-150 active:scale-[0.99] tracking-wide mt-2 flex items-center justify-center gap-2 ${
-                busy || !username || !password
-                  ? 'bg-[var(--brand)]/60 text-white/80 cursor-not-allowed'
-                  : 'bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)]'
-              }`}
-            >
-              {busy ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Signing in…
-                </>
-              ) : (
-                "Sign In"
+          <Card className="border-none shadow-2xl shadow-black/10 bg-card/50 backdrop-blur-xl overflow-hidden relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-primary" />
+            <CardHeader className="pb-4 pt-8">
+              {sessionExpired && (
+                <div className="mb-6 p-4 rounded-xl bg-warning/10 border border-warning/20 flex items-center gap-3 animate-in shake duration-500">
+                  <div className="p-1.5 rounded-full bg-warning text-white">
+                    <ArrowsClockwise size={12} weight="bold" />
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-warning">Session Expired ● Sign In</p>
+                </div>
               )}
-            </button>
-          </form>
-        </div>
+              <CardTitle className="text-xl font-black uppercase tracking-tight text-foreground">Sign In</CardTitle>
+              <p className="text-xs text-muted-foreground font-medium mt-1">Initialize your operational session</p>
+            </CardHeader>
+            <CardContent className="pb-8">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-2">
+                  <label htmlFor="username" className="text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground ml-1 flex items-center gap-2">
+                    <User size={12} weight="bold" /> Username
+                  </label>
+                  <input
+                    id="username"
+                    type="text"
+                    placeholder="Enter identity"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    autoComplete="username"
+                    className="w-full h-12 px-4 text-sm font-bold bg-muted/30 border border-border/50 rounded-2xl focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-muted-foreground/30"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="password" className="text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground ml-1 flex items-center gap-2">
+                    <Lock size={12} weight="bold" /> Security Key
+                  </label>
+                  <div className="relative group">
+                    <input
+                      id="password"
+                      type={showPwd ? "text" : "password"}
+                      placeholder="Enter credentials"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="current-password"
+                      className="w-full h-12 px-4 pr-12 text-sm font-bold bg-muted/30 border border-border/50 rounded-2xl focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-muted-foreground/30"
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPwd(p => !p)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      {showPwd ? <EyeSlash size={18} weight="bold" /> : <Eye size={18} weight="bold" />}
+                    </button>
+                  </div>
+                </div>
+                <Button
+                  type="submit"
+                  disabled={busy || !username || !password}
+                  className="w-full h-14 text-sm font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 gap-3 transition-all active:scale-[0.98] mt-4"
+                >
+                  {busy ? (
+                    <div className="flex items-center gap-2">Authenticating <ArrowsClockwise size={20} className="animate-spin" /></div>
+                  ) : (
+                    <><ShieldCheck size={20} weight="bold" /> Access System</>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
-        <p className="text-center text-[10px] text-[var(--text-secondary)] mt-6 tracking-[0.1em] uppercase">
-          Retail Management System
-        </p>
+          <div className="flex flex-col items-center gap-4 pt-4">
+            <p className="text-[9px] uppercase tracking-[0.3em] font-black text-muted-foreground/40">
+              Retail Management Engine v2.0
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Right side - decorative panel (tablet and desktop) */}
-      <div className="hidden md:flex md:flex-1 relative bg-[#2D2A26] overflow-hidden">
-        {/* CSS-only woven fabric pattern — no external dependency */}
-        <div className="absolute inset-0 opacity-20" style={{
-          backgroundImage: `repeating-linear-gradient(
-            45deg,
-            #C86B4D 0px, #C86B4D 1px,
-            transparent 1px, transparent 12px
-          ), repeating-linear-gradient(
-            -45deg,
-            #C86B4D 0px, #C86B4D 1px,
-            transparent 1px, transparent 12px
-          )`
+      {/* Right side - Decorative visual panel */}
+      <div className="hidden lg:flex lg:flex-1 relative bg-[#1a1917] overflow-hidden">
+        {/* Professional architectural background */}
+        <div className="absolute inset-0 opacity-10" style={{
+          backgroundImage: `radial-gradient(circle at 2px 2px, #C86B4D 1px, transparent 0)`,
+          backgroundSize: '32px 32px'
         }} />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#2D2A26] via-[#2D2A26]/40 to-transparent" />
-        <div className="absolute bottom-12 left-12 right-12 text-white">
-          <p className="font-heading text-2xl font-light tracking-tight mb-2">Crafted for Fabric Professionals</p>
-          <p className="text-sm text-white/70">Manage inventory, tailoring, and settlements in one elegant ledger.</p>
+        
+        <div className="absolute inset-0 flex items-center justify-center p-20">
+          <div className="relative w-full max-w-lg aspect-square border border-primary/10 rounded-[4rem] flex items-center justify-center animate-in zoom-in-95 duration-1000">
+            <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full" />
+            <div className="relative text-center space-y-6 p-12">
+              <div className="w-16 h-1 bg-primary mx-auto rounded-full mb-8" />
+              <h2 className="font-heading text-5xl font-black tracking-tighter text-white leading-none">
+                Precision <span className="text-primary italic">Craftsmanship</span>
+              </h2>
+              <p className="text-lg text-white/50 font-medium leading-relaxed">
+                A world-class administrative suite designed specifically for the fabric industry. Manage inventory, tailoring protocols, and financial settlements with surgical precision.
+              </p>
+              <div className="pt-8 flex items-center justify-center gap-8">
+                {[
+                  { label: "Inventory", icon: Scissors },
+                  { label: "Ledger", icon: Receipt },
+                  { label: "Security", icon: ShieldCheck },
+                ].map(item => (
+                  <div key={item.label} className="flex flex-col items-center gap-2">
+                    <div className="p-3 rounded-2xl bg-white/5 text-primary border border-white/5">
+                      <item.icon size={20} weight="duotone" />
+                    </div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/30">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom branding */}
+        <div className="absolute bottom-12 left-12 flex items-center gap-4">
+          <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/20" />
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/80">Premium Enterprise Edition</span>
+            <span className="text-[9px] font-medium text-white/30">Proprietary Software Protocol</span>
+          </div>
         </div>
       </div>
     </div>

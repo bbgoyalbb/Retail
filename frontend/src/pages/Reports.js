@@ -4,8 +4,14 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/components/ThemeProvider";
 import { getRevenueReport, getCustomerReport, getSummaryReport, exportExcelUrl } from "@/api";
 import { fmt } from "@/lib/fmt";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
-import { ChartBar, Users, TrendUp, Warning, DownloadSimple, Printer } from "@phosphor-icons/react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import { ChartBar, Users, TrendUp, Warning, DownloadSimple, Printer, CaretDown, Calendar, ArrowsClockwise } from "@phosphor-icons/react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 // CSS-variable-aware chart colours — respond to dark/light mode
 const getChartColors = () => {
@@ -20,43 +26,47 @@ const getChartColors = () => {
     "#B35A3E",
   ];
 };
+
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload) return null;
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-3 rounded-sm shadow-sm">
-      <p className="text-xs font-medium mb-1">{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} className="text-xs" style={{ color: p.color }}>
-          {p.name}: ₹{fmt(p.value)}
-        </p>
-      ))}
+    <div className="bg-card border border-border p-3 rounded-xl shadow-xl backdrop-blur-md">
+      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">{label}</p>
+      <div className="space-y-1.5">
+        {payload.map((p, i) => (
+          <div key={i} className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+              <span className="text-xs font-bold text-foreground">{p.name}</span>
+            </div>
+            <span className="font-mono text-xs font-black">₹{fmt(p.value)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
 function SummaryCards({ summary }) {
   const cards = [
-    { label: "Fabric Total", value: `₹${fmt(summary.total_fabric)}`, color: "var(--brand)" },
-    { label: "Fabric Received", value: `₹${fmt(summary.total_fabric_received)}`, color: "var(--success)" },
-    { label: "Fabric Pending", value: `₹${fmt(summary.total_fabric_pending)}`, color: "var(--warning)" },
-    { label: "Tailoring Total", value: `₹${fmt(summary.total_tailoring)}`, color: "var(--info)" },
-    { label: "Tailoring Received", value: `₹${fmt(summary.total_tailoring_received)}`, color: "var(--success)" },
-    { label: "Tailoring Pending", value: `₹${fmt(summary.total_tailoring_pending)}`, color: "var(--warning)" },
-    { label: "Embroidery Total", value: `₹${fmt(summary.total_embroidery)}`, color: "var(--brand)" },
-    { label: "Embroidery Received", value: `₹${fmt(summary.total_embroidery_received)}`, color: "var(--success)" },
-    { label: "Add-on Total", value: `₹${fmt(summary.total_addon)}`, color: "var(--text-secondary)" },
-    { label: "Add-on Received", value: `₹${fmt(summary.total_addon_received)}`, color: "var(--success)" },
-    { label: "Total Advances", value: `₹${fmt(summary.total_advance)}`, color: "var(--info)" },
-    { label: "Total Items", value: String(summary.total_items || 0), color: "var(--text-primary)" },
+    { label: "Fabric Revenue", value: `₹${fmt(summary.total_fabric)}`, icon: TrendUp, color: "text-primary", bg: "bg-primary/10" },
+    { label: "Fabric Received", value: `₹${fmt(summary.total_fabric_received)}`, icon: TrendUp, color: "text-success", bg: "bg-success/10" },
+    { label: "Tailoring Volume", value: `₹${fmt(summary.total_tailoring)}`, icon: ChartBar, color: "text-info", bg: "bg-info/10" },
+    { label: "Total Pending", value: `₹${fmt(summary.total_fabric_pending + summary.total_tailoring_pending)}`, icon: Warning, color: "text-warning", bg: "bg-warning/10" },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map(c => (
-        <div key={c.label} className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm">
-          <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] mb-1">{c.label}</p>
-          <p className="font-heading text-xl font-light tracking-tight" style={{ color: c.color }}>{c.value}</p>
-        </div>
+        <Card key={c.label} className="border-none shadow-lg shadow-black/5 overflow-hidden group">
+          <CardContent className="p-5 relative">
+            <div className={cn("absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity", c.color)}>
+              <c.icon size={64} weight="duotone" />
+            </div>
+            <p className="text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground opacity-60 mb-2">{c.label}</p>
+            <p className={cn("font-heading text-2xl font-black tracking-tighter", c.color)}>{c.value}</p>
+          </CardContent>
+        </Card>
       ))}
     </div>
   );
@@ -75,10 +85,10 @@ const DATE_PRESETS = [
 export default function Reports() {
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const { toast } = useToast();
   const chartRef = useRef(null);
   const [chartWidth, setChartWidth] = useState(800);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const COLORS = useMemo(() => getChartColors(), [theme]); // theme change invalidates CSS vars
+  const COLORS = useMemo(() => getChartColors(), [theme]);
   const [tab, setTab] = useState("revenue");
   const [period, setPeriod] = useState("daily");
   const [dateFrom, setDateFrom] = useState("");
@@ -89,7 +99,6 @@ export default function Reports() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Track chart container width — debounced so resize doesn't setState 60×/sec
   useEffect(() => {
     let timer;
     const updateWidth = () => {
@@ -103,14 +112,12 @@ export default function Reports() {
     return () => { window.removeEventListener('resize', updateWidth); clearTimeout(timer); };
   }, []);
 
-  // Calculate tick interval based on chart width and data length
   const getTickInterval = (dataLength) => {
     if (chartWidth < 480) return Math.max(1, Math.floor(dataLength / 4));
     if (chartWidth < 640) return Math.max(1, Math.floor(dataLength / 6));
-    return 0; // Show all ticks
+    return 0;
   };
 
-  // Track which tabs have been fetched for the current filter params
   const fetchedTabs = useRef(new Set());
   const lastParams = useRef("");
 
@@ -123,12 +130,10 @@ export default function Reports() {
         if (dateFrom) params.date_from = dateFrom;
         if (dateTo) params.date_to = dateTo;
         const paramsKey = JSON.stringify(params);
-        // Reset tracked tabs when filter params change
         if (paramsKey !== lastParams.current) {
           fetchedTabs.current = new Set();
           lastParams.current = paramsKey;
         }
-        // Always fetch summary (used by Breakdown tab) + active tab's data
         const fetches = [getSummaryReport(params)];
         const needRevenue  = tab === "revenue"   || !fetchedTabs.current.has("revenue");
         const needCustomer = tab === "customers" || !fetchedTabs.current.has("customers");
@@ -142,292 +147,398 @@ export default function Reports() {
         fetchedTabs.current.add("breakdown");
       } catch (err) {
         setError("Failed to load reports. Please try again.");
+        toast({ title: "Error", description: "Failed to load reports", variant: "destructive" });
       } finally {
         setLoading(false);
       }
     };
     loadReports();
-  }, [period, dateFrom, dateTo, tab]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  }, [period, dateFrom, dateTo, tab, toast]);
 
   return (
-    <div data-testid="reports-page" className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Reports & Analytics</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">Revenue, customer, and business insights</p>
+    <div data-testid="reports-page" className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary">Reports & Analytics</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium">Business performance, revenue trends, and customer insights</p>
         </div>
         <div className="flex items-center gap-2 no-print">
-          <button onClick={() => window.print()}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:text-[var(--brand)] transition-colors">
+          <Button variant="outline" size="sm" onClick={() => window.print()} className="rounded-xl font-bold uppercase tracking-widest text-[10px] gap-2">
             <Printer size={16} /> Print
-          </button>
-          <a href={exportExcelUrl()} target="_blank" rel="noreferrer"
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:text-[var(--brand)] transition-colors">
-            <DownloadSimple size={16} /> Export Excel
-          </a>
+          </Button>
+          <Button variant="outline" size="sm" asChild className="rounded-xl font-bold uppercase tracking-widest text-[10px] gap-2">
+            <a href={exportExcelUrl()} target="_blank" rel="noreferrer">
+              <DownloadSimple size={16} /> Export Excel
+            </a>
+          </Button>
         </div>
       </div>
 
-      {/* Error State */}
-      {error && (
-        <div className="p-4 border border-[var(--error)] bg-[#9E473D10] rounded-sm flex items-center gap-3 text-[var(--error)]">
-          <Warning size={20} />
-          <span className="text-sm">{error}</span>
-        </div>
-      )}
-
-      {/* Loading State - Skeleton */}
-      {loading && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[1,2,3,4].map(i => (
-              <div key={i} className="h-24 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm animate-pulse" />
+      {/* Filters Bar */}
+      <Card className="bg-card border-none shadow-lg shadow-black/5 overflow-hidden">
+        <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
+        <CardContent className="p-4 space-y-4">
+          <div className="flex flex-wrap gap-1.5">
+            {DATE_PRESETS.map(p => (
+              <Button 
+                key={p.label} 
+                variant={dateFrom === p.from && dateTo === p.to ? "default" : "outline"}
+                size="sm"
+                onClick={() => { setDateFrom(p.from); setDateTo(p.to); }}
+                className={cn(
+                  "h-8 px-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all",
+                  dateFrom === p.from && dateTo === p.to ? "shadow-md" : "text-muted-foreground"
+                )}
+              >
+                {p.label}
+              </Button>
             ))}
-          </div>
-          <div className="h-64 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm animate-pulse" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="h-48 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm animate-pulse" />
-            <div className="h-48 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm animate-pulse" />
-          </div>
-        </div>
-      )}
-
-      {/* Summary */}
-      {!loading && summary && <SummaryCards summary={summary} />}
-
-      {/* Global date filters — shared across all tabs */}
-      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4 rounded-sm space-y-3">
-        <div className="flex flex-wrap gap-1.5">
-          {DATE_PRESETS.map(p => (
-            <button key={p.label} onClick={() => { setDateFrom(p.from); setDateTo(p.to); }}
-              className={`px-3 py-1 text-xs font-medium rounded-sm border transition-colors ${
-                dateFrom === p.from && dateTo === p.to
-                  ? 'bg-[var(--brand)] text-white border-[var(--brand)]'
-                  : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]'
-              }`}>{p.label}</button>
-          ))}
-          {(dateFrom || dateTo) && (
-            <button onClick={() => { setDateFrom(""); setDateTo(""); }}
-              className="px-3 py-1 text-xs font-medium rounded-sm border border-[var(--border-subtle)] text-[var(--error)] hover:bg-[#9E473D08]">Clear</button>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-3 items-center">
-          <select data-testid="report-period" value={period} onChange={e => setPeriod(e.target.value)} className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]">
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
-          <DatePickerInput value={dateFrom} onChange={setDateFrom} placeholder="From date" />
-          <DatePickerInput value={dateTo} onChange={setDateTo} placeholder="To date" />
-          {(dateFrom || dateTo) && (
-            <span className="text-xs text-[var(--text-secondary)]">Showing: {dateFrom || "all"} → {dateTo || "all"}</span>
-          )}
-        </div>
-      </div>
-
-      {/* Tabs with scroll-snap for crisp stops on mobile */}
-      <div className="flex gap-1 border-b border-[var(--border-subtle)] overflow-x-auto [&::-webkit-scrollbar]:hidden scroll-snap-type-x mandatory no-print">
-        {[
-          { key: "revenue", label: "Revenue", icon: TrendUp },
-          { key: "customers", label: "Customers", icon: Users },
-          { key: "breakdown", label: "Breakdown", icon: ChartBar },
-        ].map((t, key) => (
-          <button
-            key={key}
-            data-testid={`report-tab-${t.key}`}
-            onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap scroll-snap-align-start -mb-px flex-shrink-0 ${
-              tab === t.key ? 'border-[var(--brand)] text-[var(--brand)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-          >
-            <t.icon size={16} /> {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Revenue Tab */}
-      {tab === "revenue" && (
-        <div className="space-y-4">
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
-            <h3 className="font-heading text-base font-medium mb-4">Fabric Revenue Over Time</h3>
-            {!loading && revenueData.length === 0 && (
-              <div className="p-8 text-center text-sm text-[var(--text-secondary)]">
-                No data available for selected period
-              </div>
+            {(dateFrom || dateTo) && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => { setDateFrom(""); setDateTo(""); }}
+                className="h-8 px-3 text-[10px] font-black uppercase tracking-widest text-destructive hover:bg-destructive/10 rounded-lg"
+              >
+                Clear
+              </Button>
             )}
-            {/* Responsive height: mobile 192px, tablet 256px, desktop 320px */}
-            <div className="h-48 sm:h-64 lg:h-80" ref={chartRef}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-                  <XAxis 
-                    dataKey="_id" 
-                    tick={{ fontSize: chartWidth < 480 ? 8 : 10 }} 
-                    angle={-45} 
-                    textAnchor="end" 
-                    height={60}
-                    interval={getTickInterval(revenueData.length)}
-                  />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="fabric_total" name="Total" fill="var(--brand)" radius={[2, 2, 0, 0]} />
-                  <Bar dataKey="fabric_received" name="Received" fill="var(--success)" radius={[2, 2, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          </div>
+
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative group">
+              <select 
+                data-testid="report-period" 
+                value={period} 
+                onChange={e => setPeriod(e.target.value)} 
+                className="h-10 pl-4 pr-10 text-[11px] font-black uppercase tracking-widest bg-background border border-border/50 rounded-xl appearance-none focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer group-hover:border-primary/50"
+              >
+                <option value="daily">Daily View</option>
+                <option value="weekly">Weekly View</option>
+                <option value="monthly">Monthly View</option>
+              </select>
+              <CaretDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none group-hover:text-primary transition-colors" />
             </div>
-          </div>
 
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
-            <h3 className="font-heading text-base font-medium mb-4">Revenue Trend (Received)</h3>
-            {/* Responsive height: mobile 192px, tablet 256px, desktop 320px */}
-            <div className="h-48 sm:h-64 lg:h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-                  <XAxis 
-                    dataKey="_id" 
-                    tick={{ fontSize: chartWidth < 480 ? 8 : 10 }} 
-                    angle={-45} 
-                    textAnchor="end" 
-                    height={60}
-                    interval={getTickInterval(revenueData.length)}
-                  />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="fabric_received" name="Fabric" stroke="var(--brand)" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="tailoring_received" name="Tailoring" stroke="var(--info)" strokeWidth={2} dot={{ r: 3 }} />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="flex items-center gap-2">
+              <DatePickerInput value={dateFrom} onChange={setDateFrom} placeholder="From date" />
+              <div className="w-2 h-px bg-border/50" />
+              <DatePickerInput value={dateTo} onChange={setDateTo} placeholder="To date" />
             </div>
+
+            {(dateFrom || dateTo) && (
+              <Badge variant="secondary" className="font-mono text-[10px] font-black uppercase tracking-tighter bg-primary/10 text-primary border-none">
+                <Calendar size={12} className="mr-1.5" />
+                {dateFrom || "Start"} — {dateTo || "End"}
+              </Badge>
+            )}
+
+            <div className="flex-1" />
+            <Button variant="ghost" size="icon" onClick={() => lastParams.current = ""} disabled={loading} className="rounded-full">
+              <ArrowsClockwise size={18} className={loading ? "animate-spin text-primary" : ""} />
+            </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Loading State */}
+      {loading ? (
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)}
+          </div>
+          <Card className="border-none shadow-lg">
+            <CardContent className="p-6 h-[400px] flex items-center justify-center">
+              <Skeleton className="w-full h-full rounded-xl" />
+            </CardContent>
+          </Card>
         </div>
-      )}
+      ) : (
+        <>
+          {summary && <SummaryCards summary={summary} />}
 
-      {/* Customers Tab */}
-      {tab === "customers" && (
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm">
-          <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
-            <h3 className="font-heading text-base font-medium">Customer Revenue Ranking</h3>
-          </div>
+          {/* Tabs */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl w-fit no-print">
+              {[
+                { key: "revenue", label: "Revenue", icon: TrendUp },
+                { key: "customers", label: "Customers", icon: Users },
+                { key: "breakdown", label: "Breakdown", icon: ChartBar },
+              ].map((t) => (
+                <Button
+                  key={t.key}
+                  variant={tab === t.key ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setTab(t.key)}
+                  className={cn(
+                    "h-9 px-6 text-xs font-black uppercase tracking-widest rounded-lg transition-all",
+                    tab === t.key ? "shadow-md" : "text-muted-foreground"
+                  )}
+                >
+                  <t.icon size={14} weight={tab === t.key ? "fill" : "bold"} className="mr-2" /> {t.label}
+                </Button>
+              ))}
+            </div>
 
-          {/* Mobile card view - stacked layout */}
-          <div className="sm:hidden divide-y divide-[var(--border-subtle)]">
-            {customerData.map((c, i) => (
-              <div key={c.name} className="p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-[var(--text-secondary)] w-5">{i + 1}</span>
-                    <button 
-                      onClick={() => navigate(`/items?name=${encodeURIComponent(c.name)}`)} 
-                      className="text-sm font-medium hover:text-[var(--brand)] hover:underline text-left"
-                    >
-                      {c.name}
-                    </button>
-                  </div>
-                  <span className="font-mono text-xs text-[var(--text-secondary)]">{c.refs_count} bills</span>
+            {/* Tab Content */}
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {tab === "revenue" && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card className="border-none shadow-xl shadow-black/5 overflow-hidden">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                          <TrendUp size={18} weight="duotone" />
+                        </div>
+                        <CardTitle className="text-sm font-black uppercase tracking-widest">Fabric Revenue Trend</CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="h-64 sm:h-80" ref={chartRef}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={revenueData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                            <XAxis 
+                              dataKey="_id" 
+                              tick={{ fontSize: 10, fontWeight: 700, fill: "var(--muted-foreground)" }} 
+                              axisLine={false}
+                              tickLine={false}
+                              angle={-45} 
+                              textAnchor="end" 
+                              height={60}
+                              interval={getTickInterval(revenueData.length)}
+                            />
+                            <YAxis 
+                              tick={{ fontSize: 10, fontWeight: 700, fill: "var(--muted-foreground)" }} 
+                              axisLine={false}
+                              tickLine={false}
+                              tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} 
+                            />
+                            <Tooltip content={<CustomTooltip />} cursor={{ fill: "var(--muted)", opacity: 0.1 }} />
+                            <Bar dataKey="fabric_total" name="Total Revenue" fill="var(--brand)" radius={[4, 4, 0, 0]} barSize={20} />
+                            <Bar dataKey="fabric_received" name="Amount Received" fill="var(--success)" radius={[4, 4, 0, 0]} barSize={20} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-none shadow-xl shadow-black/5 overflow-hidden">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-info/10 text-info">
+                          <ChartBar size={18} weight="duotone" />
+                        </div>
+                        <CardTitle className="text-sm font-black uppercase tracking-widest">Service Distribution</CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="h-64 sm:h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={revenueData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                            <XAxis 
+                              dataKey="_id" 
+                              tick={{ fontSize: 10, fontWeight: 700, fill: "var(--muted-foreground)" }} 
+                              axisLine={false}
+                              tickLine={false}
+                              angle={-45} 
+                              textAnchor="end" 
+                              height={60}
+                              interval={getTickInterval(revenueData.length)}
+                            />
+                            <YAxis 
+                              tick={{ fontSize: 10, fontWeight: 700, fill: "var(--muted-foreground)" }} 
+                              axisLine={false}
+                              tickLine={false}
+                              tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} 
+                            />
+                            <Tooltip content={<CustomTooltip />} />
+                            <Line type="monotone" dataKey="fabric_received" name="Fabric" stroke="var(--brand)" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: "var(--background)" }} activeDot={{ r: 6 }} />
+                            <Line type="monotone" dataKey="tailoring_received" name="Tailoring" stroke="var(--info)" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: "var(--background)" }} activeDot={{ r: 6 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div>
-                    <span className="text-[var(--text-secondary)] block">Fabric</span>
-                    <span className="font-mono">₹{fmt(c.total_fabric)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-secondary)] block">Received</span>
-                    <span className="font-mono text-[var(--success)]">₹{fmt(c.total_received)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-secondary)] block">Pending</span>
-                    <span className="font-mono text-[var(--warning)]">₹{fmt(c.total_pending)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              )}
 
-          {/* Desktop table view */}
-          <div className="hidden sm:block overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-[var(--border-strong)]">
-            <table className="w-full min-w-[640px]" data-testid="customer-report-table">
-              <thead>
-                <tr className="bg-[var(--bg)]">
-                  {["#", "Customer", "Bills", "Items", "Fabric Total", "Received", "Pending", "Tailoring"].map(h => (
-                    <th key={h} className="text-left px-4 py-2.5 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)]">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {customerData.map((c, i) => (
-                  <tr key={c.name} className="border-b border-[var(--border-subtle)] hover:bg-[#C86B4D05]">
-                    <td className="px-4 py-2.5 font-mono text-xs text-[var(--text-secondary)]">{i + 1}</td>
-                    <td className="px-4 py-2.5 text-sm font-medium">
-                      <button onClick={() => navigate(`/items?name=${encodeURIComponent(c.name)}`)} className="hover:text-[var(--brand)] hover:underline text-left">{c.name}</button>
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-xs">{c.refs_count}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs">{c.items_count}</td>
-                    <td className="px-4 py-2.5 font-mono text-sm text-right">₹{fmt(c.total_fabric)}</td>
-                    <td className="px-4 py-2.5 font-mono text-sm text-right text-[var(--success)]">₹{fmt(c.total_received)}</td>
-                    <td className="px-4 py-2.5 font-mono text-sm text-right text-[var(--warning)]">₹{fmt(c.total_pending)}</td>
-                    <td className="px-4 py-2.5 font-mono text-sm text-right text-[var(--info)]">₹{fmt(c.total_tailoring)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Breakdown Tab */}
-      {tab === "breakdown" && summary && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Payment Mode Distribution */}
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
-            <h3 className="font-heading text-base font-medium mb-4">Payment Mode Distribution</h3>
-            {summary.payment_modes?.length > 0 ? (
-              <div className="h-48 sm:h-64 lg:h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={summary.payment_modes}
-                      dataKey="amount"
-                      nameKey="mode"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label={({ mode, percent }) => window.innerWidth < 500 ? `${(percent * 100).toFixed(0)}%` : `${mode} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {summary.payment_modes.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+              {tab === "customers" && (
+                <Card className="border-none shadow-xl shadow-black/5 overflow-hidden">
+                  <CardHeader className="border-b border-border/50 bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                          <Users size={18} weight="duotone" />
+                        </div>
+                        <CardTitle className="text-sm font-black uppercase tracking-widest">Customer Revenue Ranking</CardTitle>
+                      </div>
+                      <Badge variant="outline" className="font-mono text-[10px] font-black">Top {customerData.length} Partners</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="sm:hidden divide-y divide-border/30">
+                      {customerData.map((c, i) => (
+                        <div key={c.name} className="p-4 space-y-3 hover:bg-muted/30 transition-colors" onClick={() => navigate(`/items?name=${encodeURIComponent(c.name)}`)}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono text-xs font-black text-muted-foreground/40 w-5">{(i + 1).toString().padStart(2, '0')}</span>
+                              <span className="text-sm font-black text-foreground">{c.name}</span>
+                            </div>
+                            <Badge variant="secondary" className="text-[9px] font-black px-2 py-0.5">{c.refs_count} Bills</Badge>
+                          </div>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="space-y-0.5">
+                              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Revenue</span>
+                              <p className="font-mono text-xs font-black">₹{fmt(c.total_fabric)}</p>
+                            </div>
+                            <div className="space-y-0.5">
+                              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Received</span>
+                              <p className="font-mono text-xs font-black text-success">₹{fmt(c.total_received)}</p>
+                            </div>
+                            <div className="space-y-0.5">
+                              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Pending</span>
+                              <p className="font-mono text-xs font-black text-warning">₹{fmt(c.total_pending)}</p>
+                            </div>
+                          </div>
+                        </div>
                       ))}
-                    </Pie>
-                    <Tooltip formatter={v => `₹${fmt(v)}`} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <p className="text-sm text-[var(--text-secondary)] text-center py-8">No payment data</p>
-            )}
-          </div>
+                    </div>
 
-          {/* Article Type Distribution */}
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm">
-            <h3 className="font-heading text-base font-medium mb-4">Article Type Distribution</h3>
-            {summary.article_types?.length > 0 ? (
-              <div className="h-48 sm:h-64 lg:h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={summary.article_types} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-                    <XAxis type="number" tick={{ fontSize: 10 }} />
-                    <YAxis dataKey="type" type="category" width={90} tick={{ fontSize: 10 }} />
-                    <Tooltip />
-                    <Bar dataKey="count" name="Count" fill="var(--info)" radius={[0, 2, 2, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <p className="text-sm text-[var(--text-secondary)] text-center py-8">No article type data</p>
-            )}
-          </div>
+                    <div className="hidden sm:block overflow-x-auto custom-scrollbar">
+                      <table className="w-full min-w-[800px]">
+                        <thead>
+                          <tr className="bg-muted/30 border-b border-border/50">
+                            <th className="text-left px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">#</th>
+                            <th className="text-left px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Customer Partner</th>
+                            <th className="text-center px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Volume</th>
+                            <th className="text-right px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Gross Fabric</th>
+                            <th className="text-right px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Settled</th>
+                            <th className="text-right px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Outstanding</th>
+                            <th className="text-right px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Tailoring</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/30">
+                          {customerData.map((c, i) => (
+                            <tr key={c.name} className="group hover:bg-primary/[0.02] cursor-pointer transition-colors" onClick={() => navigate(`/items?name=${encodeURIComponent(c.name)}`)}>
+                              <td className="px-6 py-4 font-mono text-xs font-black text-muted-foreground/40">{(i + 1).toString().padStart(2, '0')}</td>
+                              <td className="px-6 py-4">
+                                <span className="text-sm font-black text-foreground group-hover:text-primary transition-colors">{c.name}</span>
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                <Badge variant="outline" className="font-mono text-[10px] font-black border-border/50 group-hover:border-primary/30 group-hover:bg-primary/5 transition-all">
+                                  {c.refs_count} Bills · {c.items_count} Items
+                                </Badge>
+                              </td>
+                              <td className="px-6 py-4 font-mono text-sm font-black text-right tracking-tighter">₹{fmt(c.total_fabric)}</td>
+                              <td className="px-6 py-4 font-mono text-sm font-black text-right text-success tracking-tighter">₹{fmt(c.total_received)}</td>
+                              <td className="px-6 py-4 font-mono text-sm font-black text-right text-warning tracking-tighter">₹{fmt(c.total_pending)}</td>
+                              <td className="px-6 py-4 font-mono text-sm font-black text-right text-info tracking-tighter">₹{fmt(c.total_tailoring)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-        </div>
+              {tab === "breakdown" && summary && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card className="border-none shadow-xl shadow-black/5 overflow-hidden">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                          <CurrencyDollar size={18} weight="duotone" />
+                        </div>
+                        <CardTitle className="text-sm font-black uppercase tracking-widest">Payment Channels</CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      {summary.payment_modes?.length > 0 ? (
+                        <div className="h-64 sm:h-80">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={summary.payment_modes}
+                                dataKey="amount"
+                                nameKey="mode"
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={60}
+                                outerRadius={80}
+                                paddingAngle={5}
+                                stroke="none"
+                              >
+                                {summary.payment_modes.map((_, i) => (
+                                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip formatter={v => `₹${fmt(v)}`} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                          <div className="mt-4 flex flex-wrap justify-center gap-4">
+                            {summary.payment_modes.map((m, i) => (
+                              <div key={m.mode} className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{m.mode}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-64 flex flex-col items-center justify-center text-muted-foreground/40">
+                          <Warning size={32} weight="duotone" className="mb-2" />
+                          <p className="text-xs font-black uppercase tracking-widest">No payment data available</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-none shadow-xl shadow-black/5 overflow-hidden">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-info/10 text-info">
+                          <Package size={18} weight="duotone" />
+                        </div>
+                        <CardTitle className="text-sm font-black uppercase tracking-widest">Article Distribution</CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      {summary.article_types?.length > 0 ? (
+                        <div className="h-64 sm:h-80">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={summary.article_types} layout="vertical">
+                              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                              <XAxis type="number" hide />
+                              <YAxis 
+                                dataKey="type" 
+                                type="category" 
+                                width={100} 
+                                tick={{ fontSize: 10, fontWeight: 700, fill: "var(--muted-foreground)" }} 
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <Tooltip cursor={{ fill: "var(--muted)", opacity: 0.1 }} />
+                              <Bar dataKey="count" name="Total Units" fill="var(--info)" radius={[0, 4, 4, 0]} barSize={16} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      ) : (
+                        <div className="h-64 flex flex-col items-center justify-center text-muted-foreground/40">
+                          <Warning size={32} weight="duotone" className="mb-2" />
+                          <p className="text-xs font-black uppercase tracking-widest">No article data available</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

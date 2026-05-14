@@ -1,16 +1,10 @@
 import { PencilSimple, Trash, Scissors, Plus } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 /**
  * BillLineItemRow - Displays a single item in the bill with actions
- * 
- * @param {Object} props
- * @param {Object} props.item - The item data {barcode, qty, price, discount, total, tailoring, addon}
- * @param {number} props.index - Index in the items array
- * @param {boolean} props.isEditing - Whether this row is being edited
- * @param {Function} props.onEdit - Callback to edit this item
- * @param {Function} props.onRemove - Callback to remove this item
- * @param {Function} props.onOpenTailoring - Callback to open tailoring config
- * @param {Function} props.onOpenAddon - Callback to open addon config
  */
 export default function BillLineItemRow({ 
   item, 
@@ -28,84 +22,110 @@ export default function BillLineItemRow({
   return (
     <div 
       data-testid={`bill-item-row-${index}`}
-      className={`group flex items-center justify-between p-3 border rounded-sm transition-all ${
+      className={cn(
+        "group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-all duration-300",
         isEditing 
-          ? 'border-[var(--brand)] bg-[#C86B4D10] ring-1 ring-[var(--brand)]' 
-          : 'border-[var(--border-subtle)] bg-[var(--surface)] hover:border-[var(--brand)]'
-      }`}
+          ? "border-primary bg-primary/[0.03] shadow-md ring-1 ring-primary/20" 
+          : "border-border/50 bg-card hover:border-primary/30 hover:shadow-lg hover:shadow-black/5"
+      )}
     >
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-mono text-sm font-medium">{item.barcode}</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="font-mono text-base font-black text-primary">#{item.barcode}</span>
           {isEditing && (
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-[var(--brand)]">Editing</span>
+            <Badge variant="default" className="h-5 px-2 text-[9px] font-black uppercase tracking-widest animate-pulse">
+              Editing
+            </Badge>
+          )}
+          {tailoringActive && (
+            <Badge variant="outline" className="h-5 px-2 text-[9px] font-black uppercase tracking-widest bg-info/5 text-info border-info/20 gap-1.5">
+              <Scissors size={10} weight="bold" /> {item.tailoring.article_type}
+            </Badge>
+          )}
+          {addonActive && (
+            <Badge variant="outline" className="h-5 px-2 text-[9px] font-black uppercase tracking-widest bg-success/5 text-success border-success/20 gap-1.5">
+              <Plus size={10} weight="bold" /> {item.addon.items.length} Add-on{item.addon.items.length > 1 ? 's' : ''}
+            </Badge>
           )}
         </div>
-        <div className="mt-1 text-xs text-[var(--text-secondary)] flex items-center gap-3 flex-wrap">
-          <span>{item.qty}m × ₹{item.price}</span>
-          {item.discount > 0 && <span className="text-[var(--warning)]">-{item.discount}%</span>}
-          <span className="font-medium text-[var(--text-primary)]">= ₹{item.total.toLocaleString('en-IN')}</span>
-          {addonTotal > 0 && (
-            <span className="text-[var(--success)]">+₹{addonTotal} addon</span>
-          )}
-        </div>
-        {(tailoringActive || addonActive) && (
-          <div className="mt-1.5 flex items-center gap-2">
-            {tailoringActive && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-[#C86B4D20] text-[var(--brand)] rounded-sm">
-                <Scissors size={10} /> Tailoring
-              </span>
-            )}
-            {addonActive && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-[#455D4A20] text-[var(--success)] rounded-sm">
-                <Plus size={10} /> {item.addon.items.length} add-on{item.addon.items.length > 1 ? 's' : ''}
-              </span>
-            )}
+        
+        <div className="mt-2 flex items-center gap-x-6 gap-y-1 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-black text-foreground">{item.qty}</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Units</span>
+            <span className="text-muted-foreground/30 font-light mx-1">×</span>
+            <span className="text-sm font-black text-foreground">₹{item.price}</span>
           </div>
-        )}
+          
+          {item.discount > 0 && (
+            <Badge variant="destructive" className="h-5 px-1.5 text-[10px] font-black border-none bg-destructive/10 text-destructive">
+              -{item.discount}%
+            </Badge>
+          )}
+          
+          <div className="flex items-center gap-2 ml-auto sm:ml-0">
+            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] opacity-60">Subtotal</span>
+            <span className="font-mono text-base font-black text-foreground tracking-tighter">₹{item.total.toLocaleString('en-IN')}</span>
+          </div>
+          
+          {addonTotal > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-success uppercase tracking-widest opacity-60">+</span>
+              <span className="font-mono text-sm font-black text-success tracking-tighter">₹{addonTotal}</span>
+            </div>
+          )}
+        </div>
       </div>
       
-      <div className="flex items-center gap-1 ml-3">
-        <button
+      <div className="flex items-center gap-2 mt-5 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-t-0 border-border/30 justify-end">
+        <Button
+          variant={tailoringActive ? "default" : "outline"}
+          size="icon"
           onClick={() => onOpenTailoring(index)}
-          className={`p-2 rounded-sm transition-colors ${
-            tailoringActive 
-              ? 'text-[var(--brand)] bg-[#C86B4D15]' 
-              : 'text-[var(--text-secondary)] hover:text-[var(--brand)] hover:bg-[#C86B4D10]'
-          }`}
-          title={tailoringActive ? "Edit tailoring" : "Add tailoring"}
+          className={cn(
+            "h-10 w-10 rounded-xl transition-all duration-300",
+            tailoringActive ? "bg-info hover:bg-info/90 shadow-info/20" : "text-muted-foreground hover:text-info hover:bg-info/5 hover:border-info/30"
+          )}
+          title={tailoringActive ? "Edit Tailoring" : "Add Tailoring"}
         >
-          <Scissors size={18} />
-        </button>
-        <button
+          <Scissors size={18} weight={tailoringActive ? "bold" : "regular"} />
+        </Button>
+        
+        <Button
+          variant={addonActive ? "default" : "outline"}
+          size="icon"
           onClick={() => onOpenAddon(index)}
-          className={`p-2 rounded-sm transition-colors ${
-            addonActive 
-              ? 'text-[var(--success)] bg-[#455D4A15]' 
-              : 'text-[var(--text-secondary)] hover:text-[var(--success)] hover:bg-[#455D4A10]'
-          }`}
-          title={addonActive ? "Edit add-ons" : "Add add-ons"}
+          className={cn(
+            "h-10 w-10 rounded-xl transition-all duration-300",
+            addonActive ? "bg-success hover:bg-success/90 shadow-success/20" : "text-muted-foreground hover:text-success hover:bg-success/5 hover:border-success/30"
+          )}
+          title={addonActive ? "Edit Add-ons" : "Add Add-ons"}
         >
-          <Plus size={18} />
-        </button>
-        <button
+          <Plus size={18} weight={addonActive ? "bold" : "regular"} />
+        </Button>
+        
+        <Button
+          variant={isEditing ? "default" : "outline"}
+          size="icon"
           onClick={() => onEdit(index)}
-          className={`p-2 rounded-sm transition-colors ${
-            isEditing 
-              ? 'text-[var(--brand)]' 
-              : 'text-[var(--text-secondary)] hover:text-[var(--brand)] hover:bg-[#C86B4D10]'
-          }`}
-          title="Edit item"
+          className={cn(
+            "h-10 w-10 rounded-xl transition-all duration-300",
+            isEditing ? "bg-primary shadow-primary/20" : "text-muted-foreground hover:text-primary hover:bg-primary/5 hover:border-primary/30"
+          )}
+          title="Edit Details"
         >
-          <PencilSimple size={18} />
-        </button>
-        <button
+          <PencilSimple size={18} weight={isEditing ? "bold" : "regular"} />
+        </Button>
+        
+        <Button
+          variant="outline"
+          size="icon"
           onClick={() => onRemove(index)}
-          className="p-2 text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[#9E473D10] rounded-sm transition-colors"
-          title="Remove item"
+          className="h-10 w-10 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/5 hover:border-destructive/30 transition-all duration-300"
+          title="Remove Article"
         >
           <Trash size={18} />
-        </button>
+        </Button>
       </div>
     </div>
   );

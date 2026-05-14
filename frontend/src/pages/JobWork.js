@@ -1,7 +1,17 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getJobwork, moveJobwork, moveJobworkBack, moveJobworkEmb, editJobworkEmb, getJobworkFilters } from "@/api";
-import { ArrowRight, ArrowLeft, Funnel, X, PencilSimple, CheckSquare, ArrowsClockwise } from "@phosphor-icons/react";
+import { 
+  ArrowRight, ArrowLeft, Funnel, X, PencilSimple, 
+  CheckSquare, ArrowsClockwise, Scissors, ChartBar, 
+  Calendar, User, Package, MagnifyingGlass 
+} from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { fmt } from "@/lib/fmt";
 
 function MoveDialog({ title, onConfirm, onCancel, fields }) {
   const [values, setValues] = useState({});
@@ -14,38 +24,47 @@ function MoveDialog({ title, onConfirm, onCancel, fields }) {
   }, [onCancel]);
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" data-testid="move-dialog">
-      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm w-full space-y-4" onClick={e => e.stopPropagation()}>
-        <h3 className="font-heading text-lg font-medium">{title}</h3>
-        {fields.map(f => (
-          <div key={f.key}>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">{f.label}</label>
-              {f.skippable && (
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input type="checkbox" checked={skips[f.key] || false} onChange={e => setSkips(p => ({ ...p, [f.key]: e.target.checked }))} className="w-3 h-3 accent-[var(--brand)]" />
-                  <span className="text-[10px] text-[var(--text-secondary)]">Skip</span>
-                </label>
-              )}
-            </div>
-            <input
-              data-testid={`dialog-${f.key}`}
-              type={f.type || "text"}
-              value={values[f.key] || ""}
-              onChange={e => setValues(p => ({ ...p, [f.key]: e.target.value }))}
-              disabled={skips[f.key]}
-              placeholder={f.placeholder}
-              className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] disabled:bg-[var(--bg)] disabled:text-[var(--text-secondary)]"
-              autoFocus={fields.indexOf(f) === 0}
-              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); onConfirm(values, skips); } }}
-            />
+    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200" data-testid="move-dialog">
+      <Card className="max-w-md w-full shadow-2xl border-none animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
+          <CardTitle className="text-xl font-black uppercase tracking-tight text-primary">{title}</CardTitle>
+          <Button variant="ghost" size="icon" onClick={onCancel} className="rounded-full">
+            <X size={20} weight="bold" />
+          </Button>
+        </CardHeader>
+        <CardContent className="p-6 space-y-6">
+          <div className="space-y-5">
+            {fields.map(f => (
+              <div key={f.key} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground ml-1">{f.label}</label>
+                  {f.skippable && (
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <input type="checkbox" checked={skips[f.key] || false} onChange={e => setSkips(p => ({ ...p, [f.key]: e.target.checked }))} className="w-4 h-4 rounded accent-primary" />
+                      <span className="text-[10px] uppercase font-black text-muted-foreground group-hover:text-primary transition-colors">Skip</span>
+                    </label>
+                  )}
+                </div>
+                <Input
+                  data-testid={`dialog-${f.key}`}
+                  type={f.type || "text"}
+                  value={values[f.key] || ""}
+                  onChange={e => setValues(p => ({ ...p, [f.key]: e.target.value }))}
+                  disabled={skips[f.key]}
+                  placeholder={f.placeholder}
+                  className="h-12 text-base font-bold focus:border-primary border-2"
+                  autoFocus={fields.indexOf(f) === 0}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); onConfirm(values, skips); } }}
+                />
+              </div>
+            ))}
           </div>
-        ))}
-        <div className="flex gap-3 justify-end pt-2">
-          <button onClick={onCancel} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">Cancel</button>
-          <button data-testid="dialog-confirm-btn" onClick={() => onConfirm(values, skips)} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">Confirm</button>
-        </div>
-      </div>
+          <div className="flex gap-4 pt-2">
+            <Button variant="outline" onClick={onCancel} className="flex-1 h-12 font-black uppercase tracking-widest">Cancel</Button>
+            <Button data-testid="dialog-confirm-btn" onClick={() => onConfirm(values, skips)} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg shadow-primary/20">Confirm Action</Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -82,83 +101,134 @@ function StatusColumn({ title, items, color, onMove, moveLabel, onMoveBack, move
   };
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm flex flex-col" data-kanban-col={title}>
-      <div className="p-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-          <h4 className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-primary)]">{title}</h4>
-          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-semibold font-mono text-white" style={{ backgroundColor: color }}>{items.length}</span>
+    <Card className="flex flex-col shadow-lg border-muted-foreground/10 h-full overflow-hidden" data-kanban-col={title}>
+      <CardHeader className="p-4 border-b bg-muted/20 sticky top-0 z-10 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 rounded-full animate-pulse shadow-[0_0_8px_rgba(0,0,0,0.1)]" style={{ backgroundColor: color }} />
+            <div className="flex flex-col">
+              <CardTitle className="text-xs uppercase tracking-[0.2em] font-black text-primary">{title}</CardTitle>
+              <span className="text-[9px] font-black text-muted-foreground uppercase opacity-60 tracking-widest">{items.length} Workloads</span>
+            </div>
+          </div>
+          <Badge variant="outline" className="font-mono text-[10px] font-black">{sortKey === "order_no" ? "ORD" : sortKey === "date" ? "DATE" : "DEL"}</Badge>
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1.5">
           {["order_no", "date", "delivery_date"].map(k => (
-            <button key={k} onClick={() => onSort(k)} className={`px-2 py-1 text-[10px] uppercase rounded-sm border transition-all min-w-[32px] ${sortKey === k ? 'bg-[var(--brand)] text-white border-[var(--brand)]' : 'border-[var(--border-subtle)] text-[var(--text-secondary)]'}`}>
-              {k === "order_no" ? "Ord" : k === "date" ? "Date" : "Del"}
-            </button>
+            <Button key={k} variant={sortKey === k ? "default" : "outline"} size="sm" onClick={() => onSort(k)} 
+              className={`flex-1 h-8 text-[9px] font-black uppercase tracking-widest transition-all ${sortKey === k ? 'shadow-md shadow-primary/20' : 'text-muted-foreground hover:text-primary'}`}>
+              {k === "order_no" ? "Order" : k === "date" ? "Booked" : "Delivery"}
+            </Button>
           ))}
         </div>
-      </div>
-      {/* Dynamic height: full viewport on mobile, calculated on desktop */}
-      <div className="flex-1 overflow-y-auto max-h-[60vh] lg:max-h-[calc(100vh-280px)] divide-y divide-[var(--border-subtle)]">
+      </CardHeader>
+      
+      <CardContent className="flex-1 overflow-y-auto min-h-[300px] lg:max-h-[calc(100vh-340px)] p-0 divide-y divide-muted/30 no-scrollbar bg-background">
         {items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 gap-2">
-            <CheckSquare size={24} className="text-[var(--border-strong)]" weight="duotone" />
-            <p className="text-xs text-[var(--text-secondary)]">No items here</p>
+          <div className="flex flex-col items-center justify-center py-24 gap-4 opacity-40">
+            <div className="p-4 rounded-full bg-muted">
+              <CheckSquare size={40} className="text-muted-foreground" weight="duotone" />
+            </div>
+            <p className="text-[10px] uppercase tracking-[0.3em] font-black text-muted-foreground">Operational Void</p>
           </div>
         ) : items.map(item => (
           <div 
             key={item.id} 
-            className={`px-3 py-2.5 text-sm cursor-pointer transition-colors ${selected.includes(item.id) ? 'bg-[#C86B4D10]' : 'hover:bg-[var(--bg)]'}`} 
+            className={`px-5 py-4 cursor-pointer transition-all border-l-4 group relative ${selected.includes(item.id) ? 'bg-primary/[0.03] border-l-primary' : 'hover:bg-muted/[0.02] border-l-transparent'}`} 
             onClick={() => toggleSelect(item.id)}
             onDoubleClick={() => handleDoubleClick(item)}
             onTouchStart={() => handleTouchStart(item)}
             onTouchEnd={handleTouchEnd}
             onTouchMove={handleTouchEnd}
-            title={onItemDoubleClick ? "Double-click or long-press to edit" : undefined}
           >
-            <div className="flex items-center gap-2">
-              <input type="checkbox" checked={selected.includes(item.id)} readOnly className="w-3.5 h-3.5 accent-[var(--brand)]" />
+            <div className="flex items-start gap-4">
+              <div className={`mt-1 flex-shrink-0 w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${selected.includes(item.id) ? 'bg-primary border-primary scale-110 shadow-md shadow-primary/20' : 'border-muted-foreground/20 bg-background group-hover:border-primary/50'}`}>
+                {selected.includes(item.id) && <CheckSquare size={14} weight="bold" className="text-white" />}
+              </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium truncate">{item.article_type}</p>
-                  <div className="flex items-center gap-1">
-                    <p className="font-mono text-[10px] text-[var(--text-secondary)]">#{item.order_no}</p>
-                    {onItemDoubleClick && <PencilSimple size={10} className="text-[var(--text-secondary)]" />}
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-black text-primary truncate uppercase tracking-tight">{item.article_type}</p>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge variant="outline" className="font-mono text-[10px] font-black text-primary border-primary/20 bg-primary/5">#{item.order_no}</Badge>
+                    {onItemDoubleClick && (
+                      <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                        onClick={(e) => { e.stopPropagation(); handleDoubleClick(item); }}>
+                        <PencilSimple size={14} weight="bold" />
+                      </Button>
+                    )}
                   </div>
                 </div>
-                <p className="text-xs text-[var(--text-secondary)]">{item.name}</p>
-                <div className="flex gap-3 text-[10px] text-[var(--text-secondary)] mt-0.5">
-                  <span>Date: {item.date}</span>
-                  <span>Del: {item.delivery_date}</span>
+                <p className="text-xs font-bold text-muted-foreground mt-1 truncate">{item.name}</p>
+                
+                <div className="grid grid-cols-2 gap-4 mt-3">
+                  <div className="space-y-1">
+                    <span className="text-[8px] uppercase font-black text-muted-foreground opacity-50 tracking-widest block">Booked</span>
+                    <div className="flex items-center gap-1.5">
+                      <Calendar size={10} className="text-muted-foreground" />
+                      <span className="font-mono text-[10px] font-black">{item.date}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1 text-right sm:text-left">
+                    <span className="text-[8px] uppercase font-black text-muted-foreground opacity-50 tracking-widest block">Due Date</span>
+                    <div className="flex items-center gap-1.5 justify-end sm:justify-start">
+                      <Calendar size={10} className="text-info" />
+                      <span className="font-mono text-[10px] font-black text-info">{item.delivery_date}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex gap-3 text-[10px] text-[var(--text-secondary)] mt-0.5">
-                  {item.barcode && item.barcode !== "N/A" && <span className="font-mono">#{item.barcode}</span>}
-                  {item.price > 0 && <span>₹{item.price}</span>}
-                  {item.qty > 0 && <span>×{item.qty}</span>}
+
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {item.barcode && item.barcode !== "N/A" && (
+                    <Badge variant="outline" className="font-mono text-[9px] font-black gap-1 py-0.5 px-2">
+                      <Package size={10} /> {item.barcode}
+                    </Badge>
+                  )}
+                  {item.price > 0 && (
+                    <Badge variant="outline" className="text-[9px] font-black gap-1 py-0.5 px-2">
+                      ₹{fmt(item.price)} × {item.qty}
+                    </Badge>
+                  )}
+                  {item.karigar && item.karigar !== "N/A" && (
+                    <Badge variant="info" className="text-[9px] font-black gap-1 py-0.5 px-2">
+                      <User size={10} weight="fill" /> {item.karigar}
+                    </Badge>
+                  )}
+                  {item.emb_labour_amount > 0 && (
+                    <Badge variant="success" className="text-[9px] font-black gap-1 py-0.5 px-2">
+                      LABOUR: ₹{item.emb_labour_amount}
+                    </Badge>
+                  )}
                 </div>
-                {item.karigar && item.karigar !== "N/A" && (
-                  <p className="text-[10px] text-[var(--info)] mt-0.5">Karigar: {item.karigar}</p>
-                )}
-                {item.emb_labour_amount > 0 && (
-                  <p className="text-[10px] text-[var(--success)] mt-0.5">Labour: ₹{item.emb_labour_amount}</p>
-                )}
               </div>
             </div>
           </div>
         ))}
-      </div>
-      <div className="space-y-2 p-3 border-t border-[var(--border-subtle)]">
+      </CardContent>
+
+      <div className="p-4 border-t bg-muted/20 space-y-3">
         {moveLabel && (
-          <button data-testid={`move-${title.toLowerCase().replace(/\s/g, '-')}-btn`} onClick={handleMove} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] transition-all">
-            Move {selected.length} to {moveLabel} <ArrowRight size={14} />
-          </button>
+          <Button 
+            data-testid={`move-${title.toLowerCase().replace(/\s/g, '-')}-btn`} 
+            onClick={handleMove} 
+            disabled={selected.length === 0}
+            className="w-full h-12 font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 active:scale-95 transition-all gap-2"
+          >
+            Advance {selected.length > 0 ? selected.length : ''} <ArrowRight size={18} weight="bold" />
+          </Button>
         )}
         {onMoveBack && moveBackLabel && (
-          <button data-testid={`moveback-${title.toLowerCase().replace(/\s/g, '-')}-btn`} onClick={handleMoveBack} disabled={selected.length === 0} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-[var(--text-secondary)] text-white rounded-sm hover:bg-[var(--text-primary)] disabled:opacity-50 transition-all">
-            <ArrowLeft size={14} /> Move {selected.length} {moveBackLabel}
-          </button>
+          <Button 
+            data-testid={`moveback-${title.toLowerCase().replace(/\s/g, '-')}-btn`} 
+            onClick={handleMoveBack} 
+            disabled={selected.length === 0} 
+            variant="outline"
+            className="w-full h-10 font-black uppercase tracking-[0.2em] text-muted-foreground hover:text-primary hover:border-primary active:scale-95 transition-all gap-2"
+          >
+            <ArrowLeft size={16} weight="bold" /> Revert
+          </Button>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -359,91 +429,125 @@ export default function JobWork() {
   };
 
   return (
-    <div data-testid="jobwork-page" className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Job Work Tracker</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">Track tailoring and embroidery progress</p>
+    <div data-testid="jobwork-page" className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Production Pipeline</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium truncate">Real-time tracking of tailoring and embroidery workflows</p>
         </div>
-        <button onClick={() => loadData()} title="Refresh"
-          className="p-2 rounded-sm border border-[var(--border-subtle)] hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-          <ArrowsClockwise size={16} />
-        </button>
+        <Button variant="outline" size="icon" onClick={() => loadData()} className="rounded-full shadow-sm">
+          <ArrowsClockwise size={20} className="text-primary" />
+        </Button>
       </div>
 
-      <div className="flex gap-1 border-b border-[var(--border-subtle)]">
-        {["tailoring", "embroidery"].map(t => (
-          <button key={t} data-testid={`tab-${t}`} onClick={() => { setTab(t); setActiveCol(t === "tailoring" ? "Pending" : "Required"); }} className={`px-4 py-2.5 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${tab === t ? 'border-[var(--brand)] text-[var(--brand)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
-            {t}
-          </button>
-        ))}
+      <div className="flex items-center justify-between border-b pb-1">
+        <div className="flex gap-2">
+          {[
+            { id: "tailoring", label: "Tailoring Units", icon: Scissors },
+            { id: "embroidery", label: "Embroidery Studio", icon: ChartBar },
+          ].map(t => (
+            <Button 
+              key={t.id} 
+              variant={tab === t.id ? "default" : "ghost"} 
+              onClick={() => { setTab(t.id); setActiveCol(t.id === "tailoring" ? "Pending" : "Required"); }} 
+              className={`h-11 px-6 font-black uppercase tracking-widest text-[10px] gap-2 transition-all ${tab === t.id ? 'shadow-lg shadow-primary/20' : 'text-muted-foreground'}`}
+            >
+              <t.icon size={18} weight={tab === t.id ? "fill" : "bold"} />
+              {t.label}
+            </Button>
+          ))}
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 items-center">
-        <Funnel size={16} className="text-[var(--text-secondary)]" />
-        <select value={orderFilter} onChange={e => setOrderFilter(e.target.value)} className="px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm">
-          <option value="All">All Orders</option>
-          {filters.order_nos?.sort().map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-        <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm">
-          <option value="All">All Dates</option>
-          {filters.dates?.sort().reverse().map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
-        <select value={deliveryFilter} onChange={e => setDeliveryFilter(e.target.value)} className="px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm">
-          <option value="All">All Delivery</option>
-          {filters.delivery_dates?.sort().reverse().map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
-      </div>
+      <Card className="bg-muted/10 border-none shadow-inner">
+        <CardContent className="p-4 flex flex-wrap gap-4 items-center">
+          <div className="flex items-center gap-2 text-muted-foreground px-2">
+            <Funnel size={18} weight="bold" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Filters</span>
+          </div>
+          
+          <div className="flex-1 flex flex-wrap gap-3">
+            <div className="relative flex-1 min-w-[140px]">
+              <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <select value={orderFilter} onChange={e => setOrderFilter(e.target.value)} className="w-full h-10 pl-9 pr-4 text-[11px] font-bold uppercase tracking-wider bg-background border border-muted-foreground/20 rounded-lg focus:ring-2 focus:ring-primary appearance-none cursor-pointer">
+                <option value="All">All Order References</option>
+                {filters.order_nos?.sort().map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+
+            <div className="relative flex-1 min-w-[140px]">
+              <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="w-full h-10 pl-9 pr-4 text-[11px] font-bold uppercase tracking-wider bg-background border border-muted-foreground/20 rounded-lg focus:ring-2 focus:ring-primary appearance-none cursor-pointer">
+                <option value="All">All Booking Dates</option>
+                {filters.dates?.sort().reverse().map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+
+            <div className="relative flex-1 min-w-[140px]">
+              <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-info" />
+              <select value={deliveryFilter} onChange={e => setDeliveryFilter(e.target.value)} className="w-full h-10 pl-9 pr-4 text-[11px] font-bold uppercase tracking-wider bg-background border border-muted-foreground/20 rounded-lg focus:ring-2 focus:ring-primary appearance-none cursor-pointer text-info">
+                <option value="All">All Delivery Deadlines</option>
+                {filters.delivery_dates?.sort().reverse().map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {(orderFilter !== "All" || dateFilter !== "All" || deliveryFilter !== "All") && (
+            <Button variant="ghost" size="sm" onClick={() => { setOrderFilter("All"); setDateFilter("All"); setDeliveryFilter("All"); }} className="text-[10px] font-black uppercase tracking-widest text-destructive hover:bg-destructive/10">
+              Reset <X size={12} weight="bold" className="ml-1" />
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       {dialog && <MoveDialog title={dialog.title} fields={dialog.fields} onConfirm={dialog.onConfirm} onCancel={() => setDialog(null)} />}
 
       {tab === "tailoring" ? (
-        <div>
-          <div className="flex md:hidden gap-1 mb-3 p-1 bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm">
+        <div className="space-y-6">
+          <div className="flex lg:hidden gap-1 p-1 bg-muted/20 border rounded-xl overflow-hidden shadow-inner">
             {["Pending", "Stitched", "Delivered"].map(col => (
-              <button key={col} onClick={() => setActiveCol(col)}
-                className={`flex-1 py-1.5 text-xs font-medium rounded-sm transition-colors ${
-                  activeCol === col ? "bg-[var(--brand)] text-white" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                }`}>{col}</button>
+              <Button key={col} variant={activeCol === col ? "default" : "ghost"} onClick={() => setActiveCol(col)}
+                className={`flex-1 h-10 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                  activeCol === col ? "shadow-md" : "text-muted-foreground"
+                }`}>{col}</Button>
             ))}
           </div>
-          {/* Stack on mobile/tablet, side-by-side on lg+ */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className={activeCol === "Pending" ? "block lg:block" : "hidden lg:block"}>
-              <StatusColumn title="Pending" items={sortedPending} color="var(--warning)" moveLabel="Stitched" onMove={(ids) => handleTailoringMove(ids, "Stitched")} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+              <StatusColumn title="Pending" items={sortedPending} color="#D49842" moveLabel="Stitched" onMove={(ids) => handleTailoringMove(ids, "Stitched")} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
             </div>
             <div className={activeCol === "Stitched" ? "block lg:block" : "hidden lg:block"}>
-              <StatusColumn title="Stitched" items={sortedStitched} color="var(--info)" moveLabel="Delivered" onMove={(ids) => handleTailoringMove(ids, "Delivered")} onMoveBack={(ids) => handleTailoringMoveBack(ids, "Stitched")} moveBackLabel="to Pending" sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+              <StatusColumn title="Stitched" items={sortedStitched} color="#5C8A9E" moveLabel="Delivered" onMove={(ids) => handleTailoringMove(ids, "Delivered")} onMoveBack={(ids) => handleTailoringMoveBack(ids, "Stitched")} moveBackLabel="to Pending" sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
             </div>
             <div className={activeCol === "Delivered" ? "block lg:block" : "hidden lg:block"}>
-              <StatusColumn title="Delivered" items={sortedDelivered} color="var(--success)" onMoveBack={(ids) => handleTailoringMoveBack(ids, "Delivered")} moveBackLabel="to Stitched" sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+              <StatusColumn title="Delivered" items={sortedDelivered} color="#455D4A" onMoveBack={(ids) => handleTailoringMoveBack(ids, "Delivered")} moveBackLabel="to Stitched" sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
             </div>
           </div>
         </div>
       ) : (
-        <div>
-          <div className="flex md:hidden gap-1 mb-3 p-1 bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm">
+        <div className="space-y-6">
+          <div className="flex lg:hidden gap-1 p-1 bg-muted/20 border rounded-xl overflow-hidden shadow-inner">
             {["Required", "In Progress", "Finished"].map(col => (
-              <button key={col} onClick={() => setActiveCol(col)}
-                className={`flex-1 py-1.5 text-xs font-medium rounded-sm transition-colors ${
-                  activeCol === col ? "bg-[var(--brand)] text-white" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                }`}>{col}</button>
+              <Button key={col} variant={activeCol === col ? "default" : "ghost"} onClick={() => setActiveCol(col)}
+                className={`flex-1 h-10 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                  activeCol === col ? "shadow-md" : "text-muted-foreground"
+                }`}>{col}</Button>
             ))}
           </div>
-          {/* Stack on mobile/tablet, side-by-side on lg+ */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className={activeCol === "Required" ? "block lg:block" : "hidden lg:block"}>
-              <StatusColumn title="Required" items={sortedRequired} color="var(--warning)" moveLabel="In Progress" onMove={handleEmbRequiredMove} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+              <StatusColumn title="Required" items={sortedRequired} color="#D49842" moveLabel="In Progress" onMove={handleEmbRequiredMove} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
             </div>
             <div className={activeCol === "In Progress" ? "block lg:block" : "hidden lg:block"}>
-              <StatusColumn title="In Progress" items={sortedInProgress} color="var(--info)" moveLabel="Finished" onMove={handleEmbProgressMove} onMoveBack={(ids) => handleEmbMoveBack(ids, "In Progress")} moveBackLabel="to Required" onItemDoubleClick={handleEditInProgress} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+              <StatusColumn title="In Progress" items={sortedInProgress} color="#5C8A9E" moveLabel="Finished" onMove={handleEmbProgressMove} onMoveBack={(ids) => handleEmbMoveBack(ids, "In Progress")} moveBackLabel="to Required" onItemDoubleClick={handleEditInProgress} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
             </div>
             <div className={activeCol === "Finished" ? "block lg:block" : "hidden lg:block"}>
-              <StatusColumn title="Finished" items={sortedFinished} color="var(--success)" onMoveBack={(ids) => handleEmbMoveBack(ids, "Finished")} moveBackLabel="to In Progress" onItemDoubleClick={handleEditFinished} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
+              <StatusColumn title="Finished" items={sortedFinished} color="#455D4A" onMoveBack={(ids) => handleEmbMoveBack(ids, "Finished")} moveBackLabel="to In Progress" onItemDoubleClick={handleEditFinished} sortKey={sortKey} onSort={handleSort} sortDir={sortDir} />
             </div>
           </div>
         </div>
       )}
     </div>
   );
+}
 }

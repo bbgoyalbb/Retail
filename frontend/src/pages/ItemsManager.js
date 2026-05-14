@@ -9,7 +9,7 @@ import { fmt } from "@/lib/fmt";
 import { DatePickerInput } from "@/components/DatePickerInput";
 import {
   PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle,
-  CurrencyDollar, Scissors, Tag, Copy, ArrowsClockwise,
+  CurrencyDollar, Scissors, Tag, Copy, ArrowsClockwise, Package, MagnifyingGlass, Funnel, Info, Wallet, Receipt, User
 } from "@phosphor-icons/react";
 import { useToast } from "@/hooks/use-toast";
 import InvoiceModal from "@/components/InvoiceModal";
@@ -17,6 +17,11 @@ import SettlementPanel from "@/components/SettlementPanel";
 import OrderDetailPane from "@/components/OrderDetailPane";
 import { TailoringOverlay, AddOnOverlay } from "@/components/OrderOverlays";
 import { ItemsFilterBar } from "@/components/items";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 // ─── Section config ───────────────────────────────────────────
 const SECTIONS = {
@@ -100,7 +105,7 @@ const SECTIONS = {
   },
 };
 
-const FC = "w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:border-[var(--brand)] focus:outline-none bg-[var(--surface)] text-[var(--text-primary)]";
+const FC = "w-full h-8 px-2 text-[11px] border border-border/50 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary bg-muted/20 transition-all outline-none text-foreground font-medium";
 
 const renderFieldInput = (field, itemId, value, onChange) => {
   switch (field.type) {
@@ -110,13 +115,13 @@ const renderFieldInput = (field, itemId, value, onChange) => {
       return <input type="number" step={field.step || 1} value={value ?? 0}
         onChange={e => onChange(itemId, field.key, parseFloat(e.target.value) || 0)}
         disabled={field.computed}
-        className={`${FC} ${field.computed ? "bg-[var(--bg)] text-[var(--text-secondary)] cursor-not-allowed" : ""}`}/>;
+        className={cn(FC, field.computed && "bg-muted text-muted-foreground cursor-not-allowed opacity-70")}/>;
     case "select":
       return <select value={value || ""} onChange={e => onChange(itemId, field.key, e.target.value)} className={FC}>
         {field.options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>;
     case "checkbox":
-      return <input type="checkbox" checked={!!value} onChange={e => onChange(itemId, field.key, e.target.checked)} className="w-4 h-4 accent-[var(--brand)]"/>;
+      return <input type="checkbox" checked={!!value} onChange={e => onChange(itemId, field.key, e.target.checked)} className="w-4 h-4 rounded border-border/50 text-primary focus:ring-primary/20 accent-primary transition-all"/>;
     default:
       return <input type="text" value={value || ""} onChange={e => onChange(itemId, field.key, e.target.value)} className={FC}/>;
   }
@@ -138,19 +143,6 @@ const CANCEL_ZERO_PAYLOAD = { ...ITEM_DEFAULTS, cancelled: true };
 const computeFabric = (price, qty, disc) =>
   Math.round((price - price * (disc || 0) / 100) * qty);
 const computePending = (total, received) => Math.round(total - (received || 0));
-
-// ─── Status badge (keep for edit panel use) ────────────────────
-const StatusBadge = ({ settled, cancelled, pending }) => {
-  if (cancelled) return (
-    <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-[var(--error)]/10 text-[var(--error)] font-medium">Cancelled</span>
-  );
-  if (settled) return (
-    <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-[#455D4A15] text-[var(--success)] font-medium flex items-center gap-0.5">
-      <CheckCircle size={10} weight="fill"/>Settled
-    </span>
-  );
-  return <span className="text-[10px] font-mono text-[var(--warning)]">₹{fmt(pending)}</span>;
-};
 
 // ─── Main page ────────────────────────────────────────────────
 export default function ItemsManager() {
@@ -306,12 +298,11 @@ export default function ItemsManager() {
         : { data: [] };
       setAdvances(advRes.data || []);
     } catch {
-      setMessage({ type: "error", text: "Failed to load data" });
-      setTimeout(() => setMessage(null), 4000);
+      toast({ title: "Error", description: "Failed to load data", variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -381,8 +372,8 @@ export default function ItemsManager() {
 
   // Always look up full group from `grouped` so detail pane shows complete order data
   const selectedGroups = useMemo(
-    () => Array.from(selectedRefs).map(ref => grouped[ref]).filter(Boolean),
-    [selectedRefs, grouped]
+    () => Array.from(selectedRefs).map(ref => grouped[ref] || searchGrouped[ref]).filter(Boolean),
+    [selectedRefs, grouped, searchGrouped]
   );
 
   // Select / deselect
@@ -502,8 +493,7 @@ export default function ItemsManager() {
       for (const a of newAdvances) { try { const {id,...d}=a; await createAdvance(d); ok++; } catch { fail++; } }
       setSaving(false); setSelectedSection(null);
       setAdvanceData({}); setOrigAdvData({}); setNewAdvances([]); setDeletedAdvances([]); setEditItems([]);
-      setMessage({ type: fail===0?"success":"error", text: fail===0?`Advances saved`:`${fail} operation(s) failed` });
-      setTimeout(()=>setMessage(null),3000);
+      toast({ title: fail===0?"Success":"Partial Success", description: fail===0?`Advances saved`:`${fail} operations failed`, variant: fail===0?"default":"destructive" });
       invalidateItemsCache(); invalidateAdvancesCache(); loadData();
       return;
     }
@@ -523,9 +513,9 @@ export default function ItemsManager() {
     setSaving(false); setSelectedSection(null); setEditData({}); setOriginalData({}); setEditItems([]); setNewItemIds([]);
     if (fail === 0) {
       if (allMM.length) setMismatchPrompt({ refs: Array.from(affRefs), mismatches: allMM });
-      else if (reRef) { setReSettlePrompt({ ref:reRef,customer:reCust,sections:reSecs }); setMessage({ type:"success",text:`${ok} item(s) saved`}); setTimeout(()=>setMessage(null),2000); }
-      else { setMessage({ type:"success",text:`${ok} item(s) saved`}); setTimeout(()=>setMessage(null),3000); }
-    } else { setMessage({ type:"error",text:`${fail} failed, ${ok} saved`}); setTimeout(()=>setMessage(null),3000); }
+      else if (reRef) { setReSettlePrompt({ ref:reRef,customer:reCust,sections:reSecs }); toast({ title:"Success", description:`${ok} items saved` }); }
+      else { toast({ title:"Success", description:`${ok} items saved` }); }
+    } else { toast({ title:"Partial Success", description:`${fail} failed, ${ok} saved`, variant: "destructive" }); }
     invalidateItemsCache(); loadData();
   };
 
@@ -539,26 +529,31 @@ export default function ItemsManager() {
     try {
       if (delMode === "order") { for (const id of delConfirm.items.map(i=>i.id)) await deleteItem(id); }
       else await deleteItem(delConfirm.id);
-      setMessage({ type:"success", text: delMode==="order"?`Order ${delConfirm.ref} deleted`:"Item deleted" });
-    } catch { setMessage({ type:"error", text:"Failed to delete" }); }
+      toast({ title: "Deleted", description: delMode==="order"?`Order ${delConfirm.ref} deleted`:"Item deleted" });
+    } catch { toast({ title: "Error", description: "Failed to delete", variant: "destructive" }); }
     setDelConfirm(null); invalidateItemsCache(); loadData();
-    setTimeout(()=>setMessage(null),3000);
   };
 
   const handleCancelOrder = async (group) => {
-    const zero = { ...CANCEL_ZERO_PAYLOAD, cancelled_at: new Date().toISOString(), cancelled_ref: group.ref };
+    const zero = { ...CANCEL_ZERO_PAYLOAD, cancelled: true, cancelled_at: new Date().toISOString(), cancelled_ref: group.ref };
     const results = await Promise.allSettled(group.items.map(item => updateItem(item.id, zero)));
     const ok = results.filter(r => r.status === "fulfilled").length;
-    setMessage({ type: ok===group.items.length?"success":"error", text: ok===group.items.length?`Order ${group.ref} cancelled`:`${group.items.length-ok} items failed` });
-    setTimeout(()=>setMessage(null),3000);
+    toast({ 
+      title: ok===group.items.length?"Cancelled":"Partial Cancel", 
+      description: ok===group.items.length?`Order ${group.ref} cancelled`:`${group.items.length-ok} items failed`,
+      variant: ok===group.items.length?"default":"destructive"
+    });
     setCancelConfirm(null); invalidateItemsCache(); loadData();
   };
 
   const handleCancelItem = async (item) => {
-    const zero = { ...CANCEL_ZERO_PAYLOAD, cancelled_at: new Date().toISOString(), cancelled_ref: item.ref };
-    try { await updateItem(item.id, zero); setMessage({ type:"success", text:`Article ${item.barcode} cancelled` }); }
-    catch { setMessage({ type:"error", text:"Failed to cancel article" }); }
-    setTimeout(()=>setMessage(null),3000);
+    const zero = { ...CANCEL_ZERO_PAYLOAD, cancelled: true, cancelled_at: new Date().toISOString(), cancelled_ref: item.ref };
+    try { 
+      await updateItem(item.id, zero); 
+      toast({ title: "Article Cancelled", description: `Article ${item.barcode} cancelled` }); 
+    } catch { 
+      toast({ title: "Error", description: "Failed to cancel article", variant: "destructive" }); 
+    }
     invalidateItemsCache(); loadData();
   };
 
@@ -571,10 +566,10 @@ export default function ItemsManager() {
 
   // ─── Render ───────────────────────────────────────────────
   return (
-    <div data-testid="items-manager-page" className="flex absolute inset-0 top-12 md:top-0 overflow-hidden">
+    <div data-testid="items-manager-page" className="flex absolute inset-0 top-12 md:top-0 overflow-hidden bg-background">
 
       {/* ── LEFT COLUMN ── */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden border-r border-border/50">
 
       {/* ── TOP BAR ── */}
       <ItemsFilterBar
@@ -596,66 +591,110 @@ export default function ItemsManager() {
       />
 
       {/* ── BODY ── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden bg-muted/10">
 
         {/* Order list */}
-        <div className={`flex flex-col border-r border-[var(--border-subtle)] bg-[var(--surface)] overflow-hidden flex-shrink-0
-          ${detailOpen ? "hidden sm:flex sm:flex-1" : "flex w-full sm:flex-1"}` }>
+        <div className={cn(
+          "flex flex-col bg-background overflow-hidden flex-shrink-0 transition-all duration-300",
+          detailOpen ? "hidden sm:flex sm:flex-1" : "flex w-full sm:flex-1"
+        )}>
 
-          <div className="flex-shrink-0 px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg)] flex items-center gap-3">
-            <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] flex-shrink-0">
-              {isSearchMode ? "Search results" : "Orders"} <span className="font-mono ml-1">{searchLoading ? "…" : refs.length}</span>
-            </p>
-            <div className="hidden sm:flex items-center gap-3 ml-2 pl-3 border-l border-[var(--border-subtle)]">
-              <span className="text-[10px] text-[var(--text-secondary)]">Pending <span className="font-mono text-[var(--warning)] ml-1">₹{fmt(refs.reduce((s,g)=>s+Math.max(0,g.totals.pending),0))}</span></span>
-              <span className="text-[10px] text-[var(--text-secondary)]">Value <span className="font-mono ml-1">₹{fmt(refs.reduce((s,g)=>s+g.totals.total,0))}</span></span>
+          <div className="flex-shrink-0 px-4 py-3 border-b border-border/50 bg-background/50 backdrop-blur-sm flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground">
+                {isSearchMode ? "Search Results" : "Orders"}
+              </p>
+              <Badge variant="secondary" className="font-mono text-[10px] h-4.5 px-1.5 font-bold">
+                {searchLoading ? "…" : refs.length}
+              </Badge>
             </div>
+            
+            <div className="hidden lg:flex items-center gap-4 pl-4 border-l border-border/50">
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground/60 leading-none mb-1">Total Pending</span>
+                <span className="font-mono text-[11px] font-black text-warning">₹{fmt(refs.reduce((s,g)=>s+Math.max(0,g.totals.pending),0))}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground/60 leading-none mb-1">Total Value</span>
+                <span className="font-mono text-[11px] font-black text-foreground">₹{fmt(refs.reduce((s,g)=>s+g.totals.total,0))}</span>
+              </div>
+            </div>
+
             <div className="flex-1"/>
+            
             {selectedRefs.size > 0 && (
-              <button onClick={() => setSelectedRefs(new Set())} className="text-[10px] text-[var(--brand)] hover:underline flex-shrink-0">{selectedRefs.size} selected · clear</button>
-            )}
-            <button onClick={() => { invalidateItemsCache(); invalidateAdvancesCache(); loadData(); }} title="Refresh"
-              className="p-1 text-[var(--text-secondary)] hover:text-[var(--brand)] hover:bg-[var(--brand)]/5 rounded-sm transition-colors flex-shrink-0">
-              <ArrowsClockwise size={13} className={loading ? "animate-spin" : ""} />
-            </button>
-            {refs.length > 0 && (
-              <button
-                onClick={() => {
-                  const lines = refs.map(g => {
-                    const orderNos = [...new Set(g.items.map(i=>i.order_no).filter(o=>o&&o!=="N/A"))];
-                    return `${g.ref} — ${g.name}${orderNos.length ? ` (#${orderNos.join(", #")})` : ""} — ₹${fmt(g.totals.pending)} pending`;
-                  });
-                  const text = `Orders Summary (${new Date().toLocaleDateString("en-IN")})\n${"─".repeat(40)}\n${lines.join("\n")}`;
-                  navigator.clipboard.writeText(text).then(() => toast({ title: "Copied", description: `${refs.length} orders copied to clipboard` }));
-                }}
-                className="p-1 text-[var(--text-secondary)] hover:text-[var(--brand)] hover:bg-[var(--brand)]/5 rounded-sm transition-colors flex-shrink-0"
-                title="Copy summary to clipboard"
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setSelectedRefs(new Set())}
+                className="h-7 text-[10px] font-bold text-primary hover:bg-primary/5 px-2"
               >
-                <Copy size={13} />
-              </button>
+                {selectedRefs.size} selected · clear
+              </Button>
             )}
+            
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => { invalidateItemsCache(); invalidateAdvancesCache(); loadData(); }}
+                className={cn("h-8 w-8 text-muted-foreground hover:text-primary transition-all", loading && "animate-spin")}
+                title="Refresh"
+              >
+                <ArrowsClockwise size={16} />
+              </Button>
+              {refs.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    const lines = refs.map(g => {
+                      const orderNos = [...new Set(g.items.map(i=>i.order_no).filter(o=>o&&o!=="N/A"))];
+                      return `${g.ref} — ${g.name}${orderNos.length ? ` (#${orderNos.join(", #")})` : ""} — ₹${fmt(g.totals.pending)} pending`;
+                    });
+                    const text = `Orders Summary (${new Date().toLocaleDateString("en-IN")})\n${"─".repeat(40)}\n${lines.join("\n")}`;
+                    navigator.clipboard.writeText(text).then(() => toast({ title: "Copied", description: `${refs.length} orders copied to clipboard` }));
+                  }}
+                  className="h-8 w-8 text-muted-foreground hover:text-primary transition-all"
+                  title="Copy summary"
+                >
+                  <Copy size={16} />
+                </Button>
+              )}
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
-            {loading && Array.from({length:5}).map((_,i)=>(
-              <div key={i} className="h-16 border-b border-[var(--border-subtle)] animate-pulse bg-[var(--bg)]/50"/>
-            ))}
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {loading && (
+              <div className="p-4 space-y-3">
+                {Array.from({length:8}).map((_,i)=>(
+                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                ))}
+              </div>
+            )}
 
             {!loading && refs.length === 0 && (
-              <div className="py-12 px-6 flex flex-col items-center gap-3 text-center">
-                <div className="w-10 h-10 rounded-full bg-[var(--bg)] flex items-center justify-center">
-                  <X size={18} className="text-[var(--text-secondary)]" />
+              <div className="flex flex-col items-center justify-center py-24 px-6 text-center animate-in fade-in zoom-in duration-500">
+                <div className="w-16 h-16 rounded-full bg-muted/20 flex items-center justify-center mb-6">
+                  <Package size={32} className="text-muted-foreground/30" />
                 </div>
-                <p className="text-sm font-medium text-[var(--text-primary)]">
-                  {isSearchMode ? (searchLoading ? "Searching…" : "No orders match your search") : `No ${settleTab==="unsettled"?"pending":settleTab==="settled"?"settled":settleTab==="awaiting"?"awaiting tailoring":""} orders`}
+                <h3 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/70 mb-2">
+                  {isSearchMode ? (searchLoading ? "Searching..." : "No Matches Found") : "Empty Inventory"}
+                </h3>
+                <p className="text-[11px] text-muted-foreground/60 font-bold max-w-[240px] leading-relaxed mb-6">
+                  {isSearchMode 
+                    ? "Try adjusting your filters or search terms to find what you're looking for." 
+                    : `No ${settleTab} orders are currently in the system.`}
                 </p>
                 {(isSearchMode || nameFilter) && (
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={clearSearch}
-                    className="text-xs px-3 py-1.5 border border-[var(--border-subtle)] rounded-sm text-[var(--brand)] hover:bg-[var(--brand)]/5 transition-colors"
+                    className="h-9 px-6 font-bold uppercase tracking-widest text-[10px] border-primary/20 text-primary hover:bg-primary/5"
                   >
-                    Clear filters
-                  </button>
+                    Clear All Filters
+                  </Button>
                 )}
               </div>
             )}
@@ -663,7 +702,7 @@ export default function ItemsManager() {
             {!loading && (() => {
               let lastDate = null;
               return refs.map(group => {
-                const isCancelled = group.items.some(i => i.cancelled);
+                const isCancelled = group.items.every(i => i.cancelled);
                 const isSelected  = selectedRefs.has(group.ref);
                 const orderNos    = [...new Set(group.items.map(i=>i.order_no).filter(o=>o&&o!=="N/A"))];
                 const showDiv     = group.date !== lastDate;
@@ -672,30 +711,55 @@ export default function ItemsManager() {
                 return (
                   <React.Fragment key={group.ref}>
                     {showDiv && (
-                      <div className="px-3 py-1.5 bg-[var(--bg)] border-b border-[var(--border-subtle)] sticky top-0 z-10">
-                        <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-[var(--text-secondary)]">{group.date || "—"}</p>
+                      <div className="px-5 py-2.5 bg-muted/30 border-b border-border/40 sticky top-0 z-10 backdrop-blur-md">
+                        <p className="text-[10px] uppercase tracking-[0.3em] font-black text-muted-foreground/70">{group.date || "—"}</p>
                       </div>
                     )}
                     <div
-                      className={`border-b border-[var(--border-subtle)] cursor-pointer transition-colors group/row
-                        ${isSelected ? "bg-[#C86B4D08] border-l-2 border-l-[var(--brand)]" : "hover:bg-[#C86B4D03] border-l-2 border-l-transparent"}`}
+                      className={cn(
+                        "group/row border-b border-border/40 cursor-pointer transition-all duration-200 relative",
+                        isSelected 
+                          ? "bg-primary/[0.03] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-primary shadow-sm" 
+                          : "hover:bg-muted/30 border-l-4 border-l-transparent"
+                      )}
                       onClick={e => selectRef(group.ref, e.ctrlKey || e.metaKey || e.shiftKey)}
                     >
-                      <div className="flex items-center gap-2 px-3 py-2.5">
-                        {/* Name — takes all available space */}
-                        <p className={`text-xs font-medium truncate flex-1 min-w-0 ${isCancelled ? "line-through text-[var(--text-secondary)]" : ""}`}>
-                          {group.name}
-                        </p>
-                        {/* Ref + order# */}
-                        <div className="flex flex-col items-end flex-shrink-0">
-                          <span className="font-mono text-[10px] text-[var(--brand)]">{group.ref}</span>
-                          {orderNos.length > 0 && <span className="font-mono text-[9px] text-[var(--text-secondary)] leading-tight">#{orderNos[0]}</span>}
+                      <div className="flex items-center gap-4 px-5 py-4">
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <p className={cn(
+                            "text-xs font-bold uppercase tracking-wide truncate",
+                            isCancelled ? "line-through text-muted-foreground/50" : "text-foreground group-hover/row:text-primary transition-colors"
+                          )}>
+                            {group.name}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="font-mono text-[9px] h-4 px-1.5 font-bold text-primary border-primary/20 bg-primary/5">
+                              {group.ref}
+                            </Badge>
+                            {orderNos.length > 0 && (
+                              <span className="font-mono text-[9px] font-black text-muted-foreground/40 leading-none">
+                                #{orderNos[0]}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        {/* Actions — always visible */}
-                        <div className="flex items-center gap-0 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                          <button onClick={() => setTailoringGroup(group)} className="p-1 text-[var(--info)] hover:bg-[#5C8A9E15] rounded-sm" title="Assign Tailoring" aria-label="Assign Tailoring"><Scissors size={11}/></button>
-                          <button onClick={() => setAddonGroup(group)} className="p-1 text-[var(--brand)] hover:bg-[#C86B4D10] rounded-sm" title="Add Add-on" aria-label="Add Add-on"><Tag size={11}/></button>
-                          <button onClick={() => setInvoiceRef(group.ref)} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm" title="Invoice" aria-label="Print Invoice"><Printer size={11}/></button>
+
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                          <span className={cn(
+                            "font-mono text-[11px] font-black tracking-tighter",
+                            group.totals.pending > 0 ? "text-warning" : group.totals.pending < 0 ? "text-destructive" : "text-success"
+                          )}>
+                            {group.totals.pending !== 0 ? `₹${fmt(group.totals.pending)}` : "SETTLED"}
+                          </span>
+                          <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">
+                            ₹{fmt(group.totals.total)} TOTAL
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-all translate-x-2 group-hover/row:translate-x-0" onClick={e => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-info hover:bg-info/10" onClick={() => setTailoringGroup(group)} title="Tailoring"><Scissors size={14} weight="bold"/></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/10" onClick={() => setAddonGroup(group)} title="Add-on"><Tag size={14} weight="bold"/></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted/50" onClick={() => setInvoiceRef(group.ref)} title="Invoice"><Printer size={14} weight="bold"/></Button>
                         </div>
                       </div>
                     </div>
@@ -705,23 +769,14 @@ export default function ItemsManager() {
             })()}
           </div>
         </div>
-
       </div>{/* end BODY */}
       </div>{/* end LEFT COLUMN */}
 
-      {/* Detail pane — full-height sibling column */}
-      {/* Responsive widths: mobile full screen, tablet ~45%, desktop sidebar */}
-      <div className={`flex-shrink-0 bg-[var(--surface)] overflow-hidden w-full sm:w-[55%] md:w-[45%] lg:w-[35%] xl:w-[30vw] flex flex-col ${detailOpen ? "flex" : "hidden sm:flex"}`}>
-        {/* Back to list button - visible on mobile/tablet when detail is open */}
-        {detailOpen && (
-          <button
-            onClick={() => setDetailOpen(false)}
-            className="sm:hidden flex items-center gap-1 px-3 py-2 text-xs text-[var(--brand)] hover:bg-[var(--bg)] border-b border-[var(--border-subtle)]"
-          >
-            <CaretRight size={14} className="rotate-180" />
-            Back to list
-          </button>
-        )}
+      {/* Detail pane */}
+      <div className={cn(
+        "flex-shrink-0 bg-background overflow-hidden border-l border-border/50 transition-all duration-300",
+        detailOpen ? "w-full sm:w-[50%] lg:w-[40%] xl:w-[35%]" : "w-0 sm:w-[50%] lg:w-[40%] xl:w-[35%]"
+      )}>
         <OrderDetailPane
           selectedGroups={selectedGroups}
           advances={advances}
@@ -733,253 +788,327 @@ export default function ItemsManager() {
         />
       </div>
 
-      {/* Mobile: back to list */}
-      {detailOpen && (
-        <div className="sm:hidden fixed bottom-4 left-4 z-40">
-          <button onClick={() => setDetailOpen(false)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--surface)] border border-[var(--border-strong)] rounded-full shadow-lg">
-            <CaretRight size={14} className="rotate-180"/> Orders
-          </button>
-        </div>
-      )}
 
       {/* ════ SECTION SELECTOR MODAL ════ */}
       {showSectionSelector && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--surface)] rounded-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
-            <div className="p-5 border-b border-[var(--border-subtle)] flex items-center justify-between">
-              <div>
-                <h2 className="font-heading text-xl font-medium">Select Section to Edit</h2>
-                <p className="text-sm text-[var(--text-secondary)] mt-1">{editMode==="order"?`${editItems.length} items`:"1 item"}</p>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <Card className="max-w-2xl w-full shadow-2xl border-border/50 animate-in zoom-in-95 duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6 border-b border-border/50">
+              <div className="space-y-1">
+                <CardTitle className="text-lg font-black uppercase tracking-[0.2em]">Select Section</CardTitle>
+                <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">{editMode==="order"?`${editItems.length} items selected`:"Single item editing"}</p>
               </div>
-              <button onClick={() => { setShowSectionSelector(false); setEditItems([]); }} className="p-1.5 hover:bg-[var(--bg)] rounded-sm text-[var(--text-secondary)]" aria-label="Close"><X size={16}/></button>
-            </div>
-            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <Button variant="ghost" size="icon" onClick={() => { setShowSectionSelector(false); setEditItems([]); }} className="h-8 w-8 rounded-full"><X size={18}/></Button>
+            </CardHeader>
+            <CardContent className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(SECTIONS).map(([key, section]) => (
                 <button key={key} onClick={() => startEdit(key, editItems, editMode)}
-                  className="p-4 border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] hover:bg-[#C86B4D08] text-left transition-colors group">
-                  <h3 className="font-medium text-[var(--brand)] group-hover:text-[var(--brand-hover)]">{section.label}</h3>
-                  <p className="text-xs text-[var(--text-secondary)] mt-1">{section.description}</p>
+                  className="group relative p-5 border border-border/50 rounded-xl hover:border-primary/50 hover:bg-primary/[0.02] text-left transition-all hover:shadow-lg">
+                  <div className="p-2 w-fit rounded-lg bg-muted group-hover:bg-primary/10 group-hover:text-primary transition-colors mb-4">
+                    {key === "items" && <Package size={20} weight="duotone" />}
+                    {key === "tailoring" && <Scissors size={20} weight="duotone" />}
+                    {key === "embroidery" && <Info size={20} weight="duotone" />}
+                    {key === "addon" && <Tag size={20} weight="duotone" />}
+                    {key === "advances" && <Wallet size={20} weight="duotone" />}
+                  </div>
+                  <h3 className="font-black text-[11px] uppercase tracking-[0.2em] text-foreground group-hover:text-primary transition-colors">{section.label}</h3>
+                  <p className="text-[10px] text-muted-foreground font-bold mt-1.5 leading-relaxed opacity-60">{section.description}</p>
                 </button>
               ))}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* ════ SECTION EDIT MODAL ════ */}
       {selectedSection && _sf && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--surface)] rounded-sm max-w-[96vw] w-full max-h-[92vh] flex flex-col shadow-xl">
-            <div className="px-5 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between flex-shrink-0">
-              <div>
-                <h2 className="font-heading text-lg font-medium">{_sf.label}</h2>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">{editMode==="order"?`${editItems.length} items`:"1 item"} · {_sf.description}</p>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <Card className="max-w-[96vw] w-full max-h-[94vh] flex flex-col shadow-2xl border-border/50 animate-in zoom-in-95 duration-300 overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-border/50 bg-background/80 backdrop-blur-md">
+              <div className="space-y-1">
+                <div className="flex items-center gap-3">
+                  <CardTitle className="text-lg font-black uppercase tracking-[0.2em]">{_sf.label}</CardTitle>
+                  <Badge variant="outline" className="text-[10px] h-5 px-2 font-bold uppercase tracking-widest bg-primary/5 text-primary border-primary/20">
+                    {editMode==="order"?`${editItems.length} Articles`:"Single Article"}
+                  </Badge>
+                </div>
+                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.15em] opacity-60">{_sf.description}</p>
               </div>
-              <button onClick={cancelEdit} className="p-1.5 hover:bg-[var(--bg)] rounded-sm text-[var(--text-secondary)]" aria-label="Close"><X size={18}/></button>
-            </div>
+              <Button variant="ghost" size="icon" onClick={cancelEdit} className="h-9 w-9 rounded-full"><X size={20}/></Button>
+            </CardHeader>
 
-            <div className="flex-1 overflow-auto p-4">
+            <div className="flex-1 overflow-auto p-6 bg-muted/5">
               {_isAdv ? (
-                <div className="overflow-x-auto">
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className="text-xs text-[var(--text-secondary)]">Advances for: <span className="font-mono font-medium">{editItems[0]?.ref}</span></span>
-                    <button onClick={addNewAdvance} className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[var(--success)] text-white rounded-sm hover:opacity-90"><Plus size={12}/> Add Advance</button>
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between bg-background p-4 rounded-xl border border-border/50 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-info/10 text-info">
+                        <Wallet size={18} weight="duotone" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Reference</span>
+                        <span className="font-mono text-sm font-black text-primary">{editItems[0]?.ref}</span>
+                      </div>
+                    </div>
+                    <Button onClick={addNewAdvance} className="h-9 gap-2 font-bold uppercase tracking-widest text-[10px] bg-success hover:bg-success/90">
+                      <Plus size={14} weight="bold"/> Add Advance
+                    </Button>
                   </div>
-                  {Object.keys(advanceData).length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs font-semibold text-[var(--text-secondary)] mb-2">Existing</p>
-                      <table className="w-full border border-[var(--border-subtle)] rounded-sm overflow-hidden text-xs">
-                        <thead className="bg-[var(--bg)]"><tr>
-                          {_sf.fields.map(f => <th key={f.key} className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">{f.label}</th>)}
-                          <th className="px-3 py-2 w-14 border-b border-[var(--border-subtle)] text-center">Del</th>
-                        </tr></thead>
-                        <tbody>
-                          {Object.entries(advanceData).map(([id, adv]) => (
-                            <tr key={id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D04]">
-                              {_sf.fields.map(f => <td key={f.key} className="px-2 py-2">{renderFieldInput(f, id, adv[f.key], handleAdvChange)}</td>)}
-                              <td className="px-2 py-2 text-center"><button onClick={() => markAdvDelete(id)} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm" aria-label="Delete advance"><Trash size={13}/></button></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  {newAdvances.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs font-semibold text-[var(--success)] mb-2">New (to be created)</p>
-                      <table className="w-full border border-[var(--border-subtle)] rounded-sm overflow-hidden text-xs">
-                        <thead className="bg-[#455D4A08]"><tr>
-                          {_sf.fields.map(f => <th key={f.key} className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">{f.label}</th>)}
-                          <th className="px-3 py-2 w-14 border-b border-[var(--border-subtle)]"></th>
-                        </tr></thead>
-                        <tbody>
-                          {newAdvances.map((adv, idx) => (
-                            <tr key={adv.id} className="border-b border-[var(--border-subtle)] last:border-0 bg-[#455D4A05]">
-                              {_sf.fields.map(f => <td key={f.key} className="px-2 py-2">{renderFieldInput(f, idx, adv[f.key], handleNewAdvChange)}</td>)}
-                              <td className="px-2 py-2 text-center"><button onClick={() => removeNewAdvance(idx)} className="p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm" aria-label="Remove"><X size={13}/></button></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  {deletedAdvances.length > 0 && (
-                    <div className="mb-3 p-2.5 bg-[#9E473D10] border border-[var(--error)] rounded-sm text-xs text-[var(--error)]">
-                      {deletedAdvances.length} advance(s) marked for deletion
-                    </div>
-                  )}
-                  {Object.keys(advanceData).length === 0 && newAdvances.length === 0 && (
-                    <div className="p-6 text-center text-sm text-[var(--text-secondary)] border border-dashed border-[var(--border-strong)] rounded-sm">
-                      No advances for this reference. Click "Add Advance" to create one.
-                    </div>
-                  )}
+
+                  <div className="space-y-4">
+                    {Object.keys(advanceData).length > 0 && (
+                      <div className="space-y-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 px-2">Existing Advances</p>
+                        <div className="overflow-hidden border border-border/50 rounded-xl bg-background shadow-sm">
+                          <table className="w-full text-xs">
+                            <thead className="bg-muted/30"><tr>
+                              {_sf.fields.map(f => <th key={f.key} className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/50">{f.label}</th>)}
+                              <th className="px-4 py-3 w-14 border-b border-border/50"></th>
+                            </tr></thead>
+                            <tbody className="divide-y divide-border/50">
+                              {Object.entries(advanceData).map(([id, adv]) => (
+                                <tr key={id} className="hover:bg-muted/20 transition-colors">
+                                  {_sf.fields.map(f => <td key={f.key} className="px-3 py-2.5">{renderFieldInput(f, id, adv[f.key], handleAdvChange)}</td>)}
+                                  <td className="px-3 py-2.5 text-center">
+                                    <Button variant="ghost" size="icon" onClick={() => markAdvDelete(id)} className="h-8 w-8 text-destructive hover:bg-destructive/10"><Trash size={14}/></Button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {newAdvances.length > 0 && (
+                      <div className="space-y-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-success/70 px-2">New Entries</p>
+                        <div className="overflow-hidden border border-success/30 rounded-xl bg-success/[0.02] shadow-sm">
+                          <table className="w-full text-xs">
+                            <tbody className="divide-y divide-success/20">
+                              {newAdvances.map((adv, idx) => (
+                                <tr key={adv.id} className="hover:bg-success/[0.05] transition-colors">
+                                  {_sf.fields.map(f => <td key={f.key} className="px-3 py-2.5">{renderFieldInput(f, idx, adv[f.key], handleNewAdvChange)}</td>)}
+                                  <td className="px-3 py-2.5 text-center">
+                                    <Button variant="ghost" size="icon" onClick={() => removeNewAdvance(idx)} className="h-8 w-8 text-destructive hover:bg-destructive/10"><X size={14}/></Button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {deletedAdvances.length > 0 && (
+                      <Badge variant="destructive" className="w-full py-2.5 justify-center rounded-lg gap-2 font-bold uppercase tracking-widest text-[10px]">
+                        <Info size={14} weight="bold"/> {deletedAdvances.length} advance(s) will be removed
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="space-y-6">
                   {_sf?.label === "Items" && editMode === "order" && (
-                    <div className="mb-3 flex items-center justify-between">
-                      <span className="text-xs text-[var(--text-secondary)]">Editing {editItems.length} items · <span className="font-mono font-medium">{editItems[0]?.ref}</span></span>
-                      <button onClick={addNewItem} className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[var(--success)] text-white rounded-sm hover:opacity-90"><Plus size={12}/> Add Item</button>
+                    <div className="flex items-center justify-between bg-background p-4 rounded-xl border border-border/50 shadow-sm">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Reference</span>
+                        <span className="font-mono text-sm font-black text-primary">{editItems[0]?.ref}</span>
+                      </div>
+                      <Button onClick={addNewItem} className="h-9 gap-2 font-bold uppercase tracking-widest text-[10px] bg-success hover:bg-success/90">
+                        <Plus size={14} weight="bold"/> Add New Article
+                      </Button>
                     </div>
                   )}
-                  <table className="w-full border border-[var(--border-subtle)] rounded-sm overflow-hidden text-xs">
-                    <thead className="bg-[var(--bg)] sticky top-0 z-10"><tr>
-                      <th className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] w-16">#</th>
-                      {_sf.fields.map(f => (
-                        <th key={f.key} className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] min-w-[90px]">
-                          {f.label}{f.computed && <span className="ml-1 text-[var(--info)] font-normal normal-case">(auto)</span>}
-                        </th>
-                      ))}
-                    </tr></thead>
-                    <tbody>
-                      {editItems.map((item, idx) => (
-                        <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[#C86B4D04]">
-                          <td className="px-3 py-2 align-top">
-                            <div className="font-mono text-[var(--brand)] font-medium">#{idx+1}</div>
-                            <div className="text-[10px] text-[var(--text-secondary)] truncate max-w-[60px] mt-0.5">{item.barcode}</div>
-                          </td>
+
+                  <div className="overflow-hidden border border-border/50 rounded-xl bg-background shadow-xl">
+                    <div className="overflow-x-auto custom-scrollbar">
+                      <table className="w-full text-xs min-w-[800px]">
+                        <thead className="bg-muted/50 sticky top-0 z-20"><tr>
+                          <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/50 w-20">Article</th>
                           {_sf.fields.map(f => (
-                            <td key={f.key} className="px-2 py-2 align-top">
-                              {renderFieldInput(f, item.id, editData[item.id]?.[f.key], handleFieldChange)}
-                            </td>
+                            <th key={f.key} className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/50 min-w-[120px]">
+                              <div className="flex items-center gap-1.5">
+                                {f.label}
+                                {f.computed && <Info size={12} className="text-info opacity-70" />}
+                              </div>
+                            </th>
                           ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                        </tr></thead>
+                        <tbody className="divide-y divide-border/50">
+                          {editItems.map((item, idx) => (
+                            <tr key={item.id} className="hover:bg-muted/20 transition-colors">
+                              <td className="px-4 py-3 align-top bg-muted/5">
+                                <div className="flex flex-col gap-1">
+                                  <span className="font-mono text-[11px] font-black text-primary">#{idx+1}</span>
+                                  <span className="text-[9px] font-black text-muted-foreground opacity-60 uppercase tracking-tighter truncate max-w-[60px]">{item.barcode}</span>
+                                </div>
+                              </td>
+                              {_sf.fields.map(f => (
+                                <td key={f.key} className="px-3 py-3 align-top">
+                                  {renderFieldInput(f, item.id, editData[item.id]?.[f.key], handleFieldChange)}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="px-5 py-4 border-t border-[var(--border-subtle)] flex justify-between items-center flex-shrink-0 bg-[var(--bg)]">
-              <button onClick={() => setShowSectionSelector(true)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)]">
-                ← Change Section
-              </button>
-              <div className="flex gap-2">
-                <button onClick={cancelEdit} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)]">Cancel</button>
-                <button onClick={saveEdits} disabled={saving} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 flex items-center gap-2">
-                  {saving ? "Saving…" : <><Check size={14}/> Save Changes</>}
-                </button>
+            <CardContent className="px-6 py-4 border-t border-border/50 flex justify-between items-center bg-background/80 backdrop-blur-md">
+              <Button variant="outline" onClick={() => setShowSectionSelector(true)} className="h-10 gap-2 font-black uppercase tracking-widest text-[10px]">
+                <CaretRight size={14} className="rotate-180" /> Change Section
+              </Button>
+              <div className="flex gap-3">
+                <Button variant="ghost" onClick={cancelEdit} className="h-10 font-black uppercase tracking-widest text-[10px]">Cancel</Button>
+                <Button onClick={saveEdits} disabled={saving} className="h-10 px-8 gap-2 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20">
+                  {saving ? (
+                    <>Saving Changes <ArrowsClockwise size={14} className="animate-spin" /></>
+                  ) : (
+                    <><Check size={16} weight="bold"/> Commit Updates</>
+                  )}
+                </Button>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* ════ DELETE CONFIRM ════ */}
       {delConfirm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setDelConfirm(null)}>
-          <div data-testid="delete-confirm-modal" className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm w-full shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="font-heading text-lg font-medium mb-2">Delete {delMode==="order"?"Order":"Item"}?</h3>
-            <p className="text-sm text-[var(--text-secondary)] mb-5">
-              {delMode==="order"
-                ? <><span className="font-mono font-medium">{delConfirm.ref}</span> — {delConfirm.items?.length||0} items will be permanently deleted.</>
-                : <>Item <span className="font-mono">{delConfirm.barcode}</span> will be permanently deleted.</>}
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setDelConfirm(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">Cancel</button>
-              <button data-testid="confirm-delete-btn" onClick={handleDelete} className="px-4 py-2 text-sm bg-[var(--error)] text-white rounded-sm hover:opacity-90">Delete</button>
-            </div>
-          </div>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <Card className="max-w-sm w-full shadow-2xl border-destructive/20 animate-in zoom-in-95 duration-300">
+            <CardHeader className="text-center pb-2">
+              <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto mb-4">
+                <Trash size={24} weight="bold" />
+              </div>
+              <CardTitle className="text-lg font-black uppercase tracking-widest text-destructive">Delete Confirmation</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-4">
+              <p className="text-xs text-muted-foreground font-bold leading-relaxed px-4">
+                {delMode==="order"
+                  ? <>Order <span className="font-mono font-black text-foreground">{delConfirm.ref}</span> and all its {delConfirm.items?.length||0} articles will be permanently removed.</>
+                  : <>Article <span className="font-mono font-black text-foreground">{delConfirm.barcode}</span> will be permanently deleted from the system.</>}
+              </p>
+              <div className="flex flex-col gap-2 pt-2">
+                <Button variant="destructive" onClick={handleDelete} className="w-full font-black uppercase tracking-widest text-[10px] h-11">Confirm Deletion</Button>
+                <Button variant="ghost" onClick={() => setDelConfirm(null)} className="w-full font-black uppercase tracking-widest text-[10px] h-11">Keep It</Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* ════ CANCEL CONFIRM ════ */}
       {cancelConfirm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setCancelConfirm(null)}>
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-sm w-full shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="font-heading text-lg font-medium mb-2 text-[var(--warning)]">Cancel Order?</h3>
-            <p className="text-sm text-[var(--text-secondary)] mb-5">
-              <span className="font-mono font-medium">{cancelConfirm.ref}</span> — {cancelConfirm.items?.length||0} items will be marked cancelled and all amounts zeroed.
-            </p>
-            <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end mt-2">
-              <button onClick={() => setCancelConfirm(null)} className="px-5 py-2.5 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] w-full sm:w-auto">Back</button>
-              <button onClick={() => handleCancelOrder(cancelConfirm)} className="px-5 py-2.5 text-sm bg-[var(--warning)] text-white rounded-sm hover:opacity-90 w-full sm:w-auto font-medium">Cancel Order</button>
-            </div>
-          </div>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <Card className="max-w-sm w-full shadow-2xl border-warning/20 animate-in zoom-in-95 duration-300">
+            <CardHeader className="text-center pb-2">
+              <div className="w-12 h-12 rounded-full bg-warning/10 text-warning flex items-center justify-center mx-auto mb-4">
+                <X size={24} weight="bold" />
+              </div>
+              <CardTitle className="text-lg font-black uppercase tracking-widest text-warning">Cancel Order?</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-4">
+              <p className="text-xs text-muted-foreground font-bold leading-relaxed px-4">
+                Order <span className="font-mono font-black text-foreground">{cancelConfirm.ref}</span> will be marked as cancelled. All amounts will be zeroed out.
+              </p>
+              <div className="flex flex-col gap-2 pt-2">
+                <Button onClick={() => handleCancelOrder(cancelConfirm)} className="w-full bg-warning hover:bg-warning/90 font-black uppercase tracking-widest text-[10px] h-11">Yes, Cancel Order</Button>
+                <Button variant="ghost" onClick={() => setCancelConfirm(null)} className="w-full font-black uppercase tracking-widest text-[10px] h-11">No, Go Back</Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* ════ MISMATCH PROMPT ════ */}
       {mismatchPrompt && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--surface)] rounded-sm max-w-lg w-full max-h-[80vh] flex flex-col shadow-xl">
-            <div className="p-4 border-b border-[var(--border-subtle)] bg-[#9E473D10] flex-shrink-0">
-              <h3 className="font-heading text-lg font-medium text-[var(--error)]">⚠ Amount Mismatch</h3>
-              <p className="text-sm text-[var(--text-secondary)] mt-1">Some amounts were reduced below what has already been received.</p>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[300] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <Card className="max-w-lg w-full shadow-2xl border-destructive/30 overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-5 bg-destructive/10 flex items-center gap-4 border-b border-destructive/20">
+              <div className="w-10 h-10 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center flex-shrink-0">
+                <Info size={20} weight="bold" />
+              </div>
+              <div>
+                <h3 className="font-black uppercase tracking-[0.2em] text-destructive text-sm">Amount Mismatch Detected</h3>
+                <p className="text-[10px] font-bold text-destructive/70 uppercase tracking-widest mt-0.5">Amounts reduced below received values</p>
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <table className="w-full text-xs">
-                <thead className="bg-[var(--bg)] sticky top-0"><tr>
-                  <th className="px-2 py-2 text-left text-[var(--text-secondary)]">Ref</th>
-                  <th className="px-2 py-2 text-left text-[var(--text-secondary)]">Type</th>
-                  <th className="px-2 py-2 text-right text-[var(--text-secondary)]">Old</th>
-                  <th className="px-2 py-2 text-right text-[var(--text-secondary)]">New</th>
-                  <th className="px-2 py-2 text-right text-[var(--text-secondary)]">Rcvd</th>
-                  <th className="px-2 py-2 text-right text-[var(--error)]">Over</th>
+            <div className="p-0 max-h-[50vh] overflow-y-auto custom-scrollbar">
+              <table className="w-full text-[11px]">
+                <thead className="bg-muted/50 sticky top-0"><tr>
+                  <th className="px-4 py-3 text-left font-black uppercase tracking-widest text-muted-foreground/60">Ref</th>
+                  <th className="px-4 py-3 text-left font-black uppercase tracking-widest text-muted-foreground/60">Type</th>
+                  <th className="px-4 py-3 text-right font-black uppercase tracking-widest text-muted-foreground/60">New</th>
+                  <th className="px-4 py-3 text-right font-black uppercase tracking-widest text-muted-foreground/60">Rcvd</th>
+                  <th className="px-4 py-3 text-right font-black uppercase tracking-widest text-destructive">Overage</th>
                 </tr></thead>
-                <tbody>
+                <tbody className="divide-y divide-border/50">
                   {mismatchPrompt.mismatches.map((m, i) => (
-                    <tr key={i} className="border-b border-[var(--border-subtle)]">
-                      <td className="px-2 py-2 font-mono">{m.ref}</td>
-                      <td className="px-2 py-2">{m.type}</td>
-                      <td className="px-2 py-2 text-right font-mono">₹{fmt(m.oldAmount)}</td>
-                      <td className="px-2 py-2 text-right font-mono">₹{fmt(m.newAmount)}</td>
-                      <td className="px-2 py-2 text-right font-mono text-[var(--success)]">₹{fmt(m.received)}</td>
-                      <td className="px-2 py-2 text-right font-mono text-[var(--error)] font-medium">₹{fmt(m.overage)}</td>
+                    <tr key={i} className="hover:bg-muted/20">
+                      <td className="px-4 py-3 font-mono font-black text-primary">{m.ref}</td>
+                      <td className="px-4 py-3 font-bold uppercase text-muted-foreground">{m.type}</td>
+                      <td className="px-4 py-3 text-right font-mono font-black">₹{fmt(m.newAmount)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-black text-success">₹{fmt(m.received)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-black text-destructive">₹{fmt(m.overage)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="p-4 border-t border-[var(--border-subtle)] flex justify-between items-center flex-shrink-0 bg-[var(--bg)]">
-              <button onClick={() => setMismatchPrompt(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--surface)]">Fix later</button>
-              <button onClick={() => { const orders=mismatchPrompt.refs.map(r=>{const g=refs.find(x=>x.ref===r);return{ref:r,name:g?.name||""};});setMismatchPrompt(null);setSettlementOrders(orders);}} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">Settle Now →</button>
+            <div className="p-4 bg-muted/30 border-t border-border/50 flex justify-between items-center">
+              <Button variant="ghost" onClick={() => setMismatchPrompt(null)} className="font-black uppercase tracking-widest text-[10px]">Fix Later</Button>
+              <Button onClick={() => { 
+                const orders = mismatchPrompt.refs.map(r => {
+                  const g = refs.find(x => x.ref === r);
+                  return { ref: r, name: g?.name || "" };
+                });
+                setMismatchPrompt(null);
+                setSettlementOrders(orders);
+              }} className="gap-2 font-black uppercase tracking-widest text-[10px] px-6">
+                Settle Imbalance <CaretRight size={14} weight="bold" />
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
       {/* ════ RE-SETTLE PROMPT ════ */}
       {reSettlePrompt && !settlementOrders && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setReSettlePrompt(null)}>
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="font-heading text-lg font-medium mb-1 text-[var(--warning)]">Settled amounts changed</h3>
-            <p className="text-sm text-[var(--text-secondary)] mb-4">These sections were previously settled but amounts have been updated.</p>
-            <div className="mb-5 space-y-1.5">
-              {reSettlePrompt.sections.map((s, i) => (
-                <div key={i} className="flex items-center justify-between px-3 py-2 bg-[var(--bg)] rounded-sm text-sm">
-                  <span className="font-medium">{s.label}</span>
-                  <span className="font-mono text-xs text-[var(--text-secondary)]">₹{fmt(s.oldAmt)} → <span className="text-[var(--brand)] font-medium">₹{fmt(s.newAmt)}</span></span>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setReSettlePrompt(null)} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)]">Skip for now</button>
-              <button onClick={() => { setSettlementOrders([{ref:reSettlePrompt.ref,name:reSettlePrompt.customer}]); setReSettlePrompt(null); }} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">Settle Now →</button>
-            </div>
-          </div>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <Card className="max-w-md w-full shadow-2xl border-warning/30 animate-in zoom-in-95 duration-300">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-black uppercase tracking-[0.2em] text-warning">Settlement Required</CardTitle>
+              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Amounts changed for previously settled articles</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                {reSettlePrompt.sections.map((s, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border/50">
+                    <span className="text-[10px] font-black uppercase tracking-widest">{s.label}</span>
+                    <div className="flex items-center gap-3 font-mono text-xs">
+                      <span className="text-muted-foreground/50 line-through">₹{fmt(s.oldAmt)}</span>
+                      <span className="text-primary font-black">₹{fmt(s.newAmt)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button variant="ghost" onClick={() => setReSettlePrompt(null)} className="flex-1 font-black uppercase tracking-widest text-[10px]">Ignore</Button>
+                <Button onClick={() => { 
+                  setSettlementOrders([{ref:reSettlePrompt.ref, name:reSettlePrompt.customer}]); 
+                  setReSettlePrompt(null); 
+                }} className="flex-1 font-black uppercase tracking-widest text-[10px] gap-2 shadow-lg shadow-primary/20">
+                  Update Settlement <CaretRight size={14} weight="bold" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 

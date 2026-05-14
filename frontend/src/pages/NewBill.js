@@ -3,12 +3,20 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { createBill, getCustomers, getInvoiceUrl, getSettings, invalidateCustomersCache, getNextBillRef } from "@/api";
 import { invalidate } from "@/lib/dataEvents";
-import { Plus, FloppyDisk, Spinner, WifiSlash, ArrowsSplit, User, ShoppingCart, CreditCard, X, Trash } from "@phosphor-icons/react";
+import { 
+  Plus, FloppyDisk, Spinner, WifiSlash, ArrowsSplit, User, 
+  ShoppingCart, CreditCard, X, Trash, Receipt, Calendar, ArrowRight, CheckCircle 
+} from "@phosphor-icons/react";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { DatePickerInput } from "@/components/DatePickerInput";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import InvoiceModal from "@/components/InvoiceModal";
 import { BillLineItemRow, ItemInputForm, PaymentSummaryPanel, BillSuccessPanel } from "@/components/bill";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function NewBill() {
   const navigate = useNavigate();
@@ -356,19 +364,19 @@ export default function NewBill() {
 
   const handleSave = async () => {
     if (!customerName || items.length === 0) {
-      setMessage({ type: "error", text: "Please enter customer name and at least one item" });
+      toast({ title: "Validation Error", description: "Please enter customer name and at least one item", variant: "destructive" });
       return;
     }
     if (parseFloat(amountPaid) > 0 && selectedModes.length === 0) {
-      setMessage({ type: "error", text: "Please select a payment mode when entering an amount paid" });
+      toast({ title: "Validation Error", description: "Please select a payment mode when entering an amount paid", variant: "destructive" });
       return;
     }
     if (isSettled && selectedModes.length === 0) {
-      setMessage({ type: "error", text: "Please select at least one payment mode when settling the invoice" });
+      toast({ title: "Validation Error", description: "Please select at least one payment mode when settling", variant: "destructive" });
       return;
     }
     if (!validateTailoringRows()) {
-      setMessage({ type: "error", text: "Please complete order number, delivery date and article type for all tailoring-enabled rows" });
+      toast({ title: "Validation Error", description: "Please complete all tailoring details (Order #, Delivery Date)", variant: "destructive" });
       return;
     }
 
@@ -415,14 +423,14 @@ export default function NewBill() {
       setLastBillRef(res.data.ref);
       setLastBillTotal(res.data.grand_total);
       setShowPostSave(true);
-      setMessage(null);
+      toast({ title: "Success", description: `Invoice ${res.data.ref} created successfully` });
       invalidate("dashboard");
       invalidate("daybook");
       invalidateCustomersCache();
       getCustomers().then(res => setConfig(p => ({ ...p, customers: res.data || [] }))).catch(() => {});
       resetFormFields();
     } catch (err) {
-      setMessage({ type: "error", text: err.response?.data?.detail || "Failed to save bill" });
+      toast({ title: "Error", description: err.response?.data?.detail || "Failed to save bill", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -478,42 +486,41 @@ export default function NewBill() {
   const billStep = customerName.trim() === "" ? 0 : items.length === 0 ? 1 : 2;
 
   return (
-    <div data-testid="new-bill-page" className="space-y-6 pb-24 lg:pb-6">
-      <div>
-        <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">New Bill</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">Create a new fabric sale entry</p>
+    <div data-testid="new-bill-page" className="space-y-8 pb-32 lg:pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Checkout</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium truncate">Generate digital invoice and record inventory exit</p>
+        </div>
+        {!isOnline && (
+          <Badge variant="destructive" className="animate-pulse px-4 py-1 font-black uppercase tracking-widest gap-2">
+            <WifiSlash size={16} weight="bold" /> Offline Mode
+          </Badge>
+        )}
       </div>
 
       {/* Mobile step indicator */}
       {!showPostSave && (
-        <div className="lg:hidden flex items-stretch bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm overflow-hidden">
+        <div className="lg:hidden flex items-stretch bg-card border border-muted-foreground/10 rounded-xl overflow-hidden shadow-sm">
           {[
             { label: "Customer", icon: User },
-            { label: "Items",    icon: ShoppingCart },
-            { label: "Payment", icon: CreditCard },
+            { label: "Inventory", icon: ShoppingCart },
+            { label: "Settlement", icon: CreditCard },
           ].map(({ label, icon: Icon }, idx) => (
             <div key={label} className="contents">
-              <div className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
+              <div className={`flex-1 flex flex-col items-center justify-center gap-1 py-4 text-[10px] font-black uppercase tracking-widest transition-all ${
                 idx === billStep
-                  ? "bg-[var(--brand)] text-white"
+                  ? "bg-primary text-white"
                   : idx < billStep
-                  ? "bg-[var(--brand)]/10 text-[var(--brand)]"
-                  : "text-[var(--text-secondary)]"
+                  ? "bg-success/10 text-success"
+                  : "bg-muted/50 text-muted-foreground"
               }`}>
-                <Icon size={13} weight={idx <= billStep ? "fill" : "regular"} />
-                {label}
+                <Icon size={20} weight={idx <= billStep ? "fill" : "duotone"} />
+                <span>{label}</span>
               </div>
-              {idx < 2 && (
-                <span className="flex items-center justify-center w-4 flex-shrink-0 text-[10px] text-[var(--border-strong)] bg-[var(--bg)] border-x border-[var(--border-subtle)]">›</span>
-              )}
+              {idx < 2 && <div className="w-px bg-muted-foreground/10" />}
             </div>
           ))}
-        </div>
-      )}
-
-      {message && !showPostSave && (
-        <div data-testid="bill-message" className={`p-4 border rounded-sm text-sm ${message.type === 'success' ? 'bg-[#455D4A10] border-[var(--success)] text-[var(--success)]' : 'bg-[#9E473D10] border-[var(--error)] text-[var(--error)]'}`}>
-          <span>{message.text}</span>
         </div>
       )}
 
@@ -527,180 +534,212 @@ export default function NewBill() {
         />
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Customer & Items */}
-        <div className="lg:col-span-2 bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
-          <h3 className="font-heading text-base font-medium">Customer Info</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="sm:col-span-1 col-span-1">
-              <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Customer Name</label>
-              <div ref={nameWrapRef} className="relative">
-                <input ref={nameRef} data-testid="customer-name-input" value={customerName}
-                  onChange={e => { setCustomerName(e.target.value); setShowSuggestions(true); }}
-                  onFocus={e => { if (e.target.value.trim()) setShowSuggestions(true); }}
-                  onKeyDown={e => { if (e.key === 'Escape') setShowSuggestions(false); else enterNav(e, dateRef); }}
-                  maxLength={100} autoComplete="off"
-                  className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)]" placeholder="Customer name" />
-                {showSuggestions && nameSuggestions.length > 0 && (
-                  <ul className="absolute z-50 left-0 right-0 top-full mt-0.5 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm shadow-lg max-h-48 overflow-y-auto">
-                    {nameSuggestions.map(c => (
-                      <li key={c}
-                        onMouseDown={e => { e.preventDefault(); setCustomerName(c); setShowSuggestions(false); setTimeout(() => dateRef.current?.focus(), 50); }}
-                        onTouchEnd={e => { e.preventDefault(); setCustomerName(c); setShowSuggestions(false); setTimeout(() => dateRef.current?.focus(), 50); }}
-                        className="px-3 py-2 text-sm cursor-pointer hover:bg-[var(--bg)] active:bg-[var(--bg)]">
-                        {c}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+        <div className="lg:col-span-2 space-y-8">
+          <Card className="shadow-lg border-muted-foreground/10 overflow-hidden">
+            <CardHeader className="bg-muted/20 pb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <User size={20} className="text-primary" weight="duotone" />
+                </div>
+                <CardTitle className="text-lg font-black uppercase tracking-tight">Client Intelligence</CardTitle>
               </div>
-            </div>
-            <div>
-              <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">Order Date</label>
-              <DatePickerInput 
-                ref={dateRef}
-                data-testid="order-date-input"
-                value={orderDate} 
-                onChange={setOrderDate} 
-                onKeyDown={e => enterNav(e, barcodeRef)}
-              />
-            </div>
-            <div>
-              <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)] block mb-1.5">
-                Bill Ref
-                {refEdited && customRef !== refPreview && (
-                  <button onClick={() => { setCustomRef(refPreview); setRefEdited(false); }} className="ml-2 text-[9px] text-[var(--brand)] hover:underline normal-case tracking-normal font-normal">reset</button>
-                )}
-              </label>
-              <input
-                data-testid="bill-ref-input"
-                value={customRef}
-                onChange={e => { setCustomRef(e.target.value); setRefEdited(true); }}
-                placeholder={refPreview || "Auto"}
-                className={`w-full px-3 py-2 text-sm font-mono border rounded-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand)] ${
-                  refEdited && customRef !== refPreview
-                    ? 'border-[var(--warning)] bg-[#D4984210]'
-                    : 'border-[var(--border-subtle)]'
-                }`}
-              />
-            </div>
-          </div>
+            </CardHeader>
+            <CardContent className="p-6 sm:p-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="sm:col-span-1 col-span-1 space-y-2">
+                  <label className="text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground block ml-1">Customer Entity</label>
+                  <div ref={nameWrapRef} className="relative group">
+                    <Input 
+                      ref={nameRef} 
+                      data-testid="customer-name-input" 
+                      value={customerName}
+                      onChange={e => { setCustomerName(e.target.value); setShowSuggestions(true); }}
+                      onFocus={e => { if (e.target.value.trim()) setShowSuggestions(true); }}
+                      onKeyDown={e => { if (e.key === 'Escape') setShowSuggestions(false); else enterNav(e, dateRef); }}
+                      maxLength={100} 
+                      autoComplete="off"
+                      className="h-11 font-bold focus:border-primary border-2" 
+                      placeholder="Name or ID..." 
+                    />
+                    {showSuggestions && nameSuggestions.length > 0 && (
+                      <Card className="absolute z-50 left-0 right-0 top-full mt-2 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                        <div className="max-h-64 overflow-y-auto p-1">
+                          {nameSuggestions.map(c => (
+                            <div key={c}
+                              onMouseDown={e => { e.preventDefault(); setCustomerName(c); setShowSuggestions(false); setTimeout(() => dateRef.current?.focus(), 50); }}
+                              className="px-4 py-3 text-sm font-bold cursor-pointer hover:bg-primary/5 rounded-md transition-colors flex items-center justify-between group/item">
+                              {c}
+                              <ArrowRight size={14} className="opacity-0 group-hover/item:opacity-100 transition-opacity text-primary" />
+                            </div>
+                          ))}
+                        </div>
+                      </Card>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground block ml-1">Order Date</label>
+                  <DatePickerInput 
+                    ref={dateRef}
+                    data-testid="order-date-input"
+                    value={orderDate} 
+                    onChange={setOrderDate} 
+                    onKeyDown={e => enterNav(e, barcodeRef)}
+                    className="h-11 font-bold"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground block ml-1">
+                    Invoice Reference
+                    {refEdited && customRef !== refPreview && (
+                      <Badge variant="warning" onClick={() => { setCustomRef(refPreview); setRefEdited(false); }} className="ml-2 text-[8px] cursor-pointer hover:scale-105 transition-transform">RESET</Badge>
+                    )}
+                  </label>
+                  <Input
+                    data-testid="bill-ref-input"
+                    value={customRef}
+                    onChange={e => { setCustomRef(e.target.value); setRefEdited(true); }}
+                    placeholder={refPreview || "Auto-generating..."}
+                    className={`h-11 font-mono font-black tracking-wider ${
+                      refEdited && customRef !== refPreview
+                        ? 'border-warning bg-warning/[0.03] text-warning'
+                        : 'border-2'
+                    }`}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          <h3 className="font-heading text-base font-medium pt-2">Add Items</h3>
-          <ItemInputForm
-            barcode={barcode}
-            qty={qty}
-            price={price}
-            discount={discount}
-            editingIndex={editingIndex}
-            refs={{ barcodeRef, qtyRef, priceRef, discountRef }}
-            onChange={(field, val) => {
-              if (field === 'barcode') setBarcode(val);
-              else if (field === 'qty') setQty(val);
-              else if (field === 'price') setPrice(val);
-              else if (field === 'discount') setDiscount(val);
-            }}
-            onAdd={addItem}
-            onOpenScanner={() => setShowScanner(true)}
-            onKeyNav={(e, nextRef) => enterNav(e, nextRef)}
-          />
-
-          {editingIndex !== null && (
-            <div className="flex justify-end">
-              <button onClick={resetItemForm} className="text-xs px-2.5 py-1.5 border border-[var(--border-subtle)] rounded-sm text-[var(--text-secondary)] hover:border-[var(--brand)]">Cancel Edit</button>
-            </div>
-          )}
-
-          {showScanner && <BarcodeScanner onScan={(code) => { setBarcode(code); setShowScanner(false); setTimeout(() => qtyRef.current?.focus(), 100); }} onClose={() => setShowScanner(false)} />}
-
-          {items.length > 0 && (
-            <div className="space-y-2" data-testid="bill-items-list">
-              {items.map((item, i) => (
-                <BillLineItemRow
-                  key={i}
-                  item={item}
-                  index={i}
-                  isEditing={editingIndex === i}
-                  onEdit={editItem}
-                  onRemove={removeItem}
-                  onOpenTailoring={(idx) => {
-                    setEditingIndex(idx);
-                    setShowTailoringModal(true);
+          <Card className="shadow-lg border-muted-foreground/10 overflow-hidden">
+            <CardHeader className="bg-muted/20 pb-6 border-b">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <ShoppingCart size={20} className="text-primary" weight="duotone" />
+                  </div>
+                  <CardTitle className="text-lg font-black uppercase tracking-tight">Inventory Exit</CardTitle>
+                </div>
+                {items.length > 0 && <Badge variant="info" className="font-black px-3 py-1 uppercase tracking-widest">{items.length} Articles</Badge>}
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="p-6 sm:p-8 bg-muted/[0.02]">
+                <ItemInputForm
+                  barcode={barcode}
+                  qty={qty}
+                  price={price}
+                  discount={discount}
+                  editingIndex={editingIndex}
+                  refs={{ barcodeRef, qtyRef, priceRef, discountRef }}
+                  onChange={(field, val) => {
+                    if (field === 'barcode') setBarcode(val);
+                    else if (field === 'qty') setQty(val);
+                    else if (field === 'price') setPrice(val);
+                    else if (field === 'discount') setDiscount(val);
                   }}
-                  onOpenAddon={(idx) => {
-                    setEditingIndex(idx);
-                    setShowAddonModal(true);
-                  }}
+                  onAdd={addItem}
+                  onOpenScanner={() => setShowScanner(true)}
+                  onKeyNav={(e, nextRef) => enterNav(e, nextRef)}
                 />
-              ))}
-              <div className="flex justify-between items-center px-3 py-2 text-sm text-[var(--text-secondary)] border-t border-[var(--border-subtle)] bg-[var(--bg)] rounded-sm">
-                <span>{items.length} item{items.length !== 1 ? 's' : ''}</span>
-                <span className="font-mono font-semibold text-[var(--text-primary)]">
-                  ₹{items.reduce((s, it) => s + it.total, 0).toLocaleString('en-IN')}
-                </span>
+
+                {editingIndex !== null && (
+                  <div className="flex justify-end mt-4">
+                    <Button variant="ghost" size="sm" onClick={resetItemForm} className="text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-destructive">
+                      Discard Changes <X size={12} weight="bold" className="ml-2" />
+                    </Button>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+
+              {showScanner && <BarcodeScanner onScan={(code) => { setBarcode(code); setShowScanner(false); setTimeout(() => qtyRef.current?.focus(), 100); }} onClose={() => setShowScanner(false)} />}
+
+              {items.length > 0 && (
+                <div className="border-t border-muted-foreground/10 bg-background" data-testid="bill-items-list">
+                  <div className="divide-y divide-muted/50 max-h-[400px] overflow-y-auto p-4 sm:p-6 space-y-4">
+                    {items.map((item, i) => (
+                      <BillLineItemRow
+                        key={i}
+                        item={item}
+                        index={i}
+                        isEditing={editingIndex === i}
+                        onEdit={editItem}
+                        onRemove={removeItem}
+                        onOpenTailoring={(idx) => {
+                          setEditingIndex(idx);
+                          setShowTailoringModal(true);
+                        }}
+                        onOpenAddon={(idx) => {
+                          setEditingIndex(idx);
+                          setShowAddonModal(true);
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex justify-between items-center px-8 py-5 text-sm bg-muted/20 border-t">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Cart Valuation</span>
+                    <span className="font-mono text-xl font-black text-primary tracking-tighter">
+                      ₹{items.reduce((s, it) => s + it.total, 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Payment Panel */}
-        <PaymentSummaryPanel
-          grandTotal={grandTotal}
-          amountPaid={amountPaid}
-          selectedModes={selectedModes}
-          isSettled={isSettled}
-          needsTailoring={needsTailoring}
-          payDate={payDate}
-          paymentModes={paymentModes}
-          canSubmit={items.length > 0}
-          saving={saving}
-          refs={{ amountRef, settledRef, saveBtnRef, payDateRef, tailoringRef }}
-          onAmountPaidChange={setAmountPaid}
-          onModeToggle={toggleMode}
-          onSettledChange={setIsSettled}
-          onNeedsTailoringChange={setNeedsTailoring}
-          onPayDateChange={setPayDate}
-          onSave={handleSave}
-          onKeyNav={(e, nextRef) => enterNav(e, nextRef)}
-        />
+        <div className="lg:sticky lg:top-24 h-fit">
+          <PaymentSummaryPanel
+            grandTotal={grandTotal}
+            amountPaid={amountPaid}
+            selectedModes={selectedModes}
+            isSettled={isSettled}
+            needsTailoring={needsTailoring}
+            payDate={payDate}
+            paymentModes={paymentModes}
+            canSubmit={items.length > 0}
+            saving={saving}
+            refs={{ amountRef, settledRef, saveBtnRef, payDateRef, tailoringRef }}
+            onAmountPaidChange={setAmountPaid}
+            onModeToggle={toggleMode}
+            onSettledChange={setIsSettled}
+            onNeedsTailoringChange={setNeedsTailoring}
+            onPayDateChange={setPayDate}
+            onSave={handleSave}
+            onKeyNav={(e, nextRef) => enterNav(e, nextRef)}
+          />
+        </div>
       </div>
 
       {/* Mobile sticky summary bar - visible only on small screens */}
       <div 
-        className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--surface)] border-t border-[var(--border-subtle)] p-3 shadow-lg z-50"
-        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 12px))' }}
+        className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-muted-foreground/10 p-4 shadow-2xl z-50 animate-in slide-in-from-bottom-full duration-500"
+        style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom, 16px))' }}
       >
-        {/* Offline indicator */}
-        {!isOnline && (
-          <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-[#9E473D10] border border-[var(--error)] rounded-sm text-[var(--error)] text-xs">
-            <WifiSlash size={14} />
-            <span>You're offline. Connect to save.</span>
-          </div>
-        )}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-6">
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">Grand Total</p>
-            <p className="font-heading text-xl font-semibold" style={{ color: "var(--brand)" }}>
+            <p className="text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground">Total Valuation</p>
+            <p className="font-heading text-2xl font-black text-primary tracking-tighter">
               ₹{grandTotal.toLocaleString('en-IN')}
             </p>
-            {items.length > 0 && (
-              <p className="text-xs text-[var(--text-secondary)]">{items.length} item{items.length !== 1 ? 's' : ''}</p>
-            )}
           </div>
-          <button 
+          <Button 
             onClick={handleSave} 
             disabled={saving || items.length === 0 || !isOnline} 
-            className="flex items-center gap-2 px-4 py-3 text-sm font-medium bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50 whitespace-nowrap"
-            title={!isOnline ? "You're offline. Connect to save." : ""}
+            size="lg"
+            className="h-14 px-8 text-base font-black uppercase tracking-widest shadow-xl shadow-primary/20 active:scale-95 transition-all gap-3"
           >
-            {saving ? <Spinner size={16} className="animate-spin" /> : (
+            {saving ? <Spinner size={20} className="animate-spin" /> : (
               <>
-                {!isOnline && <WifiSlash size={16} weight="bold" />}
-                <FloppyDisk size={16} weight="bold" /> 
+                {!isOnline && <WifiSlash size={20} weight="bold" />}
+                <FloppyDisk size={20} weight="bold" /> 
                 Save Bill
               </>
             )}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -718,149 +757,174 @@ export default function NewBill() {
         <InvoiceModal billRef={lastBillRef} onClose={() => setShowInvoice(false)} />
       )}
 
+      {/* Add-on Modal */}
       {showAddonModal && (
         <div 
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="addon-modal-title"
+          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300"
           onClick={(e) => { if (e.target === e.currentTarget) setShowAddonModal(false); }}
         >
-          <div className="w-full max-w-5xl bg-[var(--surface)] rounded-sm border border-[var(--border-subtle)] shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
-              <h3 id="addon-modal-title" className="font-heading text-base">Configure Add-ons for Current Bill ({customerName || 'No Customer'})</h3>
-              <button onClick={() => setShowAddonModal(false)} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm" aria-label="Close"><X size={16} /></button>
-            </div>
-            <div className="p-4 overflow-auto flex-1">
-              {/* Mobile card view */}
-              <div className="sm:hidden space-y-3">
+          <Card className="w-full max-w-5xl border-none shadow-2xl shadow-black/40 overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-300">
+            <CardHeader className="border-b border-border/50 bg-muted/20 px-6 py-4 flex flex-row items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-success/10 text-success">
+                  <Plus size={20} weight="duotone" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg font-black uppercase tracking-widest">Article Add-ons</CardTitle>
+                  <p className="text-xs text-muted-foreground font-medium">Extra charges for embroidery, buttons, etc.</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setShowAddonModal(false)} className="rounded-full">
+                <X size={20} />
+              </Button>
+            </CardHeader>
+            
+            <CardContent className="p-0 overflow-auto flex-1 custom-scrollbar">
+              {/* Mobile View */}
+              <div className="sm:hidden p-4 space-y-4">
                 {items.map((item, idx) => (
-                  <div key={`addon-mobile-${idx}`} className="bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm p-3 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-sm font-medium">{item.barcode}</span>
-                        <span className="text-xs text-[var(--text-secondary)] ml-2">{item.qty}m</span>
+                  <Card key={`addon-mob-${idx}`} className={cn(
+                    "border-border/50 shadow-none overflow-hidden",
+                    (item.addon?.items?.length > 0) ? "bg-success/[0.02] border-success/20" : "bg-muted/10"
+                  )}>
+                    <CardContent className="p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-sm font-black text-primary">#{item.barcode}</span>
+                        <Badge variant="outline" className="font-mono text-[10px] font-black">{item.qty}m</Badge>
                       </div>
-                      <span className="text-sm font-mono">
-                        ₹{(item.addon?.items || []).reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0).toLocaleString()}
-                      </span>
-                    </div>
-                    
-                    {(item.addon?.items || []).length === 0 ? (
-                      <p className="text-sm text-[var(--text-secondary)] italic">No add-ons configured</p>
-                    ) : (
-                      <div className="space-y-2">
+
+                      <div className="space-y-3">
                         {(item.addon?.items || []).map((addon, addonIdx) => (
-                          <div key={addonIdx} className="flex items-center gap-2 bg-[var(--surface)] p-2 rounded-sm">
+                          <div key={addonIdx} className="flex items-center gap-2 p-2 bg-background border border-border/50 rounded-xl shadow-sm">
                             <select
                               value={addon.name}
                               onChange={e => updateAddonItem(idx, addonIdx, { name: e.target.value })}
-                              className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm"
+                              className="flex-1 h-9 px-3 text-xs font-bold bg-transparent outline-none cursor-pointer"
                             >
                               {addonItems.map(name => <option key={name} value={name}>{name}</option>)}
                             </select>
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              pattern="[0-9]*"
-                              value={addon.amount}
-                              onChange={e => updateAddonItem(idx, addonIdx, { amount: e.target.value })}
-                              className="w-20 px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm"
-                              placeholder="₹"
-                            />
-                            <button
+                            <div className="relative w-24">
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground">₹</span>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                value={addon.amount}
+                                onChange={e => updateAddonItem(idx, addonIdx, { amount: e.target.value })}
+                                className="w-full h-9 pl-6 pr-3 text-xs font-mono font-black border-none bg-muted/20 rounded-lg focus:ring-1 focus:ring-success/30 transition-all outline-none"
+                                placeholder="0"
+                              />
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={() => removeAddonItem(idx, addonIdx)}
-                              className="p-1.5 text-[var(--error)] hover:bg-[var(--error)]/10 rounded-sm flex-shrink-0"
+                              className="h-9 w-9 text-destructive hover:bg-destructive/10 rounded-lg"
                             >
-                              <Trash size={14} />
-                            </button>
+                              <Trash size={16} />
+                            </Button>
                           </div>
                         ))}
                       </div>
-                    )}
-                    
-                    <button
-                      onClick={() => addAddonItem(idx)}
-                      className="w-full px-3 py-2 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] flex items-center justify-center gap-1"
-                    >
-                      <Plus size={12} /> Add Add-on
-                    </button>
-                  </div>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addAddonItem(idx)}
+                        className="w-full h-10 font-black uppercase tracking-widest text-[10px] border-dashed border-2 hover:border-success/50 hover:bg-success/5 hover:text-success gap-2 rounded-xl transition-all"
+                      >
+                        <Plus size={14} weight="bold" /> Add Add-on
+                      </Button>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
 
-              {/* Desktop table view */}
-              <div className="hidden sm:block overflow-x-auto -mx-4 px-4">
-                <table className="w-full min-w-[800px]">
+              {/* Desktop View */}
+              <div className="hidden sm:block">
+                <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-[var(--bg)]">
-                      <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Article</th>
-                      <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Qty</th>
-                      <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Add-ons</th>
-                      <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Total</th>
-                      <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Actions</th>
+                    <tr className="bg-muted/30 border-b border-border/50">
+                      <th className="text-left px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Article</th>
+                      <th className="text-left px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Qty</th>
+                      <th className="text-left px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Extra Add-ons</th>
+                      <th className="text-right px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Total Extra</th>
+                      <th className="text-right px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Actions</th>
                     </tr>
-                </thead>
-                <tbody>
-                  {items.map((item, idx) => (
-                    <tr key={`addon-${idx}`} className="border-b border-[var(--border-subtle)]">
-                      <td className="px-2 py-2 text-sm font-medium">{item.barcode}</td>
-                      <td className="px-2 py-2 text-sm">{item.qty}</td>
-                      <td className="px-2 py-2">
-                        {(item.addon?.items || []).length === 0 ? (
-                          <span className="text-sm text-[var(--text-secondary)]">No add-ons</span>
-                        ) : (
-                          <div className="space-y-1">
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                    {items.map((item, idx) => (
+                      <tr key={`addon-row-${idx}`} className="group hover:bg-success/[0.01] transition-colors">
+                        <td className="px-6 py-4">
+                          <span className="font-mono text-sm font-black text-primary">#{item.barcode}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm font-bold text-foreground">{item.qty}m</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-2">
                             {(item.addon?.items || []).map((addon, addonIdx) => (
-                              <div key={addonIdx} className="flex items-center gap-2">
+                              <div key={addonIdx} className="flex items-center gap-2 p-1 bg-background border border-border/50 rounded-xl shadow-sm animate-in fade-in zoom-in-95">
                                 <select
                                   value={addon.name}
                                   onChange={e => updateAddonItem(idx, addonIdx, { name: e.target.value })}
-                                  className="px-2 py-1 text-sm border border-[var(--border-subtle)] rounded-sm"
+                                  className="h-8 pl-3 pr-1 text-xs font-bold bg-transparent outline-none cursor-pointer hover:text-success transition-colors"
                                 >
                                   {addonItems.map(name => <option key={name} value={name}>{name}</option>)}
                                 </select>
-                                <input
-                                  type="number"
-                                  inputMode="decimal"
-                                  pattern="[0-9]*"
-                                  value={addon.amount}
-                                  onChange={e => updateAddonItem(idx, addonIdx, { amount: e.target.value })}
-                                  className="w-24 px-2 py-1 text-sm border border-[var(--border-subtle)] rounded-sm"
-                                  placeholder="Amount"
-                                />
-                                <button
+                                <div className="relative w-24">
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground opacity-40">₹</span>
+                                  <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    value={addon.amount}
+                                    onChange={e => updateAddonItem(idx, addonIdx, { amount: e.target.value })}
+                                    className="w-full h-8 pl-6 pr-2 text-xs font-mono font-black border-none bg-muted/20 rounded-lg focus:ring-1 focus:ring-success/30 transition-all outline-none"
+                                    placeholder="0"
+                                  />
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   onClick={() => removeAddonItem(idx, addonIdx)}
-                                  className="p-1 text-[var(--error)] hover:bg-[var(--error)]/10 rounded-sm"
+                                  className="h-8 w-8 text-destructive/60 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
                                 >
                                   <Trash size={14} />
-                                </button>
+                                </Button>
                               </div>
                             ))}
+                            {(item.addon?.items || []).length === 0 && (
+                              <span className="text-xs text-muted-foreground/40 font-bold uppercase tracking-widest italic py-2">No extra charges</span>
+                            )}
                           </div>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 text-sm">
-                        ₹{(item.addon?.items || []).reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0).toLocaleString()}
-                      </td>
-                      <td className="px-2 py-2">
-                        <button
-                          onClick={() => addAddonItem(idx)}
-                          className="px-3 py-1.5 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] flex items-center gap-1"
-                        >
-                          <Plus size={12} /> Add
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="font-mono text-sm font-black text-success tracking-tighter">
+                            ₹{(item.addon?.items || []).reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0).toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => addAddonItem(idx)}
+                            className="h-9 px-4 font-black uppercase tracking-widest text-[10px] border-dashed border-2 hover:border-success/50 hover:bg-success/5 hover:text-success gap-2 rounded-xl transition-all"
+                          >
+                            <Plus size={14} weight="bold" /> Add
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
                 </table>
               </div>
-            </div>
-            <div className="px-4 py-3 border-t border-[var(--border-subtle)] flex justify-end">
-              <button onClick={() => setShowAddonModal(false)} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">Done</button>
-            </div>
-          </div>
+            </CardContent>
+            
+            <CardFooter className="border-t border-border/50 bg-muted/20 px-6 py-4 flex justify-end gap-3">
+              <Button onClick={() => setShowAddonModal(false)} className="h-10 px-8 font-black uppercase tracking-widest text-xs rounded-xl shadow-lg shadow-primary/20">
+                Finalize Add-ons
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
       )}
     </div>
@@ -873,15 +937,11 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
   const [splitError, setSplitError] = useState(null);
   const trapRef = useFocusTrap(true);
 
-  // Escape key handler for accessibility
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
-        if (splitItem) {
-          setSplitItem(null);
-        } else {
-          onClose();
-        }
+        if (splitItem) setSplitItem(null);
+        else onClose();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -901,7 +961,6 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
       originalTotal: item.total,
       originalPrice: item.price,
       originalDiscount: item.discount,
-      // Pre-fill with 2 split parts, user can adjust
       splits: [
         { qty: (item.qty / 2).toFixed(2), article_type: articleTypes[0] || "Shirt" },
         { qty: (item.qty / 2).toFixed(2), article_type: articleTypes[0] || "Shirt" }
@@ -943,7 +1002,6 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
     const newItems = [...items];
     const totalQty = splitItem.originalQty;
 
-    // Calculate proportional amounts for each split, remainder-correcting the last part
     let runningTotal = 0;
     const splitData = splitItem.splits.map((split, i) => {
       const isLast = i === splitItem.splits.length - 1;
@@ -961,7 +1019,6 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
       };
     });
 
-    // Update original item with first split
     newItems[splitItem.itemIdx] = {
       ...originalItem,
       qty: parseFloat(splitData[0].qty),
@@ -969,13 +1026,12 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
       tailoring: {
         enabled: true,
         article_type: splitData[0].article_type,
-        order_no: "",  // User fills this in main table
-        delivery_date: "",  // User fills this in main table
+        order_no: "",
+        delivery_date: "",
         embroidery_status: "Not Required"
       }
     };
 
-    // Add additional items for remaining splits
     for (let i = 1; i < splitData.length; i++) {
       newItems.splice(splitItem.itemIdx + i, 0, {
         ...originalItem,
@@ -985,8 +1041,8 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
         tailoring: {
           enabled: true,
           article_type: splitData[i].article_type,
-          order_no: "",  // User fills this in main table
-          delivery_date: "",  // User fills this in main table
+          order_no: "",
+          delivery_date: "",
           embroidery_status: "Not Required"
         }
       });
@@ -1001,249 +1057,307 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
     const isBalanced = Math.abs(currentTotal - splitItem.originalQty) < 0.01;
     return (
       <div 
-        className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="split-dialog-title"
+        className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
         onClick={(e) => { if (e.target === e.currentTarget) setSplitItem(null); }}
       >
-        <div className="w-full max-w-2xl bg-[var(--surface)] rounded-sm border border-[var(--border-subtle)] shadow-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
+        <Card className="w-full max-w-2xl border-none shadow-2xl animate-in zoom-in-95 duration-300">
+          <CardHeader className="border-b border-border/50 bg-muted/20 px-6 py-4 flex flex-row items-center justify-between">
             <div>
-              <h3 id="split-dialog-title" className="font-heading text-base">Split Article: {items[splitItem.itemIdx]?.barcode}</h3>
-              <p className="text-xs text-[var(--text-secondary)]">Original Qty: {splitItem.originalQty} | Original Amount: ₹{splitItem.originalTotal?.toLocaleString()}</p>
+              <CardTitle className="text-lg font-black uppercase tracking-widest">Split Article: #{items[splitItem.itemIdx]?.barcode}</CardTitle>
+              <div className="flex items-center gap-4 mt-1">
+                <Badge variant="outline" className="font-mono text-[10px] font-black">Qty: {splitItem.originalQty}</Badge>
+                <Badge variant="outline" className="font-mono text-[10px] font-black">Amount: ₹{splitItem.originalTotal?.toLocaleString()}</Badge>
+              </div>
             </div>
-            <button onClick={() => setSplitItem(null)} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm" aria-label="Close"><X size={16} /></button>
-          </div>
-          <div className="p-4 max-h-[60vh] overflow-auto">
-            <div className="space-y-3">
+            <Button variant="ghost" size="icon" onClick={() => setSplitItem(null)} className="rounded-full">
+              <X size={20} />
+            </Button>
+          </CardHeader>
+          
+          <CardContent className="p-6 max-h-[60vh] overflow-auto custom-scrollbar">
+            <div className="space-y-4">
               {splitItem.splits.map((split, idx) => {
                 const ratio = splitItem.originalQty > 0 ? (parseFloat(split.qty) || 0) / splitItem.originalQty : 0;
                 const splitAmount = Math.round((splitItem.originalTotal || 0) * ratio);
                 return (
-                  <div key={idx} className="flex items-center gap-3 p-3 border border-[var(--border-subtle)] rounded-sm bg-[var(--bg)]">
-                    <div className="w-24">
-                      <label className="text-xs text-[var(--text-secondary)] block mb-1">Qty</label>
+                  <div key={idx} className="flex items-center gap-4 p-4 bg-muted/30 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
+                    <div className="w-24 space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Qty</label>
                       <input
                         type="number"
                         step="0.01"
-                        min="0"
                         value={split.qty}
                         onChange={e => updateSplitPart(idx, { qty: e.target.value })}
-                        className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm"
+                        className="w-full h-10 px-3 text-sm font-mono font-black bg-background border border-border/50 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                       />
                     </div>
-                    <div className="flex-1">
-                      <label className="text-xs text-[var(--text-secondary)] block mb-1">Article Type</label>
+                    <div className="flex-1 space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Type</label>
                       <select
                         value={split.article_type}
                         onChange={e => updateSplitPart(idx, { article_type: e.target.value })}
-                        className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm"
+                        className="w-full h-10 px-3 text-sm font-bold bg-background border border-border/50 rounded-xl outline-none cursor-pointer"
                       >
                         {articleTypes.map(type => <option key={type} value={type}>{type}</option>)}
                       </select>
                     </div>
-                    <div className="w-28 text-right">
-                      <label className="text-xs text-[var(--text-secondary)] block mb-1">Amount</label>
-                      <span className="text-sm font-medium">₹{splitAmount.toLocaleString()}</span>
+                    <div className="w-28 text-right space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Amount</label>
+                      <p className="font-mono text-base font-black tracking-tighter">₹{splitAmount.toLocaleString()}</p>
                     </div>
-                    <button
-                      onClick={() => removeSplitPart(idx)}
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       disabled={splitItem.splits.length <= 1}
-                      className="mt-4 p-1.5 text-[var(--error)] hover:bg-[var(--error)]/10 rounded-sm disabled:opacity-30"
+                      onClick={() => removeSplitPart(idx)}
+                      className="mt-5 h-10 w-10 text-destructive/60 hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
                     >
-                      <Trash size={16} />
-                    </button>
+                      <Trash size={18} />
+                    </Button>
                   </div>
                 );
               })}
             </div>
-            <button
-              onClick={addSplitPart}
-              className="mt-3 px-3 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] flex items-center gap-1"
-            >
-              <Plus size={12} /> Add Split Part
-            </button>
-            <div className={`mt-3 text-sm ${isBalanced ? 'text-[var(--success)]' : 'text-[var(--error)]'}`}>
-              Split Total: {currentTotal.toFixed(2)} / {splitItem.originalQty} 
-              {!isBalanced && ' (Must equal original quantity)'}
+            
+            <div className="mt-6 flex items-center justify-between">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addSplitPart}
+                className="font-black uppercase tracking-widest text-[10px] border-dashed border-2 rounded-xl gap-2 h-10"
+              >
+                <Plus size={14} weight="bold" /> Add Split Part
+              </Button>
+              <div className={cn(
+                "px-4 py-2 rounded-xl font-mono text-xs font-black tracking-widest uppercase",
+                isBalanced ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive animate-pulse"
+              )}>
+                {currentTotal.toFixed(2)} / {splitItem.originalQty} {isBalanced ? '✓' : '⚠️'}
+              </div>
             </div>
-          </div>
-          {splitError && (
-            <div className="mx-4 mb-0 mt-2 px-3 py-2 text-xs text-[var(--error)] bg-[#9E473D10] border border-[var(--error)] rounded-sm">{splitError}</div>
-          )}
-          <div className="px-4 py-3 border-t border-[var(--border-subtle)] flex justify-between">
-            <button onClick={() => { setSplitItem(null); setSplitError(null); }} className="px-4 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)]">Cancel</button>
-            <button 
+          </CardContent>
+          
+          <CardFooter className="border-t border-border/50 bg-muted/20 px-6 py-4 flex justify-between gap-3">
+            <Button variant="ghost" onClick={() => { setSplitItem(null); setSplitError(null); }} className="h-10 px-6 font-black uppercase tracking-widest text-[10px] rounded-xl">
+              Cancel
+            </Button>
+            <Button 
               onClick={applySplit} 
               disabled={!isBalanced}
-              className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] disabled:opacity-50"
+              className="h-10 px-8 font-black uppercase tracking-widest text-xs rounded-xl shadow-lg shadow-primary/20"
             >
-              Apply Split
-            </button>
-          </div>
-        </div>
+              Apply Split Logic
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     );
   }
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="tailoring-modal-title"
+      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div ref={trapRef} className="w-full max-w-5xl bg-[var(--surface)] rounded-sm border border-[var(--border-subtle)] shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
-          <h3 id="tailoring-modal-title" className="font-heading text-base">Configure Tailoring for Current Bill ({customerName || 'No Customer'})</h3>
-          <button onClick={onClose} className="p-1 text-[var(--text-secondary)] hover:bg-[var(--bg)] rounded-sm" aria-label="Close"><X size={16} /></button>
-        </div>
-        <div className="p-4 overflow-auto flex-1">
-          {/* Mobile card view - visible only on small screens */}
-          <div className="sm:hidden space-y-3">
+      <Card ref={trapRef} className="w-full max-w-6xl border-none shadow-2xl shadow-black/40 overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-300">
+        <CardHeader className="border-b border-border/50 bg-muted/20 px-6 py-4 flex flex-row items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-info/10 text-info">
+              <Scissors size={20} weight="duotone" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-black uppercase tracking-widest">Tailoring Configuration</CardTitle>
+              <p className="text-xs text-muted-foreground font-medium">Customer: <span className="text-foreground font-bold">{customerName || 'Standard Partner'}</span></p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
+            <X size={20} />
+          </Button>
+        </CardHeader>
+        
+        <CardContent className="p-0 overflow-auto flex-1 custom-scrollbar">
+          {/* Mobile View */}
+          <div className="sm:hidden p-4 space-y-4">
             {items.map((item, idx) => (
-              <div key={`tail-mobile-${idx}`} className="bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm p-3 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="checkbox" 
-                      checked={!!item.tailoring?.enabled} 
-                      onChange={e => updateItemTailoring(idx, { enabled: e.target.checked })} 
-                      className="accent-[var(--brand)]"
-                    />
-                    <span className="text-sm font-medium">{item.barcode}</span>
-                  </div>
-                  <span className="text-xs text-[var(--text-secondary)]">{item.qty}m</span>
-                </div>
-                
-                {item.tailoring?.enabled && (
-                  <div className="space-y-3 pt-2 border-t border-[var(--border-subtle)]">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] block mb-1">Order No</label>
-                        <input 
-                          value={item.tailoring?.order_no || ""} 
-                          onChange={e => updateItemTailoring(idx, { order_no: e.target.value })} 
-                          maxLength={30} 
-                          className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm"
-                          placeholder="TL-2025-XXX"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] block mb-1">Delivery</label>
-                        <DatePickerInput 
-                          value={item.tailoring?.delivery_date || ""} 
-                          onChange={(val) => updateItemTailoring(idx, { delivery_date: val })} 
-                          placeholder="Select date"
-                        />
-                      </div>
+              <Card key={`tail-mob-${idx}`} className={cn(
+                "border-border/50 shadow-none overflow-hidden",
+                item.tailoring?.enabled ? "bg-info/[0.02] border-info/20" : "bg-muted/10"
+              )}>
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="checkbox" 
+                        checked={!!item.tailoring?.enabled} 
+                        onChange={e => updateItemTailoring(idx, { enabled: e.target.checked })} 
+                        className="w-5 h-5 rounded-md border-border/50 accent-info transition-all cursor-pointer"
+                      />
+                      <span className="font-mono text-sm font-black text-primary">#{item.barcode}</span>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] block mb-1">Type</label>
-                        <select 
-                          value={item.tailoring?.article_type || (articleTypes[0] || "Shirt")} 
-                          onChange={e => updateItemTailoring(idx, { article_type: e.target.value })} 
-                          className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)]"
-                        >
-                          {articleTypes.map(type => <option key={type} value={type}>{type}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] block mb-1">Embroidery</label>
-                        <select 
-                          value={item.tailoring?.embroidery_status || "Not Required"} 
-                          onChange={e => updateItemTailoring(idx, { embroidery_status: e.target.value })} 
-                          className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm bg-[var(--surface)]"
-                        >
-                          <option value="Not Required">Not Required</option>
-                          <option value="Required">Required</option>
-                        </select>
-                      </div>
-                    </div>
-                    
-                    <button
-                      onClick={() => handleSplit(idx)}
-                      disabled={item.qty <= 0}
-                      className="w-full px-3 py-2 text-xs border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] disabled:opacity-30 flex items-center justify-center gap-1"
-                      title="Split this article into multiple tailoring orders"
-                    >
-                      <ArrowsSplit size={12} /> Split Article
-                    </button>
+                    <Badge variant="outline" className="font-mono text-[10px] font-black">{item.qty}m</Badge>
                   </div>
-                )}
-                
-                {!item.tailoring?.enabled && (
-                  <p className="text-xs text-[var(--text-secondary)] italic">Enable tailoring to configure</p>
-                )}
-              </div>
+                  
+                  {item.tailoring?.enabled && (
+                    <div className="space-y-4 pt-4 border-t border-border/30 animate-in slide-in-from-top-2 duration-300">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Order #</label>
+                          <input 
+                            value={item.tailoring?.order_no || ""} 
+                            onChange={e => updateItemTailoring(idx, { order_no: e.target.value })} 
+                            className="w-full h-10 px-3 text-sm font-mono font-black bg-background border border-border/50 rounded-xl outline-none focus:ring-2 focus:ring-info/20 transition-all"
+                            placeholder="TL-XXX"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Delivery</label>
+                          <DatePickerInput 
+                            value={item.tailoring?.delivery_date || ""} 
+                            onChange={(val) => updateItemTailoring(idx, { delivery_date: val })} 
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Type</label>
+                          <select 
+                            value={item.tailoring?.article_type || (articleTypes[0] || "Shirt")} 
+                            onChange={e => updateItemTailoring(idx, { article_type: e.target.value })} 
+                            className="w-full h-10 px-3 text-sm font-bold bg-background border border-border/50 rounded-xl outline-none"
+                          >
+                            {articleTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Embroidery</label>
+                          <select 
+                            value={item.tailoring?.embroidery_status || "Not Required"} 
+                            onChange={e => updateItemTailoring(idx, { embroidery_status: e.target.value })} 
+                            className="w-full h-10 px-3 text-sm font-bold bg-background border border-border/50 rounded-xl outline-none"
+                          >
+                            <option value="Not Required">None</option>
+                            <option value="Required">Required</option>
+                          </select>
+                        </div>
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSplit(idx)}
+                        disabled={item.qty <= 0}
+                        className="w-full h-10 font-black uppercase tracking-widest text-[10px] border-dashed border-2 rounded-xl gap-2 hover:bg-info/5 hover:text-info hover:border-info/30"
+                      >
+                        <ArrowsSplit size={14} weight="bold" /> Split Article
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {!item.tailoring?.enabled && (
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 text-center py-2 italic">Tailoring not enabled</p>
+                  )}
+                </CardContent>
+              </Card>
             ))}
           </div>
           
-          {/* Desktop table view - hidden on mobile */}
-          <div className="hidden sm:block overflow-x-auto -mx-4 px-4">
-            <table className="w-full min-w-[900px]">
+          {/* Desktop View */}
+          <div className="hidden sm:block">
+            <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-[var(--bg)]">
-                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Apply</th>
-                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Article</th>
-                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Qty</th>
-                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Order No</th>
-                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Delivery</th>
-                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Article Type</th>
-                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Embroidery</th>
-                  <th className="text-left px-2 py-2 text-xs uppercase tracking-[0.1em]">Actions</th>
+                <tr className="bg-muted/30 border-b border-border/50">
+                  <th className="text-left px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground w-16">Apply</th>
+                  <th className="text-left px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Article</th>
+                  <th className="text-left px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground w-20">Qty</th>
+                  <th className="text-left px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground w-40">Order No</th>
+                  <th className="text-left px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground w-48">Delivery</th>
+                  <th className="text-left px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground w-44">Type</th>
+                  <th className="text-left px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground w-40">Embroidery</th>
+                  <th className="text-right px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Actions</th>
                 </tr>
-            </thead>
-            <tbody>
-              {items.map((item, idx) => (
-                <tr key={`tail-${idx}`} className="border-b border-[var(--border-subtle)]">
-                  <td className="px-2 py-2"><input type="checkbox" checked={!!item.tailoring?.enabled} onChange={e => updateItemTailoring(idx, { enabled: e.target.checked })} /></td>
-                  <td className="px-2 py-2 text-sm">{item.barcode}</td>
-                  <td className="px-2 py-2 text-sm">{item.qty}</td>
-                  <td className="px-2 py-2"><input value={item.tailoring?.order_no || ""} onChange={e => updateItemTailoring(idx, { order_no: e.target.value })} disabled={!item.tailoring?.enabled} maxLength={30} className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm disabled:opacity-50" /></td>
-                  <td className="px-2 py-2">
-                        <DatePickerInput 
-                          value={item.tailoring?.delivery_date || ""} 
-                          onChange={(val) => updateItemTailoring(idx, { delivery_date: val })} 
-                          disabled={!item.tailoring?.enabled}
-                          placeholder="Select date"
-                        />
-                      </td>
-                  <td className="px-2 py-2">
-                    <select value={item.tailoring?.article_type || (articleTypes[0] || "Shirt")} onChange={e => updateItemTailoring(idx, { article_type: e.target.value })} disabled={!item.tailoring?.enabled} className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm disabled:opacity-50">
-                      {articleTypes.map(type => <option key={type} value={type}>{type}</option>)}
-                    </select>
-                  </td>
-                  <td className="px-2 py-2">
-                    <select value={item.tailoring?.embroidery_status || "Not Required"} onChange={e => updateItemTailoring(idx, { embroidery_status: e.target.value })} disabled={!item.tailoring?.enabled} className="w-full px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm disabled:opacity-50">
-                      <option value="Not Required">Not Required</option>
-                      <option value="Required">Required</option>
-                    </select>
-                  </td>
-                  <td className="px-2 py-2">
-                    <button
-                      onClick={() => handleSplit(idx)}
-                      disabled={item.qty <= 0 || !item.tailoring?.enabled}
-                      className="px-2 py-1 text-xs border border-[var(--border-subtle)] rounded-sm hover:border-[var(--brand)] disabled:opacity-30 flex items-center gap-1"
-                      title="Split this article into multiple tailoring orders"
-                    >
-                      <ArrowsSplit size={12} /> Split
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {items.map((item, idx) => (
+                  <tr key={`tail-row-${idx}`} className={cn(
+                    "group transition-colors",
+                    item.tailoring?.enabled ? "bg-info/[0.01]" : "opacity-60"
+                  )}>
+                    <td className="px-6 py-4">
+                      <input 
+                        type="checkbox" 
+                        checked={!!item.tailoring?.enabled} 
+                        onChange={e => updateItemTailoring(idx, { enabled: e.target.checked })} 
+                        className="w-5 h-5 rounded-md border-border/50 accent-info transition-all cursor-pointer"
+                      />
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="font-mono text-sm font-black text-primary">#{item.barcode}</span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="text-sm font-bold text-foreground">{item.qty}m</span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <input 
+                        value={item.tailoring?.order_no || ""} 
+                        onChange={e => updateItemTailoring(idx, { order_no: e.target.value })} 
+                        disabled={!item.tailoring?.enabled} 
+                        className="w-full h-10 px-3 text-sm font-mono font-black bg-background border border-border/50 rounded-xl outline-none focus:ring-2 focus:ring-info/20 disabled:bg-muted/30 disabled:opacity-50 transition-all"
+                        placeholder="TL-XXX"
+                      />
+                    </td>
+                    <td className="px-4 py-4">
+                      <DatePickerInput 
+                        value={item.tailoring?.delivery_date || ""} 
+                        onChange={(val) => updateItemTailoring(idx, { delivery_date: val })} 
+                        disabled={!item.tailoring?.enabled}
+                      />
+                    </td>
+                    <td className="px-4 py-4">
+                      <select 
+                        value={item.tailoring?.article_type || (articleTypes[0] || "Shirt")} 
+                        onChange={e => updateItemTailoring(idx, { article_type: e.target.value })} 
+                        disabled={!item.tailoring?.enabled} 
+                        className="w-full h-10 px-3 text-sm font-bold bg-background border border-border/50 rounded-xl outline-none disabled:bg-muted/30 disabled:opacity-50"
+                      >
+                        {articleTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-4 py-4">
+                      <select 
+                        value={item.tailoring?.embroidery_status || "Not Required"} 
+                        onChange={e => updateItemTailoring(idx, { embroidery_status: e.target.value })} 
+                        disabled={!item.tailoring?.enabled} 
+                        className="w-full h-10 px-3 text-sm font-bold bg-background border border-border/50 rounded-xl outline-none disabled:bg-muted/30 disabled:opacity-50"
+                      >
+                        <option value="Not Required">Not Required</option>
+                        <option value="Required">Required</option>
+                      </select>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSplit(idx)}
+                        disabled={item.qty <= 0 || !item.tailoring?.enabled}
+                        className="h-9 px-4 font-black uppercase tracking-widest text-[10px] border-dashed border-2 rounded-xl gap-2 hover:bg-info/5 hover:text-info hover:border-info/30 transition-all disabled:opacity-30"
+                      >
+                        <ArrowsSplit size={14} weight="bold" /> Split
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
-        </div>
-        <div className="px-4 py-3 border-t border-[var(--border-subtle)] flex justify-end">
-          <button onClick={onClose} className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">Done</button>
-        </div>
-      </div>
+        </CardContent>
+        
+        <CardFooter className="border-t border-border/50 bg-muted/20 px-6 py-4 flex justify-end gap-3">
+          <Button onClick={onClose} className="h-10 px-8 font-black uppercase tracking-widest text-xs rounded-xl shadow-lg shadow-info/20 bg-info hover:bg-info/90">
+            Confirm Configuration
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

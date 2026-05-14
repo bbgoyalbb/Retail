@@ -1,8 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSettings, updateSettings, uploadLogo, invalidatePublicSettingsCache, invalidateSettingsCache, BACKEND_URL } from "@/api";
-import { FloppyDisk, Plus, Trash, CheckCircle, Warning, Keyboard } from "@phosphor-icons/react";
+import { 
+  FloppyDisk, Plus, Trash, CheckCircle, Warning, Keyboard, 
+  Storefront, CreditCard, Tag, FileText, Image, Palette, 
+  ArrowRight, ArrowsClockwise, Info
+} from "@phosphor-icons/react";
 import { DEFAULT_NUM_SHORTCUTS, DEFAULT_LETTER_SHORTCUTS, loadLetterShortcuts } from "@/components/KeyboardShortcuts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const getLogoUrl = (path) => {
   if (!path) return null;
@@ -13,16 +23,15 @@ const getLogoUrl = (path) => {
 
 export default function SettingsPage() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [settings, setSettings] = useState(null);
   const [savedSettings, setSavedSettings] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(null);
-  const [message, setMessage] = useState(null);
   const [newArticle, setNewArticle] = useState("");
   const [newMode, setNewMode] = useState("");
   const [newAddon, setNewAddon] = useState("");
   const [logoPreview, setLogoPreview] = useState(null);
-  const msgTimerRef = useRef(null);
 
   // Keyboard shortcuts (stored in localStorage only, not backend)
   const [numShortcuts, setNumShortcuts] = useState(() => {
@@ -49,13 +58,13 @@ export default function SettingsPage() {
   const saveShortcuts = (shortcuts) => {
     localStorage.setItem("keyboard_shortcuts", JSON.stringify(shortcuts));
     window.dispatchEvent(new CustomEvent("shortcuts:updated"));
-    showMessage({ type: "success", text: "Keyboard shortcuts saved!" });
+    toast({ title: "Shortcuts Saved", description: "Numerical keyboard shortcuts updated locally." });
   };
 
   const saveLetterShortcuts = (shortcuts) => {
     localStorage.setItem("keyboard_letter_shortcuts", JSON.stringify(shortcuts));
     window.dispatchEvent(new CustomEvent("shortcuts:updated"));
-    showMessage({ type: "success", text: "Keyboard shortcuts saved!" });
+    toast({ title: "Shortcuts Saved", description: "Alpha keyboard shortcuts updated locally." });
   };
 
   const updateShortcut = (key, path) => {
@@ -90,15 +99,6 @@ export default function SettingsPage() {
     return () => window.removeEventListener("navigate:request", handler);
   }, [isDirty]);
 
-  // Clear timeout on unmount to prevent memory leak
-  useEffect(() => () => { if (msgTimerRef.current) clearTimeout(msgTimerRef.current); }, []);
-
-  const showMessage = useCallback((msg) => {
-    setMessage(msg);
-    if (msgTimerRef.current) clearTimeout(msgTimerRef.current);
-    msgTimerRef.current = setTimeout(() => setMessage(null), 3000);
-  }, []);
-
   const loadSettings = useCallback(() => {
     setLoadError(null);
     return getSettings()
@@ -106,9 +106,9 @@ export default function SettingsPage() {
       .catch((err) => {
         const msg = err?.message || "Failed to load settings";
         setLoadError(msg);
-        showMessage({ type: "error", text: msg });
+        toast({ title: "Error", description: msg, variant: "destructive" });
       });
-  }, [showMessage]);
+  }, [toast]);
 
   useEffect(() => { loadSettings(); }, [loadSettings]);
 
@@ -121,9 +121,9 @@ export default function SettingsPage() {
       invalidatePublicSettingsCache();
       invalidateSettingsCache();
       window.dispatchEvent(new CustomEvent("settings:updated"));
-      showMessage({ type: "success", text: "Settings saved successfully!" });
+      toast({ title: "Settings Saved", description: "Global application configuration has been updated." });
     } catch (err) {
-      showMessage({ type: "error", text: err.message || "Failed to save settings" });
+      toast({ title: "Error", description: err.message || "Failed to save settings", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -163,375 +163,624 @@ export default function SettingsPage() {
   if (!settings) {
     if (loadError) {
       return (
-        <div className="p-8 text-center space-y-4">
-          <p className="text-sm text-[var(--error)]">{loadError}</p>
-          <button
-            onClick={loadSettings}
-            className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] transition-colors"
-          >
-            Retry
-          </button>
+        <div className="flex flex-col items-center justify-center py-32 gap-6 animate-in zoom-in-95 duration-300">
+          <div className="p-6 rounded-full bg-destructive/10 text-destructive">
+            <Warning size={48} weight="duotone" />
+          </div>
+          <div className="text-center space-y-2">
+            <p className="text-lg font-bold">Failed to load settings</p>
+            <p className="text-sm text-muted-foreground">{loadError}</p>
+          </div>
+          <Button onClick={loadSettings} size="lg" className="px-8">
+            Retry Connection
+          </Button>
         </div>
       );
     }
-    return <div className="p-8 text-center text-[var(--text-secondary)]">Loading...</div>;
+    return (
+      <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Skeleton className="h-[400px] rounded-xl" />
+          <div className="space-y-8">
+            <Skeleton className="h-[200px] rounded-xl" />
+            <Skeleton className="h-[200px] rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div data-testid="settings-page" className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-2xl sm:text-3xl font-light tracking-tight">Settings</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1 hidden sm:block">Configure article types, rates, payment modes, and more</p>
+    <div data-testid="settings-page" className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Settings</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium truncate">Global system configuration and identity management</p>
         </div>
-        <button data-testid="save-settings-btn" onClick={save} disabled={saving}
-          className={`flex-shrink-0 flex items-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 text-sm font-medium rounded-sm transition-all disabled:opacity-50 whitespace-nowrap ${
-            isDirty ? 'bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)] ring-2 ring-[var(--brand)] ring-offset-2' : 'bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)]'
-          }`}>
-          {saving ? "Saving…" : <><FloppyDisk size={16} weight="bold" /> {isDirty ? "Save Changes ●" : "Save Settings"}</>}
-        </button>
+        <Button 
+          data-testid="save-settings-btn" 
+          onClick={save} 
+          disabled={saving}
+          className={cn(
+            "h-12 px-6 font-black uppercase tracking-[0.15em] text-xs shadow-lg transition-all active:scale-95 gap-2",
+            isDirty ? "bg-primary shadow-primary/20 ring-2 ring-primary ring-offset-2" : "bg-primary shadow-primary/10"
+          )}
+        >
+          {saving ? (
+            <div className="flex items-center gap-2">Saving <ArrowsClockwise size={18} className="animate-spin" /></div>
+          ) : (
+            <><FloppyDisk size={18} weight="bold" /> {isDirty ? "Save Changes ●" : "Save Settings"}</>
+          )}
+        </Button>
       </div>
 
-      {message && (
-        <div className={`p-3 border rounded-sm text-sm flex items-center gap-2 ${message.type === 'success' ? 'bg-[#455D4A10] border-[var(--success)] text-[var(--success)]' : 'bg-[#9E473D10] border-[var(--error)] text-[var(--error)]'}`}>
-          {message.type === 'success' ? <CheckCircle size={16} /> : <Warning size={16} />} {message.text}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Article Types & Rates */}
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-4">
-          <h3 className="font-heading text-base font-medium">Article Types & Rates</h3>
-          <div className="space-y-2">
-            <div className="overflow-x-auto">
-            <div className="min-w-[320px]">
-            <div className="grid grid-cols-12 gap-2 text-xs uppercase tracking-[0.1em] font-semibold text-[var(--text-secondary)] px-1">
-              <span className="col-span-4">Type</span>
-              <span className="col-span-3">Tailoring (₹)</span>
-              <span className="col-span-3">Labour (₹)</span>
-              <span className="col-span-2"></span>
-            </div>
-            {settings.article_types?.map(type => (
-              <div key={type} className="grid grid-cols-12 gap-2 items-center mt-2">
-                <span className="col-span-4 text-sm font-medium">{type}</span>
-                <input type="number" inputMode="decimal" pattern="[0-9]*" value={settings.tailoring_rates?.[type]?.tailoring || 0} onChange={e => updateRate(type, "tailoring", e.target.value)} className="col-span-3 px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
-                <input type="number" inputMode="decimal" pattern="[0-9]*" value={settings.tailoring_rates?.[type]?.labour || 0} onChange={e => updateRate(type, "labour", e.target.value)} className="col-span-3 px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
-                <button onClick={() => removeArticle(type)} className="col-span-2 p-1 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"><Trash size={14} /></button>
+        <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden flex flex-col h-fit">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-primary" />
+          <CardHeader className="pb-4 pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-primary/10 text-primary transition-transform group-hover:rotate-12 duration-300">
+                <Storefront size={22} weight="duotone" />
               </div>
-            ))}
+              <div className="flex flex-col">
+                <CardTitle className="text-lg font-black uppercase tracking-tight">Article Management</CardTitle>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Types & Commercial Rates</span>
+              </div>
             </div>
+          </CardHeader>
+          <CardContent className="p-6 space-y-6">
+            <div className="overflow-hidden border border-border/50 rounded-2xl bg-muted/5">
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-muted/50 border-b border-border/50">
+                      <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground">Article Discipline</th>
+                      <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground">Retail (₹)</th>
+                      <th className="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground">Labour (₹)</th>
+                      <th className="px-4 py-4 w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                    {settings.article_types?.map(type => (
+                      <tr key={type} className="hover:bg-background/50 transition-colors group">
+                        <td className="px-4 py-3">
+                          <span className="text-sm font-black text-foreground group-hover:text-primary transition-colors">{type}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <input 
+                            type="number" 
+                            inputMode="decimal" 
+                            value={settings.tailoring_rates?.[type]?.tailoring || 0} 
+                            onChange={e => updateRate(type, "tailoring", e.target.value)} 
+                            className="w-full h-9 px-3 text-sm font-mono font-black border border-border/50 rounded-xl bg-background focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input 
+                            type="number" 
+                            inputMode="decimal" 
+                            value={settings.tailoring_rates?.[type]?.labour || 0} 
+                            onChange={e => updateRate(type, "labour", e.target.value)} 
+                            className="w-full h-9 px-3 text-sm font-mono font-black border border-border/50 rounded-xl bg-background focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => removeArticle(type)} 
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-full"
+                          >
+                            <Trash size={14} weight="bold" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="flex gap-2 pt-2">
-              <input value={newArticle} onChange={e => setNewArticle(e.target.value)} placeholder="New article type" onKeyDown={e => e.key === "Enter" && addArticle()} className="flex-1 px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
-              <button onClick={addArticle} className="px-3 py-1.5 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]"><Plus size={14} /></button>
+            
+            <div className="flex gap-3 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+              <input 
+                value={newArticle} 
+                onChange={e => setNewArticle(e.target.value)} 
+                placeholder="New article type (e.g. Waistcoat)" 
+                onKeyDown={e => e.key === "Enter" && addArticle()} 
+                className="flex-1 h-10 px-4 text-xs font-bold border border-primary/20 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-primary/30" 
+              />
+              <Button onClick={addArticle} className="h-10 px-4 font-black uppercase tracking-widest text-[10px] gap-2 shadow-md">
+                <Plus size={14} weight="bold" /> Add Article
+              </Button>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Payment Modes */}
-        <div className="space-y-6">
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-3">
-            <h3 className="font-heading text-base font-medium">Payment Modes</h3>
-            <div className="flex flex-wrap gap-2">
-              {settings.payment_modes?.map(m => (
-                <div key={m} className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm">
-                  <span>{m}</span>
-                  <button onClick={() => removeMode(m)} className="text-[var(--error)] hover:bg-[#9E473D10] rounded-sm p-0.5"><Trash size={12} /></button>
+        <div className="space-y-8">
+          {/* Payment Modes */}
+          <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden">
+            <CardHeader className="pb-4 pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-success/10 text-success">
+                  <CreditCard size={22} weight="duotone" />
                 </div>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input value={newMode} onChange={e => setNewMode(e.target.value)} placeholder="New mode" onKeyDown={e => e.key === "Enter" && addMode()} className="flex-1 px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
-              <button onClick={addMode} className="px-3 py-1.5 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]"><Plus size={14} /></button>
-            </div>
-          </div>
+                <div className="flex flex-col">
+                  <CardTitle className="text-lg font-black uppercase tracking-tight">Financial Channels</CardTitle>
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Settlement Methods</span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="flex flex-wrap gap-2">
+                {settings.payment_modes?.map(m => (
+                  <Badge 
+                    key={m} 
+                    variant="secondary" 
+                    className="group px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl bg-muted/50 text-foreground border border-border/50 hover:border-primary/30 transition-all"
+                  >
+                    {m}
+                    <button 
+                      onClick={() => removeMode(m)} 
+                      className="ml-2 p-0.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-colors"
+                    >
+                      <X size={10} weight="bold" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-3">
+                <input 
+                  value={newMode} 
+                  onChange={e => setNewMode(e.target.value)} 
+                  placeholder="New payment mode" 
+                  onKeyDown={e => e.key === "Enter" && addMode()} 
+                  className="flex-1 h-10 px-4 text-xs font-bold border border-border/50 rounded-xl bg-background focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                />
+                <Button onClick={addMode} variant="secondary" className="h-10 px-4 font-black uppercase tracking-widest text-[10px] shadow-sm">
+                  <Plus size={14} weight="bold" /> Add Channel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Add-on Items */}
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-3">
-            <h3 className="font-heading text-base font-medium">Add-on Items</h3>
-            <div className="flex flex-wrap gap-2">
-              {settings.addon_items?.map(a => (
-                <div key={a} className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--bg)] border border-[var(--border-subtle)] rounded-sm">
-                  <span>{a}</span>
-                  <button onClick={() => removeAddon(a)} className="text-[var(--error)] hover:bg-[#9E473D10] rounded-sm p-0.5"><Trash size={12} /></button>
+          <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden">
+            <CardHeader className="pb-4 pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-warning/10 text-warning">
+                  <Tag size={22} weight="duotone" />
+                </div>
+                <div className="flex flex-col">
+                  <CardTitle className="text-lg font-black uppercase tracking-tight">Accessories & Extras</CardTitle>
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Managed Add-on Inventory</span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="flex flex-wrap gap-2">
+                {settings.addon_items?.map(a => (
+                  <Badge 
+                    key={a} 
+                    variant="secondary" 
+                    className="group px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl bg-muted/50 text-foreground border border-border/50 hover:border-primary/30 transition-all"
+                  >
+                    {a}
+                    <button 
+                      onClick={() => removeAddon(a)} 
+                      className="ml-2 p-0.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-colors"
+                    >
+                      <X size={10} weight="bold" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-3">
+                <input 
+                  value={newAddon} 
+                  onChange={e => setNewAddon(e.target.value)} 
+                  placeholder="New accessory item" 
+                  onKeyDown={e => e.key === "Enter" && addAddonItem()} 
+                  className="flex-1 h-10 px-4 text-xs font-bold border border-border/50 rounded-xl bg-background focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                />
+                <Button onClick={addAddonItem} variant="secondary" className="h-10 px-4 font-black uppercase tracking-widest text-[10px] shadow-sm">
+                  <Plus size={14} weight="bold" /> Add Item
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Firm Details */}
+      <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden">
+        <CardHeader className="pb-4 pt-6 border-b border-border/50">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+              <FileText size={22} weight="duotone" />
+            </div>
+            <div className="flex flex-col">
+              <CardTitle className="text-lg font-black uppercase tracking-tight">Enterprise Identity</CardTitle>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Firm Details & Invoice Branding</span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-8">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-12">
+            <div className="space-y-8">
+              {/* Logo Section */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground flex items-center gap-2">
+                    <Image size={14} weight="bold" /> Standard Brandmark
+                  </label>
+                  <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-2xl border border-dashed border-border/50 group hover:border-primary/30 transition-all">
+                    {(logoPreview || settings.firm_logo) ? (
+                      <div className="relative group/img">
+                        <img 
+                          src={getLogoUrl(logoPreview) || getLogoUrl(settings.firm_logo)} 
+                          alt="Logo" 
+                          className="w-20 h-20 object-contain bg-white rounded-xl border border-border/50 shadow-sm"
+                        />
+                        <button 
+                          onClick={() => { setLogoPreview(null); setSettings(p => ({...p, firm_logo: ''})); }}
+                          className="absolute -top-2 -right-2 p-1.5 bg-destructive text-white rounded-full shadow-lg opacity-0 group-hover/img:opacity-100 transition-all scale-75 group-hover/img:scale-100"
+                        >
+                          <Trash size={12} weight="bold" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-20 h-20 rounded-xl bg-background border border-border/50 flex items-center justify-center text-muted-foreground/20">
+                        <Image size={32} />
+                      </div>
+                    )}
+                    <div className="flex-1 space-y-2">
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        id="logo-upload"
+                        className="hidden"
+                        onChange={async e => {
+                          const file = e.target.files[0];
+                          if (!file) return;
+                          if (file.size > 1024 * 1024) { toast({ title: "Error", description: "Logo image too large (max 1MB)", variant: "destructive" }); return; }
+                          try {
+                            const formData = new FormData();
+                            formData.append("file", file);
+                            const res = await uploadLogo(formData);
+                            const logoUrl = res.data.url;
+                            setLogoPreview(logoUrl);
+                            const updatedSettings = { ...settings, firm_logo: logoUrl };
+                            setSettings(updatedSettings);
+                            await updateSettings(updatedSettings);
+                            setSavedSettings(updatedSettings);
+                            invalidatePublicSettingsCache();
+                            invalidateSettingsCache();
+                            window.dispatchEvent(new CustomEvent("settings:updated"));
+                            toast({ title: "Logo Updated", description: "Standard brandmark has been synchronized." });
+                          } catch (err) {
+                            toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
+                          }
+                        }}
+                      />
+                      <label htmlFor="logo-upload" className="inline-flex h-9 px-4 items-center justify-center rounded-xl bg-background border border-border/50 text-[10px] font-black uppercase tracking-widest cursor-pointer hover:bg-muted/50 transition-colors">
+                        Select Image
+                      </label>
+                      <p className="text-[9px] text-muted-foreground font-medium">PNG/JPG (Max 1MB)</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground flex items-center gap-2">
+                    <Palette size={14} weight="bold" /> Dark Mode Variant
+                  </label>
+                  <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-2xl border border-dashed border-border/50 group hover:border-primary/30 transition-all">
+                    {settings.firm_logo_dark ? (
+                      <div className="relative group/img">
+                        <img 
+                          src={getLogoUrl(settings.firm_logo_dark)} 
+                          alt="Dark Logo" 
+                          className="w-20 h-20 object-contain bg-[#1a1917] rounded-xl border border-border/50 shadow-sm"
+                        />
+                        <button 
+                          onClick={() => setSettings(p => ({...p, firm_logo_dark: ''}))}
+                          className="absolute -top-2 -right-2 p-1.5 bg-destructive text-white rounded-full shadow-lg opacity-0 group-hover/img:opacity-100 transition-all scale-75 group-hover/img:scale-100"
+                        >
+                          <Trash size={12} weight="bold" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-20 h-20 rounded-xl bg-[#1a1917] border border-border/50 flex items-center justify-center text-white/5">
+                        <Image size={32} />
+                      </div>
+                    )}
+                    <div className="flex-1 space-y-2">
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        id="logo-dark-upload"
+                        className="hidden"
+                        onChange={async e => {
+                          const file = e.target.files[0];
+                          if (!file) return;
+                          if (file.size > 1024 * 1024) { toast({ title: "Error", description: "Logo image too large (max 1MB)", variant: "destructive" }); return; }
+                          try {
+                            const formData = new FormData();
+                            formData.append("file", file);
+                            const res = await uploadLogo(formData);
+                            const logoUrl = res.data.url;
+                            const updatedSettings = { ...settings, firm_logo_dark: logoUrl };
+                            setSettings(updatedSettings);
+                            await updateSettings(updatedSettings);
+                            setSavedSettings(updatedSettings);
+                            invalidatePublicSettingsCache();
+                            invalidateSettingsCache();
+                            window.dispatchEvent(new CustomEvent("settings:updated"));
+                            toast({ title: "Logo Updated", description: "Dark mode brandmark has been synchronized." });
+                          } catch (err) {
+                            toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
+                          }
+                        }}
+                      />
+                      <label htmlFor="logo-dark-upload" className="inline-flex h-9 px-4 items-center justify-center rounded-xl bg-background border border-border/50 text-[10px] font-black uppercase tracking-widest cursor-pointer hover:bg-muted/50 transition-colors">
+                        Select Image
+                      </label>
+                      <p className="text-[9px] text-muted-foreground font-medium">Shown on dark surfaces</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Company Styling */}
+              <div className="space-y-4 p-6 bg-muted/20 rounded-2xl border border-border/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Palette size={16} className="text-primary" weight="duotone" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-foreground">Typography & Visuals</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Brand Color</label>
+                    <div className="flex items-center gap-2 h-10 px-2 bg-background border border-border/50 rounded-xl">
+                      <input 
+                        type="color" 
+                        value={settings.firm_name_color || '#C86B4D'} 
+                        onChange={e => setSettings(p => ({...p, firm_name_color: e.target.value}))}
+                        className="w-7 h-7 rounded-lg border-none cursor-pointer bg-transparent"
+                      />
+                      <input 
+                        type="text" 
+                        value={settings.firm_name_color || '#C86B4D'} 
+                        onChange={e => setSettings(p => ({...p, firm_name_color: e.target.value.toUpperCase()}))}
+                        className="flex-1 min-w-0 bg-transparent text-xs font-mono font-black outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Font Scale</label>
+                    <select 
+                      value={settings.firm_name_size || '16'} 
+                      onChange={e => setSettings(p => ({...p, firm_name_size: e.target.value}))}
+                      className="w-full h-10 px-3 text-[11px] font-black uppercase tracking-widest bg-background border border-border/50 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
+                    >
+                      <option value="14">Small (14pt)</option>
+                      <option value="16">Medium (16pt)</option>
+                      <option value="18">Large (18pt)</option>
+                      <option value="20">X-Large (20pt)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Text Case</label>
+                    <select 
+                      value={settings.firm_name_case || 'uppercase'} 
+                      onChange={e => setSettings(p => ({...p, firm_name_case: e.target.value}))}
+                      className="w-full h-10 px-3 text-[11px] font-black uppercase tracking-widest bg-background border border-border/50 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
+                    >
+                      <option value="uppercase">UPPERCASE</option>
+                      <option value="capitalize">Capitalize</option>
+                      <option value="normal">As Typed</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Legal Entity Name</label>
+                <input 
+                  value={settings.firm_name || ""} 
+                  onChange={e => setSettings(p => ({...p, firm_name: e.target.value}))} 
+                  placeholder="Official Firm Name" 
+                  className="w-full h-12 px-4 text-sm font-bold bg-muted/10 border border-border/50 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Headquarters Address</label>
+                <input 
+                  value={settings.firm_address || ""} 
+                  onChange={e => setSettings(p => ({...p, firm_address: e.target.value}))} 
+                  placeholder="Complete postal address" 
+                  className="w-full h-12 px-4 text-sm font-bold bg-muted/10 border border-border/50 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Contact Channels</label>
+                  <input 
+                    value={settings.firm_phones || ""} 
+                    onChange={e => setSettings(p => ({...p, firm_phones: e.target.value}))} 
+                    placeholder="Phones (e.g. +91 98...)" 
+                    className="w-full h-12 px-4 text-sm font-bold bg-muted/10 border border-border/50 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">GST Identification (GSTIN)</label>
+                  <input 
+                    value={settings.firm_gstin || ""} 
+                    onChange={e => setSettings(p => ({...p, firm_gstin: e.target.value}))} 
+                    placeholder="GSTIN Number" 
+                    className="w-full h-12 px-4 text-sm font-bold font-mono bg-muted/10 border border-border/50 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all uppercase" 
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-6 p-4 bg-muted/20 rounded-2xl border border-border/50 max-w-xs">
+                <div className="flex flex-col flex-1">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Applicable GST</span>
+                  <span className="text-xs font-bold text-foreground">Standard Indirect Tax %</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="number" 
+                    value={settings.gst_rate || 5} 
+                    onChange={e => setSettings(p => ({...p, gst_rate: parseFloat(e.target.value) || 0}))} 
+                    className="w-16 h-10 px-3 text-center text-sm font-black font-mono bg-background border border-border/50 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none" 
+                  />
+                  <span className="text-sm font-black text-muted-foreground">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Keyboard Shortcuts */}
+      <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden">
+        <CardHeader className="pb-4 pt-6 border-b border-border/50 bg-muted/10">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+              <Keyboard size={22} weight="duotone" />
+            </div>
+            <div className="flex flex-col">
+              <CardTitle className="text-lg font-black uppercase tracking-tight">Rapid Access Protocol</CardTitle>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Numerical & Alpha Keyboard Mappings</span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-8 space-y-12">
+          {/* Alpha shortcuts */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col">
+                <h4 className="text-sm font-black uppercase tracking-widest text-foreground">Alpha Mapping <Badge variant="outline" className="ml-2 font-mono text-[9px] bg-primary/5 border-primary/20 text-primary">CTRL + [A-Z]</Badge></h4>
+                <p className="text-xs text-muted-foreground font-medium mt-1">Strategic navigation via primary character keys.</p>
+              </div>
+              <Button size="sm" onClick={() => saveLetterShortcuts(letterShortcuts)} className="h-9 px-4 font-black uppercase tracking-widest text-[10px] gap-2">
+                <FloppyDisk size={14} weight="bold" /> Sync Alpha
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {letterShortcuts.map(sc => (
+                <div key={sc.key} className="flex items-center gap-2 group">
+                  <kbd className="flex-shrink-0 w-16 h-10 flex items-center justify-center text-[10px] font-black border border-border/50 rounded-xl bg-muted/30 text-muted-foreground group-hover:border-primary/30 group-hover:text-primary transition-all uppercase tracking-widest">
+                    Ctrl+{sc.key}
+                  </kbd>
+                  <div className="relative flex-1">
+                    <select
+                      value={sc.path}
+                      onChange={e => updateLetterShortcut(sc.key, e.target.value)}
+                      className="w-full h-10 pl-3 pr-8 text-[11px] font-black uppercase tracking-widest bg-background border border-border/50 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer group-hover:border-primary/20"
+                    >
+                      {PAGE_OPTIONS.map(p => <option key={p.path} value={p.path}>{p.label}</option>)}
+                    </select>
+                    <CaretDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground opacity-50" />
+                  </div>
                 </div>
               ))}
             </div>
-            <div className="flex gap-2">
-              <input value={newAddon} onChange={e => setNewAddon(e.target.value)} placeholder="New add-on" onKeyDown={e => e.key === "Enter" && addAddonItem()} className="flex-1 px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
-              <button onClick={addAddonItem} className="px-3 py-1.5 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]"><Plus size={14} /></button>
-            </div>
-          </div>
-
-          {/* Firm Info */}
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-3">
-            <h3 className="font-heading text-base font-medium">Firm Details (Invoice)</h3>
-            <div className="space-y-3">
-              {/* Logo Upload */}
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Company Logo</label>
-                <div className="flex items-center gap-3">
-                  {(logoPreview || settings.firm_logo) && (
-                    <img 
-                      src={getLogoUrl(logoPreview) || getLogoUrl(settings.firm_logo)} 
-                      alt="Logo preview" 
-                      className="w-16 h-16 object-contain border border-[var(--border-subtle)] rounded-sm"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <input 
-                      type="file" 
-                      accept="image/*"
-                      onChange={async e => {
-                        const file = e.target.files[0];
-                        if (!file) return;
-                        // Validate file size (max 1MB)
-                        if (file.size > 1024 * 1024) {
-                          showMessage({ type: "error", text: "Logo image too large. Maximum size is 1MB." });
-                          return;
-                        }
-                        try {
-                          const formData = new FormData();
-                          formData.append("file", file);
-                          showMessage({ type: "success", text: "Uploading logo..." });
-                          const res = await uploadLogo(formData);
-                          const logoUrl = res.data.url;
-                          setLogoPreview(logoUrl);
-                          // Auto-save the logo URL immediately so it persists without a manual Save
-                          const updatedSettings = { ...settings, firm_logo: logoUrl };
-                          setSettings(updatedSettings);
-                          await updateSettings(updatedSettings);
-                          setSavedSettings(updatedSettings);
-                          invalidatePublicSettingsCache();
-                          invalidateSettingsCache();
-                          window.dispatchEvent(new CustomEvent("settings:updated"));
-                          showMessage({ type: "success", text: "Logo uploaded and saved successfully!" });
-                        } catch (err) {
-                          showMessage({ type: "error", text: err.message || "Failed to upload logo" });
-                        }
-                      }}
-                      className="w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-xs file:bg-[var(--brand)] file:text-white hover:file:bg-[var(--brand-hover)]"
-                    />
-                  </div>
-                  {(logoPreview || settings.firm_logo) && (
-                    <button 
-                      onClick={() => { setLogoPreview(null); setSettings(p => ({...p, firm_logo: ''})); }}
-                      className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"
-                      title="Remove logo"
-                    >
-                      <Trash size={16} />
-                    </button>
-                  )}
-                </div>
-                <p className="text-[10px] text-[var(--text-secondary)]">Upload PNG/JPG logo (recommended: 200x200px, will be auto-resized)</p>
-              </div>
-
-              {/* Dark Mode Logo Upload */}
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">Dark Mode Logo <span className="normal-case font-normal">(optional — falls back to main logo)</span></label>
-                <div className="flex items-center gap-3">
-                  {settings.firm_logo_dark && (
-                    <img
-                      src={getLogoUrl(settings.firm_logo_dark)}
-                      alt="Dark logo preview"
-                      className="w-16 h-16 object-contain border border-[var(--border-subtle)] rounded-sm bg-[#1a1917]"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={async e => {
-                        const file = e.target.files[0];
-                        if (!file) return;
-                        if (file.size > 1024 * 1024) { showMessage({ type: "error", text: "Logo image too large. Maximum size is 1MB." }); return; }
-                        try {
-                          const formData = new FormData();
-                          formData.append("file", file);
-                          showMessage({ type: "success", text: "Uploading dark logo..." });
-                          const res = await uploadLogo(formData);
-                          const logoUrl = res.data.url;
-                          const updatedSettings = { ...settings, firm_logo_dark: logoUrl };
-                          setSettings(updatedSettings);
-                          await updateSettings(updatedSettings);
-                          setSavedSettings(updatedSettings);
-                          invalidatePublicSettingsCache();
-                          invalidateSettingsCache();
-                          window.dispatchEvent(new CustomEvent("settings:updated"));
-                          showMessage({ type: "success", text: "Dark mode logo uploaded and saved!" });
-                        } catch (err) {
-                          showMessage({ type: "error", text: err.message || "Failed to upload logo" });
-                        }
-                      }}
-                      className="w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-xs file:bg-[var(--brand)] file:text-white hover:file:bg-[var(--brand-hover)]"
-                    />
-                  </div>
-                  {settings.firm_logo_dark && (
-                    <button
-                      onClick={() => { setSettings(p => ({...p, firm_logo_dark: ''})); }}
-                      className="p-1.5 text-[var(--error)] hover:bg-[#9E473D10] rounded-sm"
-                      title="Remove dark logo"
-                    >
-                      <Trash size={16} />
-                    </button>
-                  )}
-                </div>
-                <p className="text-[10px] text-[var(--text-secondary)]">Shown in sidebar and login when dark mode is active</p>
-              </div>
-
-              <input value={settings.firm_name || ""} onChange={e => setSettings(p => ({...p, firm_name: e.target.value}))} placeholder="Firm Name" className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
-              
-              {/* Company Name Styling */}
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-secondary)] block mb-1">Font Color</label>
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="color" 
-                      value={settings.firm_name_color || '#C86B4D'} 
-                      onChange={e => setSettings(p => ({...p, firm_name_color: e.target.value}))}
-                      className="w-8 h-8 rounded-sm border border-[var(--border-subtle)] cursor-pointer"
-                    />
-                    <input 
-                      type="text" 
-                      value={settings.firm_name_color || '#C86B4D'} 
-                      onChange={e => setSettings(p => ({...p, firm_name_color: e.target.value}))}
-                      className="flex-1 px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm"
-                      placeholder="#C86B4D"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-secondary)] block mb-1">Font Size</label>
-                  <select 
-                    value={settings.firm_name_size || '16'} 
-                    onChange={e => setSettings(p => ({...p, firm_name_size: e.target.value}))}
-                    className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]"
-                  >
-                    <option value="14">Small (14pt)</option>
-                    <option value="16">Medium (16pt)</option>
-                    <option value="18">Large (18pt)</option>
-                    <option value="20">Extra Large (20pt)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-secondary)] block mb-1">Case</label>
-                  <select 
-                    value={settings.firm_name_case || 'uppercase'} 
-                    onChange={e => setSettings(p => ({...p, firm_name_case: e.target.value}))}
-                    className="w-full px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]"
-                  >
-                    <option value="uppercase">UPPERCASE</option>
-                    <option value="capitalize">Capitalize</option>
-                    <option value="normal">As Typed</option>
-                  </select>
-                </div>
-              </div>
-
-              <input value={settings.firm_address || ""} onChange={e => setSettings(p => ({...p, firm_address: e.target.value}))} placeholder="Address" className="w-full px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
-              <div className="grid grid-cols-2 gap-2">
-                <input value={settings.firm_phones || ""} onChange={e => setSettings(p => ({...p, firm_phones: e.target.value}))} placeholder="Phone numbers" className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
-                <input value={settings.firm_gstin || ""} onChange={e => setSettings(p => ({...p, firm_gstin: e.target.value}))} placeholder="GSTIN" className="px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="text-xs uppercase tracking-[0.15em] font-semibold text-[var(--text-secondary)]">GST Rate %</label>
-                <input type="number" inputMode="decimal" pattern="[0-9]*" value={settings.gst_rate || 5} onChange={e => setSettings(p => ({...p, gst_rate: parseFloat(e.target.value) || 0}))} className="w-20 px-2 py-1.5 text-sm border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)]" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      {/* Keyboard Shortcuts */}
-      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-6 rounded-sm space-y-6">
-        <div className="flex items-center gap-2">
-          <Keyboard size={16} className="text-[var(--brand)]" />
-          <h3 className="font-heading text-base font-medium">Keyboard Shortcuts</h3>
-        </div>
-
-        {/* Letter shortcuts */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Letter Shortcuts (Ctrl + key)</p>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5">Assign a page to each letter key.</p>
-            </div>
             <button
-              onClick={() => saveLetterShortcuts(letterShortcuts)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">
-              <FloppyDisk size={13} weight="bold" /> Save
+              onClick={() => {
+                if (window.confirm("Reset all alpha shortcuts to defaults?")) {
+                  setLetterShortcuts(DEFAULT_LETTER_SHORTCUTS);
+                  saveLetterShortcuts(DEFAULT_LETTER_SHORTCUTS);
+                }
+              }}
+              className="text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-destructive transition-colors flex items-center gap-2"
+            >
+              <Warning size={14} /> Reset Alpha Defaults
             </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {letterShortcuts.map(sc => (
-              <div key={sc.key} className="flex items-center gap-2">
-                <kbd className="flex-shrink-0 w-16 text-center px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded bg-[var(--bg)] font-mono text-[var(--text-primary)]">Ctrl+{sc.key.toUpperCase()}</kbd>
-                <select
-                  value={sc.path}
-                  onChange={e => updateLetterShortcut(sc.key, e.target.value)}
-                  className="flex-1 px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]">
-                  {PAGE_OPTIONS.map(p => <option key={p.path} value={p.path}>{p.label}</option>)}
-                </select>
+
+          <div className="border-t border-border/50" />
+
+          {/* Numerical shortcuts */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col">
+                <h4 className="text-sm font-black uppercase tracking-widest text-foreground">Numerical Mapping <Badge variant="outline" className="ml-2 font-mono text-[9px] bg-primary/5 border-primary/20 text-primary">CTRL + [1-9]</Badge></h4>
+                <p className="text-xs text-muted-foreground font-medium mt-1">Rapid command center via numerical index.</p>
               </div>
-            ))}
-          </div>
-          <button
-            onClick={() => setLetterShortcuts(DEFAULT_LETTER_SHORTCUTS)}
-            className="text-xs text-[var(--text-secondary)] hover:text-[var(--error)] transition-colors">
-            Reset to defaults
-          </button>
-        </div>
-
-        <div className="border-t border-[var(--border-subtle)]" />
-
-        {/* Number shortcuts */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Number Shortcuts (Ctrl + 1–9)</p>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5">Assign a page to each number key.</p>
+              <Button size="sm" onClick={() => saveShortcuts(numShortcuts)} className="h-9 px-4 font-black uppercase tracking-widest text-[10px] gap-2">
+                <FloppyDisk size={14} weight="bold" /> Sync Numeric
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {numShortcuts.map(sc => (
+                <div key={sc.key} className="flex items-center gap-2 group">
+                  <kbd className="flex-shrink-0 w-16 h-10 flex items-center justify-center text-[10px] font-black border border-border/50 rounded-xl bg-muted/30 text-muted-foreground group-hover:border-primary/30 group-hover:text-primary transition-all uppercase tracking-widest">
+                    Ctrl+{sc.key}
+                  </kbd>
+                  <div className="relative flex-1">
+                    <select
+                      value={sc.path}
+                      onChange={e => updateShortcut(sc.key, e.target.value)}
+                      className="w-full h-10 pl-3 pr-8 text-[11px] font-black uppercase tracking-widest bg-background border border-border/50 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer group-hover:border-primary/20"
+                    >
+                      {PAGE_OPTIONS.map(p => <option key={p.path} value={p.path}>{p.label}</option>)}
+                    </select>
+                    <CaretDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground opacity-50" />
+                  </div>
+                </div>
+              ))}
             </div>
             <button
-              onClick={() => saveShortcuts(numShortcuts)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)]">
-              <FloppyDisk size={13} weight="bold" /> Save
+              onClick={() => {
+                if (window.confirm("Reset all numeric shortcuts to defaults?")) {
+                  setNumShortcuts(DEFAULT_NUM_SHORTCUTS);
+                  saveShortcuts(DEFAULT_NUM_SHORTCUTS);
+                }
+              }}
+              className="text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-destructive transition-colors flex items-center gap-2"
+            >
+              <Warning size={14} /> Reset Numeric Defaults
             </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {numShortcuts.map(sc => (
-              <div key={sc.key} className="flex items-center gap-2">
-                <kbd className="flex-shrink-0 w-16 text-center px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded bg-[var(--bg)] font-mono text-[var(--text-primary)]">Ctrl+{sc.key}</kbd>
-                <select
-                  value={sc.path}
-                  onChange={e => updateShortcut(sc.key, e.target.value)}
-                  className="flex-1 px-2 py-1.5 text-xs border border-[var(--border-subtle)] rounded-sm focus:ring-1 focus:ring-[var(--brand)] bg-[var(--surface)]">
-                  {PAGE_OPTIONS.map(p => <option key={p.path} value={p.path}>{p.label}</option>)}
-                </select>
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={() => setNumShortcuts(DEFAULT_NUM_SHORTCUTS)}
-            className="text-xs text-[var(--text-secondary)] hover:text-[var(--error)] transition-colors">
-            Reset to defaults
-          </button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Unsaved changes navigation guard */}
       {navConfirm && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm shadow-xl w-full max-w-xs p-5 space-y-4">
-            <div>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Unsaved changes</p>
-              <p className="text-xs text-[var(--text-secondary)] mt-1">You have unsaved settings changes. Leave without saving?</p>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setNavConfirm(null)} className="flex-1 px-3 py-2 text-sm border border-[var(--border-subtle)] rounded-sm hover:bg-[var(--bg)] transition-colors">Stay</button>
-              <button onClick={() => { setNavConfirm(null); navigate(navConfirm); }} className="flex-1 px-3 py-2 text-sm bg-[var(--error)] text-white rounded-sm hover:opacity-90 transition-opacity">Leave</button>
-            </div>
-          </div>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <Card className="max-w-sm w-full shadow-2xl border-destructive/20 animate-in zoom-in-95 duration-300">
+            <CardHeader className="text-center pb-2">
+              <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto mb-4">
+                <Warning size={24} weight="bold" />
+              </div>
+              <CardTitle className="text-lg font-black uppercase tracking-widest text-destructive">Unsaved Protocol</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-4">
+              <p className="text-xs text-muted-foreground font-bold leading-relaxed px-4">
+                You have modified system configurations. Navigating away will <span className="uppercase text-destructive">discard</span> all pending updates.
+              </p>
+              <div className="flex flex-col gap-2 pt-2">
+                <Button variant="destructive" onClick={() => { setNavConfirm(null); navigate(navConfirm); }} className="w-full font-black uppercase tracking-widest text-[10px] h-11">Discard & Proceed</Button>
+                <Button variant="ghost" onClick={() => setNavConfirm(null)} className="w-full font-black uppercase tracking-widest text-[10px] h-11">Stay & Sync</Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
+    </div>
+  );
+}
     </div>
   );
 }
