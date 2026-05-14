@@ -65,7 +65,11 @@ export default function SettlementPanel({ orders: ordersProp, billRef, customer,
       setAllotments(init);
       // Auto-expand if single ref
       if (orders.length === 1) setExpandedRefs({ [orders[0].ref]: true });
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch((err) => {
+      setRefBalances({});
+      setAllotments({});
+      setMessage({ type: "error", text: err.message || "Failed to load settlement balances" });
+    }).finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders.map(o => o.ref).join(",")]);
 

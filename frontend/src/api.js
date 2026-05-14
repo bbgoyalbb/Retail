@@ -163,7 +163,7 @@ export const getDaybookPendingCount = () => {
   if (_daybookPendingCache && now - _daybookPendingCacheTime < DAYBOOK_PENDING_TTL) {
     return Promise.resolve(_daybookPendingCache);
   }
-  return api.get("/daybook/pending-count").then(res => {
+  return api.get("/daybook/pending-count", { silent: true }).then(res => {
     _daybookPendingCache = res;
     _daybookPendingCacheTime = Date.now();
     return res;

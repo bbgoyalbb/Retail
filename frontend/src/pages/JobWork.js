@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getJobwork, moveJobwork, moveJobworkBack, moveJobworkEmb, editJobworkEmb, getJobworkFilters } from "@/api";
 import { ArrowRight, ArrowLeft, Funnel, X, PencilSimple, CheckSquare, ArrowsClockwise } from "@phosphor-icons/react";
@@ -185,7 +185,14 @@ export default function JobWork() {
     });
   }, [tab, orderFilter, dateFilter, deliveryFilter, toast]);
 
-  useEffect(() => { getJobworkFilters().then(res => setFilters(res.data)).catch(() => {}); }, []);
+  useEffect(() => {
+    getJobworkFilters()
+      .then(res => setFilters(res.data))
+      .catch((err) => {
+        toast({ title: "Error", description: err.message || "Failed to load jobwork filters", variant: "destructive" });
+        setFilters({ order_nos: [], dates: [], delivery_dates: [] });
+      });
+  }, [toast]);
   useEffect(() => { loadData(); }, [loadData]);
 
   const sortItems = (items) => {

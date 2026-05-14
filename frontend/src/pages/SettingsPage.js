@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSettings, updateSettings, uploadLogo, invalidatePublicSettingsCache, invalidateSettingsCache, BACKEND_URL } from "@/api";
 import { FloppyDisk, Plus, Trash, CheckCircle, Warning, Keyboard } from "@phosphor-icons/react";
@@ -16,6 +16,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState(null);
   const [savedSettings, setSavedSettings] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   const [message, setMessage] = useState(null);
   const [newArticle, setNewArticle] = useState("");
   const [newMode, setNewMode] = useState("");
@@ -92,13 +93,24 @@ export default function SettingsPage() {
   // Clear timeout on unmount to prevent memory leak
   useEffect(() => () => { if (msgTimerRef.current) clearTimeout(msgTimerRef.current); }, []);
 
-  const showMessage = (msg) => {
+  const showMessage = useCallback((msg) => {
     setMessage(msg);
     if (msgTimerRef.current) clearTimeout(msgTimerRef.current);
     msgTimerRef.current = setTimeout(() => setMessage(null), 3000);
-  };
+  }, []);
 
-  useEffect(() => { getSettings().then(res => { setSettings(res.data); setSavedSettings(res.data); }).catch(() => {}); }, []);
+  const loadSettings = useCallback(() => {
+    setLoadError(null);
+    return getSettings()
+      .then(res => { setSettings(res.data); setSavedSettings(res.data); })
+      .catch((err) => {
+        const msg = err?.message || "Failed to load settings";
+        setLoadError(msg);
+        showMessage({ type: "error", text: msg });
+      });
+  }, [showMessage]);
+
+  useEffect(() => { loadSettings(); }, [loadSettings]);
 
   const save = async () => {
     setSaving(true);
@@ -148,7 +160,22 @@ export default function SettingsPage() {
   const addAddonItem = () => { if (!newAddon.trim()) return; if ((prev => (prev.addon_items || []).map(a => a.toLowerCase()).includes(newAddon.trim().toLowerCase()))(settings)) return; setSettings(prev => ({ ...prev, addon_items: [...(prev.addon_items || []), newAddon.trim()] })); setNewAddon(""); };
   const removeAddon = (a) => setSettings(prev => ({ ...prev, addon_items: prev.addon_items.filter(x => x !== a) }));
 
-  if (!settings) return <div className="p-8 text-center text-[var(--text-secondary)]">Loading...</div>;
+  if (!settings) {
+    if (loadError) {
+      return (
+        <div className="p-8 text-center space-y-4">
+          <p className="text-sm text-[var(--error)]">{loadError}</p>
+          <button
+            onClick={loadSettings}
+            className="px-4 py-2 text-sm bg-[var(--brand)] text-white rounded-sm hover:bg-[var(--brand-hover)] transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return <div className="p-8 text-center text-[var(--text-secondary)]">Loading...</div>;
+  }
 
   return (
     <div data-testid="settings-page" className="space-y-6">

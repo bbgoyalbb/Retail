@@ -226,9 +226,13 @@ export default function ItemsManager() {
       if (Array.isArray(s.article_types) && s.article_types.length > 0) {
         setArticleTypeOptions(["N/A", ...s.article_types]);
       }
-    }).catch(() => {});
-    getCustomers().then(res => setCustomers(res.data || [])).catch(() => {});
-  }, []);
+    }).catch((err) => {
+      toast({ title: "Error", description: err.message || "Failed to load settings", variant: "destructive" });
+    });
+    getCustomers().then(res => setCustomers(res.data || [])).catch((err) => {
+      toast({ title: "Error", description: err.message || "Failed to load customers", variant: "destructive" });
+    });
+  }, [toast]);
 
   // Pre-fill search from URL params (Reports drill-down: /items?name=CustomerName)
   useEffect(() => {

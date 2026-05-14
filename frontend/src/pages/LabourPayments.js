@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getLabourItems, getKarigars, payLabour, deleteLabourPayment, getSettings } from "@/api";
 import { dataEvents } from "@/lib/dataEvents";
 import { fmt } from "@/lib/fmt";
@@ -31,12 +31,17 @@ export default function LabourPayments() {
   }, [filterType, filterKarigar, viewMode, toast]);
 
   useEffect(() => {
-    getKarigars().then(res => setKarigars(res.data)).catch(() => {});
+    getKarigars().then(res => setKarigars(res.data)).catch((err) => {
+      toast({ title: "Error", description: err.message || "Failed to load karigars", variant: "destructive" });
+      setKarigars([]);
+    });
     getSettings().then(res => {
       const s = res.data || {};
       if (Array.isArray(s.payment_modes) && s.payment_modes.length > 0) setPaymentModes(s.payment_modes);
-    }).catch(() => {});
-  }, []);
+    }).catch((err) => {
+      toast({ title: "Error", description: err.message || "Failed to load payment modes", variant: "destructive" });
+    });
+  }, [toast]);
 
   useEffect(() => { loadData(); setSelected([]); }, [loadData]);
 

@@ -423,6 +423,7 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
 const todayStr = new Date().toISOString().split("T")[0];
 
 export default function Daybook() {
+  const { toast } = useToast();
   const [dateFilter, setDateFilter] = useState("All");
   const [refFilter,  setRefFilter]  = useState("All");
   const [nameFilter, setNameFilter] = useState("All");
@@ -437,9 +438,12 @@ export default function Daybook() {
     setLoading(true);
     getDaybook({ date_filter: dateFilter === "All" ? undefined : dateFilter })
       .then(res => setEntries(res.data.entries || []))
-      .catch(() => {})
+      .catch((err) => {
+        toast({ title: "Error", description: err.message || "Failed to load daybook", variant: "destructive" });
+        setEntries([]);
+      })
       .finally(() => setLoading(false));
-  }, [dateFilter]);
+  }, [dateFilter, toast]);
 
   const initialLoadDone = useRef(false);
   useEffect(() => {
@@ -452,7 +456,11 @@ export default function Daybook() {
         initialLoadDone.current = true;
         loadData();
       }
-    }).catch(() => { initialLoadDone.current = true; loadData(); });
+    }).catch((err) => {
+      toast({ title: "Error", description: err.message || "Failed to load available dates", variant: "destructive" });
+      initialLoadDone.current = true;
+      loadData();
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
