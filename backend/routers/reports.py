@@ -448,125 +448,98 @@ async def generate_invoice(request: Request, db = Depends(get_db), ref_id: str =
     margin: 0 auto;
     display: flex;
     flex-direction: column;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
   }}
 
-  /* ── HEADER ── */
-  .inv-hdr {{
-    padding: 14px 18px 12px;
-    border-bottom: 2px solid #111;
+  @media print {{
+    body {{ background: none; padding: 0; }}
+    .inv {{ box-shadow: none; margin: 0; width: 100%; height: 100%; }}
+  }}
+
+  /* Accents */
+  .inv::before {{ content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 6px; background: #111; }}
+
+  /* Header */
+  .inv-header {{
+    padding: 24px 24px 16px;
     display: flex;
-    align-items: center;
-    gap: 14px;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1.5px solid #111;
   }}
-  .hdr-logo {{
-    width: 48px;
-    height: 48px;
-    object-fit: contain;
-    flex-shrink: 0;
-  }}
-  .hdr-firm {{
-    flex: 1;
-  }}
-  .hdr-firm h2 {{
-    font-size: 15px;
-    font-weight: 800;
-    letter-spacing: -0.3px;
-    color: #111;
-    line-height: 1.1;
-  }}
-  .hdr-firm .addr {{
-    font-size: 9px;
-    color: #444;
-    margin-top: 3px;
-    line-height: 1.4;
-  }}
-  /* ── BILL-TO / INVOICE DETAILS ── */
+  .hdr-left {{ flex: 1; }}
+  .hdr-logo {{ height: 42px; margin-bottom: 12px; filter: grayscale(1); }}
+  .hdr-name {{ font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: -0.02em; color: #111; margin-bottom: 2px; }}
+  .hdr-addr {{ font-size: 8.5px; color: #555; line-height: 1.5; max-width: 220px; }}
+
+  .hdr-right {{ text-align: right; }}
+  .hdr-label {{ font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2em; color: #111; margin-bottom: 8px; }}
+  .hdr-ref {{ font-size: 24px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; color: #111; line-height: 1; }}
+  .hdr-date {{ font-size: 10px; font-weight: 600; color: #555; margin-top: 4px; }}
+
+  /* Bill To */
   .inv-billto {{
-    background: #fff;
-    color: #111;
-    padding: 10px 18px;
+    padding: 14px 24px;
     display: flex;
-    gap: 0;
-    border-top: 1px solid #ddd;
-    border-bottom: 1px solid #ddd;
+    justify-content: space-between;
+    background: #fcfcfc;
+    border-bottom: 1px solid #eee;
   }}
-  .bt-col {{
-    flex: 1;
-  }}
-  .bt-col + .bt-col {{
-    border-left: 1px solid #bbb;
-    padding-left: 14px;
-    margin-left: 14px;
-  }}
-  .bt-label {{
-    font-size: 7.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    color: #555;
-    display: block;
-    margin-bottom: 2px;
-  }}
-  .bt-val {{
-    font-size: 12px;
-    font-weight: 700;
-    color: #111;
-  }}
-  .bt-val.small {{
-    font-size: 10px;
-    font-weight: 600;
-    color: #111;
-  }}
+  .bt-label {{ font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #888; margin-bottom: 3px; }}
+  .bt-name {{ font-size: 13px; font-weight: 700; color: #111; }}
 
-  /* ── SECTION BLOCKS ── */
-  .sec-block {{
-    border-top: 2px solid #111;
-    margin-top: 6px;
-  }}
+  /* Main Items Table */
+  .sec-block {{ margin-bottom: 12px; }}
   .sec-head {{
     font-size: 9px;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.25em;
     color: #111;
-    background: #fff;
-    padding: 6px 18px 4px;
-    border-left: 4px solid #111;
-    border-bottom: 1px solid #ccc;
+    background: #f0f0f0;
+    padding: 6px 24px;
+    border-bottom: 1.5px solid #111;
   }}
-  .sec-block table {{
-    width: 100%;
-    border-collapse: collapse;
-    margin-left: 4px;
-    width: calc(100% - 4px);
-  }}
-  .sec-block th {{
+  .inv-body table {{ width: 100%; border-collapse: collapse; }}
+  .inv-body th {{
     font-size: 8px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     font-weight: 700;
-    color: #fff;
-    background: #444;
-    padding: 5px 6px;
-    white-space: nowrap;
-    text-align: left;
-  }}
-  .sec-block th:first-child {{ padding-left: 18px; }}
-  .sec-block th.r {{ text-align: right; }}
-  .sec-block td {{
-    font-size: 10px;
-    padding: 5px 6px;
-    border-bottom: 1px solid #eee;
     color: #111;
+    padding: 10px 8px;
+    text-align: left;
+    border-bottom: 1.5px solid #111;
+  }}
+  .inv-body th:first-child {{ padding-left: 24px; }}
+  .inv-body th:last-child {{ padding-right: 24px; }}
+  .inv-body th.r {{ text-align: right; }}
+  
+  .inv-body td {{
+    font-size: 10px;
+    padding: 10px 8px;
+    border-bottom: 1px solid #eee;
     vertical-align: top;
+    color: #111;
   }}
-  .sec-block td:first-child {{ padding-left: 18px; }}
-  .sec-block td.r {{
-    text-align: right;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 9.5px;
+  .inv-body td:first-child {{ padding-left: 24px; }}
+  .inv-body td:last-child {{ padding-right: 24px; }}
+  .inv-body td.r {{ text-align: right; font-family: 'IBM Plex Mono', monospace; }}
+
+  .item-badge {{
+    display: inline-block;
+    font-size: 8px;
+    font-weight: 700;
+    background: #eee;
+    padding: 2px 6px;
+    border-radius: 2px;
+    margin-right: 4px;
+    margin-top: 4px;
+    text-transform: uppercase;
   }}
-  .mono {{ font-family: 'IBM Plex Mono', monospace; }}
-  .sec-block tr:nth-child(even) td {{ background: #fafafa; }}
+  .item-badge.addon {{ background: #f0f0f0; border: 1px solid #ddd; }}
   .sec-barcode {{ font-weight: 600; }}
   .sec-sub {{ font-size: 9px; color: #555; margin-top: 1px; }}
 
@@ -667,136 +640,69 @@ async def generate_invoice(request: Request, db = Depends(get_db), ref_id: str =
   }}
 
   /* ── PRINT ── */
-  @media print {{
-    body {{ background: #fff; padding: 0; }}
-    .inv {{ width: 100%; min-height: unset; border: none; box-shadow: none; }}
-    @page {{ size: A5; margin: 8mm 10mm; }}
-
-    /* Keep each section block together — avoid splitting across pages */
-    .sec-block,
-    .inv-pay-section,
-    .inv-grand,
-    .inv-footer {{
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }}
-
-    /* Footer must never be pushed to a new page */
-    .inv-footer {{
-      break-before: avoid;
-      page-break-before: avoid;
-    }}
-
-    /* If a section is too tall to fit whole, at least keep the header with first row */
-    .sec-block thead,
-    .inv-pay-section thead {{
-      display: table-header-group;
-    }}
-
-    /* Avoid splitting individual rows */
-    .sec-block tr,
-    .inv-pay-section tr {{
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }}
-
-    /* Force background colors/images to print on mobile Chrome & Safari */
-    .sec-block th,
-    .inv-grand,
-    .inv-pay-section th,
-    .inv-pay-section .sec-head {{
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }}
-  }}
 </style>
 </head>
 <body>
 <div class="inv">
-
-  <!-- Header: Logo + Firm Name + Address -->
-  <div class="inv-hdr">
-    {logo_tag}
-    <div class="hdr-firm">
-      <h2>{firm_name}</h2>
-      <div class="addr">{firm_address}<br/>Ph: {firm_phones}&nbsp;&nbsp;GSTIN: {firm_gstin}</div>
+  <div class="inv-header">
+    <div class="hdr-left">
+      {logo_tag}
+      <div class="hdr-name">{firm_name}</div>
+      <div class="hdr-addr">{firm_address}<br/>{firm_phones}<br/>GSTIN: {firm_gstin}</div>
+    </div>
+    <div class="hdr-right">
+      <div class="hdr-label">Tax Invoice</div>
+      <div class="hdr-ref">{html_mod.escape(ref_id)}</div>
+      <div class="hdr-date">{order_date}</div>
     </div>
   </div>
 
-  <!-- Bill To + Invoice Details (dark band) -->
   <div class="inv-billto">
-    <div class="bt-col">
-      <span class="bt-label">Bill To</span>
-      <div class="bt-val">{customer_name}</div>
-    </div>
-    <div class="bt-col">
-      <span class="bt-label">Tax Invoice No.</span>
-      <div class="bt-val small">{ref_id}</div>
-    </div>
-    <div class="bt-col">
-      <span class="bt-label">Bill Date</span>
-      <div class="bt-val small">{order_date}</div>
+    <div>
+      <div class="bt-label">Bill To</div>
+      <div class="bt-name">{customer_name}</div>
     </div>
   </div>
 
-  <!-- Section: Fabric -->
-  {fab_block}
+  <div class="inv-body">
+    {fab_block}
+    {tail_block}
+    {emb_block}
+    {ao_block}
+  </div>
 
-  <!-- Section: Tailoring -->
-  {tail_block}
-
-  <!-- Section: Embroidery -->
-  {emb_block}
-
-  <!-- Section: Add-on -->
-  {ao_block}
-
-  <!-- Grand Total -->
   <div class="inv-grand">
     <div class="gt-label">Grand Total</div>
     <div class="gt-val">₹{fmt(grand_total_calc)}</div>
   </div>
 
-  <!-- Payment Details -->
   <div class="inv-pay-section">
     <div class="sec-head">Payment Details</div>
     <table>
-      <thead>
-        <tr>
-          <th>Section</th>
-          <th class="r">Amount</th>
-          <th class="r">Received</th>
-          <th class="r">Rcvd Date</th>
-          <th>Mode</th>
-          <th class="r">Balance</th>
-        </tr>
-      </thead>
+      <thead><tr><th>Category</th><th class="r">Amount</th><th class="r">Received</th><th class="r">Pay Date</th><th>Mode</th><th class="r">Balance</th></tr></thead>
       <tbody>
         {pay_rows_html}
         {adv_pay_rows}
         <tr>
-          <td>Total</td>
-          <td class="r">₹{fmt(grand_total_calc)}</td>
-          <td class="r">₹{fmt(total_rcvd_all)}</td>
-          <td></td>
-          <td></td>
-          <td class="r {grand_bal_cls}">{grand_bal_str}</td>
+          <td colspan="5"><strong>Balance Due</strong></td>
+          <td class="r {grand_bal_cls}"><strong>{grand_bal_str}</strong></td>
         </tr>
       </tbody>
     </table>
   </div>
 
-  <!-- Footer -->
   <div class="inv-footer">
     <div class="footer-bottom">
       <div class="footer-tnc">
-        <strong>Terms &amp; Conditions</strong><br/>
-        1. All disputes are subject to local jurisdiction only.<br/>
-        2. Goods once sold will not be taken back or exchanged.<br/>
-        3. Payment is due within 30 days of the bill date.<br/>
-        4. We are not responsible for any damage after delivery.
+        <strong>Terms & Conditions:</strong><br/>
+        1. Goods once sold will not be taken back.<br/>
+        2. Subject to local jurisdiction.<br/>
+        3. Please bring this invoice for any delivery/adjustment.
       </div>
-      <div class="footer-sig">Authorised Signatory</div>
+      <div class="footer-sig">
+        For {firm_name}<br/><br/><br/>
+        Authorized Signatory
+      </div>
     </div>
   </div>
 
@@ -804,6 +710,7 @@ async def generate_invoice(request: Request, db = Depends(get_db), ref_id: str =
 </body>
 </html>"""
 
+    await audit_log(db, "invoice", current_user, "bill", ref_id, {"format": format})
     return HTMLResponse(content=html, status_code=200)
 
 # ==========================================

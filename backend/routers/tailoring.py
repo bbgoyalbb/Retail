@@ -88,6 +88,7 @@ async def assign_tailoring(req: TailoringOrderRequest, db = Depends(get_db), cur
     if not bulk_ops:
         return {"message": "0 items assigned"}
     result = await db.items.bulk_write(bulk_ops, ordered=False)
+    await audit_log(db, "assign_tailoring", current_user, "order", req.order_no, {"count": len(req.assignments)})
     return {"message": f"{result.modified_count} items assigned to order {req.order_no}"}
 
 @router.post("/tailoring/split")
@@ -187,6 +188,7 @@ async def split_and_assign(req: SplitTailoringRequest, db = Depends(get_db), cur
     if ops:
         await asyncio.gather(*ops)
 
+    await audit_log(db, "split", current_user, "item", req.item_id, {"pieces": len(req.splits)})
     return {"message": f"Item split into {len(req.splits)} pieces. Fill in order details to assign."}
 
 # ==========================================

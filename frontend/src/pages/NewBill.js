@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 import { createBill, getCustomers, getInvoiceUrl, getSettings, invalidateCustomersCache, getNextBillRef } from "@/api";
 import { invalidate } from "@/lib/dataEvents";
 import { Plus, FloppyDisk, Spinner, WifiSlash, ArrowsSplit, User, ShoppingCart, CreditCard, X, Trash } from "@phosphor-icons/react";
@@ -11,6 +12,7 @@ import { BillLineItemRow, ItemInputForm, PaymentSummaryPanel, BillSuccessPanel }
 
 export default function NewBill() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
   
   // Online/offline state
@@ -152,24 +154,34 @@ export default function NewBill() {
           setRefPreview(res.data.ref);
           if (!refEdited) setCustomRef(res.data.ref);
         })
-        .catch(() => {});
+        .catch((err) => {
+          toast({ title: "Error", description: err.message || "Failed to get next bill reference", variant: "destructive" });
+        });
     }, 300);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderDate]);
+  }, [orderDate, toast]);
 
   useEffect(() => {
-    getCustomers().then(res => setConfig(p => ({ ...p, customers: res.data || [] }))).catch(() => {});
-    getSettings().then(res => {
-      const s = res.data || {};
-      setConfig(p => ({
-        ...p,
-        ...(Array.isArray(s.article_types) && s.article_types.length > 0 ? { articleTypes: s.article_types } : {}),
-        ...(Array.isArray(s.addon_items)    && s.addon_items.length > 0    ? { addonItems: s.addon_items }       : {}),
-        ...(Array.isArray(s.payment_modes)  && s.payment_modes.length > 0  ? { paymentModes: s.payment_modes }   : {}),
-      }));
-    }).catch(() => {});
-  }, []);
+    getCustomers()
+      .then(res => setConfig(p => ({ ...p, customers: res.data || [] })))
+      .catch((err) => {
+        toast({ title: "Error", description: err.message || "Failed to load customers", variant: "destructive" });
+      });
+    getSettings()
+      .then(res => {
+        const s = res.data || {};
+        setConfig(p => ({
+          ...p,
+          ...(Array.isArray(s.article_types) && s.article_types.length > 0 ? { articleTypes: s.article_types } : {}),
+          ...(Array.isArray(s.addon_items)    && s.addon_items.length > 0    ? { addonItems: s.addon_items }       : {}),
+          ...(Array.isArray(s.payment_modes)  && s.payment_modes.length > 0  ? { paymentModes: s.payment_modes }   : {}),
+        }));
+      })
+      .catch((err) => {
+        toast({ title: "Error", description: err.message || "Failed to load settings", variant: "destructive" });
+      });
+  }, [toast]);
 
   const grandTotal = items.reduce((sum, item) => {
     const addonTotal = (item.addon?.items || []).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);

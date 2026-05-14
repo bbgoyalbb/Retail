@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { importExcel, exportExcelUrl, backupUrl, restoreBackup, getDbStats, getDbAudit, normalizeDbData, repairDbData } from "@/api";
 import { Upload, DownloadSimple, Database, ArrowsClockwise, Warning, CheckCircle, FileXls, FileCsv } from "@phosphor-icons/react";
 
@@ -20,7 +20,11 @@ export default function DataManager() {
   const [repairResult, setRepairResult] = useState(null);
 
   const loadStats = useCallback(() => {
-    getDbStats().then(res => setStats(res.data)).catch(() => {});
+    getDbStats()
+      .then(res => setStats(res.data))
+      .catch((err) => {
+        console.error("Failed to load DB stats", err);
+      });
   }, []);
 
   useEffect(() => { loadStats(); }, [loadStats]);

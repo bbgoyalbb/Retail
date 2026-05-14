@@ -429,14 +429,18 @@ async def normalize_db_data(db = Depends(get_db), limit: int = 100, current_user
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Only admins can normalize data")
     safe_limit = max(1, min(limit, 500))
-    return await dq_normalize_low_risk_data(db, safe_limit)
+    res = await dq_normalize_low_risk_data(db, safe_limit)
+    await audit_log(db, "normalize", current_user, "database", "data_quality", {"updated_items": res.get("items_updated", 0)})
+    return res
 
 @router.post("/db/repair")
 async def repair_db_data(db = Depends(get_db), limit: int = 100, current_user: dict = Depends(get_current_user_dep)):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Only admins can repair data")
     safe_limit = max(1, min(limit, 500))
-    return await dq_repair_high_risk_data(db, safe_limit)
+    res = await dq_repair_high_risk_data(db, safe_limit)
+    await audit_log(db, "repair", current_user, "database", "data_quality", {"updated_items": res.get("items_updated", 0)})
+    return res
 
 # ==========================================
 # SETTINGS (authenticated)

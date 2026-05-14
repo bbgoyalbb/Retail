@@ -66,7 +66,7 @@ export function TailoringOverlay({ group, onClose, onSuccess }) {
     getSettings().then(res => {
       const s = res.data || {};
       if (Array.isArray(s.article_types) && s.article_types.length > 0) setArticleTypes(s.article_types);
-    }).catch(() => {});
+    }).catch(() => setArticleTypes(["Shirt"]));
 
     // Items awaiting assignment = no order_no or tailoring_status is Awaiting Order
     const awaiting = group.items.filter(i =>
@@ -264,7 +264,11 @@ export function AddOnOverlay({ group, onClose, onSuccess }) {
         setAddonItems(s.addon_items);
         setAddons(s.addon_items.map(n => ({ name: n, checked: false, price: "" })));
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      setAddonItems([]);
+      setAddons([]);
+      setMsg({ type: "error", text: err.message || "Failed to load add-on items" });
+    });
   }, []);
 
   const toggle = idx => setAddons(p => p.map((a, i) => i === idx ? { ...a, checked: !a.checked, price: !a.checked ? a.price : "" } : a));

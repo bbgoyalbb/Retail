@@ -81,8 +81,13 @@ export default function OrderStatus() {
   }, [toast]); // stable — reads filters from ref; toast ref is also stable
 
   useEffect(() => {
-    getCustomers().then((res) => setCustomers(res.data || [])).catch(() => setCustomers([]));
-  }, []);
+    getCustomers()
+      .then((res) => setCustomers(res.data || []))
+      .catch((err) => {
+        setCustomers([]);
+        toast({ title: "Error", description: err.message || "Failed to load customers", variant: "destructive" });
+      });
+  }, [toast]);
 
   // Only load on mount; user clicks Apply to filter
   useEffect(() => { loadData(); }, [loadData]);
