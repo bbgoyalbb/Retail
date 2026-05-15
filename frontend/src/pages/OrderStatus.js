@@ -505,7 +505,10 @@ export default function OrderStatus() {
             </tbody>
           </table>
         </div>
-      </CardContent>
-    </Card>
+        </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

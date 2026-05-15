@@ -8,8 +8,8 @@ import {
 import { fmt } from "@/lib/fmt";
 import { DatePickerInput } from "@/components/DatePickerInput";
 import {
-  PencilSimple, Trash, X, Printer, CaretDown, CaretRight, Check, Plus, CheckCircle,
-  CurrencyDollar, Scissors, Tag, Copy, ArrowsClockwise, Package, MagnifyingGlass, Funnel, Info, Wallet, Receipt, User
+  PencilSimple, Trash, X, Printer, CaretRight, Check, Plus,
+  Scissors, Tag, Copy, ArrowsClockwise, Package, Info, Wallet, Receipt
 } from "@phosphor-icons/react";
 import { useToast } from "@/hooks/use-toast";
 import InvoiceModal from "@/components/InvoiceModal";
@@ -141,8 +141,8 @@ const ITEM_DEFAULTS = {
 const CANCEL_ZERO_PAYLOAD = { ...ITEM_DEFAULTS, cancelled: true };
 
 const computeFabric = (price, qty, disc) =>
-  Math.round((price - price * (disc || 0) / 100) * qty);
-const computePending = (total, received) => Math.round(total - (received || 0));
+  Math.round((price - price * (disc || 0) / 100) * qty * 100) / 100;
+const computePending = (total, received) => Math.round((total - (received || 0)) * 100) / 100;
 
 // ─── Main page ────────────────────────────────────────────────
 export default function ItemsManager() {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
 import BackToTop from "@/components/BackToTop";
 import MobileTopBar from "@/components/MobileTopBar";
@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { getPublicSettings, BACKEND_URL } from "@/api";
+import { Lock, Warning, Shield, ArrowLeft } from "@phosphor-icons/react";
 
 const PAGE_TITLES = {
   "/": "Dashboard",
@@ -44,8 +45,6 @@ const SettingsPage  = lazy(() => import("@/pages/SettingsPage"));
 const UsersPage     = lazy(() => import("@/pages/UsersPage"));
 const AuditLogPage  = lazy(() => import("@/pages/AuditLogPage"));
 const LoginPage     = lazy(() => import("@/pages/LoginPage"));
-
-import { Lock, Warning, Shield, ArrowLeft } from "@phosphor-icons/react";
 
 function RequireRole({ roles, path, children }) {
   const { user } = useAuth();

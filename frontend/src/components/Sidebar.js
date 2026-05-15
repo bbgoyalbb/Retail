@@ -91,7 +91,10 @@ export default function Sidebar({ open, setOpen }) {
   // Keyboard navigation for sidebar
   const handleNavKeyDown = (e, items, currentIndex) => {
     const navItems = items.filter(item => item.type !== "section");
-    const currentNavIndex = navItems.findIndex(item => item.key === items[currentIndex]?.key);
+    if (navItems.length === 0) return;
+    
+    const currentKey = items[currentIndex]?.key;
+    const currentNavIndex = navItems.findIndex(item => item.key === currentKey);
     
     if (e.key === "ArrowDown") {
       e.preventDefault();

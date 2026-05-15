@@ -53,10 +53,10 @@ async def update_item(item_id: str, req: ItemUpdateRequest, db = Depends(get_db)
         p = update_fields.get("price", item.get("price", 0))
         q = update_fields.get("qty", item.get("qty", 0))
         d = update_fields.get("discount", item.get("discount", 0))
-        new_fabric_amount = round((p - (p * d / 100)) * q, 0)
+        new_fabric_amount = round_money((p - (p * d / 100)) * q)
         update_fields["fabric_amount"] = new_fabric_amount
         fabric_received = update_fields.get("fabric_received", item.get("fabric_received", 0))
-        new_pending = round(new_fabric_amount - (fabric_received or 0), 0)
+        new_pending = round_money(new_fabric_amount - (fabric_received or 0))
         update_fields["fabric_pending"] = new_pending
         raw_mode = item.get("fabric_pay_mode", "")
         clean_modes = [m.strip() for m in raw_mode.replace("Settled - ", "").replace("Settled", "").split(",") if m.strip() and m.strip() != "N/A"]

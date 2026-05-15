@@ -212,13 +212,13 @@ export default function NewBill() {
     items: [], // Array of {name, amount}
   }), []);
 
-  const resetItemForm = () => {
+  const resetItemForm = useCallback(() => {
     setBarcode("");
     setQty("");
     setPrice("");
     setDiscount("");
     setEditingIndex(null);
-  };
+  }, []);
 
   const addItem = useCallback(() => {
     if (!barcode || !qty || !price) return;
@@ -253,8 +253,7 @@ export default function NewBill() {
 
     resetItemForm();
     setTimeout(() => barcodeRef.current?.focus(), 50);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [barcode, qty, price, discount, editingIndex, dupWarning, items, defaultTailoring, defaultAddon]);
+  }, [barcode, qty, price, discount, editingIndex, dupWarning, items, defaultTailoring, defaultAddon, resetItemForm, setDupWarning, setMessage]);
 
   const removeItem = (index) => {
     setItems(prev => prev.filter((_, i) => i !== index));

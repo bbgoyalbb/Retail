@@ -123,7 +123,6 @@ export default function LabourPayments() {
 
   // Group paid items by date, then by payment_id
   const groupedPaid = useMemo(() => {
-  const groupPaidByDateAndPayment = (items) => {
     const dates = {};
     
     items.forEach(item => {
@@ -166,8 +165,6 @@ export default function LabourPayments() {
         payments: Object.values(d.payments).sort((a, b) => (b.ref || "").localeCompare(a.ref || ""))
       }))
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  };
-  return groupPaidByDateAndPayment(items);
   }, [items]);
 
   const startEditPayment = (payment) => {
@@ -215,7 +212,6 @@ export default function LabourPayments() {
         toast({ title: "Error", description: "Failed to delete payment", variant: "destructive" });
       } finally {
         setSaving(false);
-        setTimeout(() => {}, 3000);
       }
       setEditingPayment(null);
       setEditSelectedItems([]);
@@ -240,7 +236,6 @@ export default function LabourPayments() {
       toast({ title: "Error", description: "Failed to update payment", variant: "destructive" });
     } finally {
       setSaving(false);
-      setTimeout(() => {}, 3000);
     }
   };
 
@@ -371,6 +366,7 @@ export default function LabourPayments() {
           <Card className="border-none shadow-xl shadow-black/5 overflow-hidden bg-background min-h-[400px]">
             <CardContent className="p-0">
               {loading ? (
+
                 <div className="p-6 space-y-4">
                   {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
                 </div>
@@ -638,104 +634,7 @@ export default function LabourPayments() {
                     </tbody>
                   </table>
                 </div>
-                
-                {/* Edit Payment Modal */}
-                {editingPayment && (
-                  <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300" onKeyDown={e => e.key === "Escape" && cancelEditPayment()}>
-                    <Card className="max-w-2xl w-full shadow-2xl border-border/50 animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-border/50">
-                        <div className="space-y-1">
-                          <CardTitle className="text-lg font-black uppercase tracking-[0.2em]">Edit Settlement</CardTitle>
-                          <Badge variant="outline" className="text-[10px] h-5 px-2 font-bold uppercase tracking-widest bg-primary/5 text-primary border-primary/20">
-                            Batch: {editingPayment.ref}
-                          </Badge>
-                        </div>
-                        <Button variant="ghost" size="icon" onClick={cancelEditPayment} className="h-9 w-9 rounded-full"><X size={20}/></Button>
-                      </CardHeader>
-                      <CardContent className="p-0 overflow-y-auto custom-scrollbar flex-1">
-                        <div className="p-6 bg-muted/5 space-y-4">
-                          <div className="flex items-start gap-3 p-4 bg-primary/5 border border-primary/10 rounded-xl">
-                            <Info size={18} className="text-primary mt-0.5" weight="duotone" />
-                            <p className="text-xs font-medium text-muted-foreground leading-relaxed">
-                              Deselect articles to remove them from this settlement. Removed articles will return to the <span className="text-primary font-bold">Pending</span> queue for future processing.
-                            </p>
-                          </div>
-                          <div className="overflow-hidden border border-border/50 rounded-xl bg-background shadow-sm">
-                            <table className="w-full text-xs">
-                              <thead className="bg-muted/30 sticky top-0">
-                                <tr>
-                                  <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Select</th>
-                                  <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Order Ref</th>
-                                  <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description</th>
-                                  {editingPayment.labour_type === "embroidery" && <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Artisan</th>}
-                                  <th className="text-right px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Amount</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-border/30">
-                                {editingPayment.items.map((item) => {
-                                  const isSelected = editSelectedItems.includes(item.id);
-                                  return (
-                                    <tr 
-                                      key={item.id} 
-                                      className={cn(
-                                        "cursor-pointer transition-colors",
-                                        isSelected ? "hover:bg-muted/30" : "opacity-40 grayscale bg-muted/10"
-                                      )}
-                                      onClick={() => toggleEditItem(item.id)}
-                                    >
-                                      <td className="px-4 py-3">
-                                        <input 
-                                          type="checkbox" 
-                                          checked={isSelected} 
-                                          readOnly
-                                          className="w-4 h-4 rounded border-border/50 text-primary focus:ring-primary/20 accent-primary"
-                                        />
-                                      </td>
-                                      <td className="px-4 py-3 font-mono text-xs font-black text-primary">#{item.order_no}</td>
-                                      <td className="px-4 py-3 font-bold text-foreground">{item.article_type}</td>
-                                      {editingPayment.labour_type === "embroidery" && <td className="px-4 py-3 text-muted-foreground font-medium">{item.karigar !== "N/A" ? item.karigar : "—"}</td>}
-                                      <td className="px-4 py-3 font-mono text-sm text-right font-black">
-                                        ₹{fmt(item.labour_type === "Tailoring" ? (item.labour_amount || 0) : (item.emb_labour_amount || 0))}
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      </CardContent>
-                      <div className="p-6 border-t border-border/50 bg-background/80 backdrop-blur-md space-y-4">
-                        {editSelectedItems.length === 0 && (
-                          <div className="flex items-center gap-3 p-3 bg-destructive/5 border border-destructive/20 rounded-lg animate-in shake duration-500">
-                            <Warning size={16} className="text-destructive" weight="fill" />
-                            <p className="text-[11px] font-bold text-destructive leading-tight">
-                              Critical: No items selected. Saving will <span className="uppercase">delete</span> this settlement record entirely.
-                            </p>
-                          </div>
-                        )}
-                        <div className="flex justify-end gap-3">
-                          <Button variant="ghost" onClick={cancelEditPayment} className="h-10 px-6 font-black uppercase tracking-widest text-[10px]">Cancel</Button>
-                          <Button
-                            onClick={saveEditPayment}
-                            disabled={saving}
-                            variant={editSelectedItems.length === 0 ? "destructive" : "default"}
-                            className="h-10 px-8 font-black uppercase tracking-widest text-[10px] shadow-lg"
-                          >
-                            {saving ? (
-                              <div className="flex items-center gap-2">Processing <ArrowsClockwise size={14} className="animate-spin" /></div>
-                            ) : editSelectedItems.length === 0 ? (
-                              <div className="flex items-center gap-2"><Trash size={14} weight="bold" /> Void Settlement</div>
-                            ) : (
-                              <div className="flex items-center gap-2"><CheckCircle size={14} weight="bold" /> Save Updates</div>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  </div>
-                )}
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -4,8 +4,8 @@ import { getDashboard } from "@/api";
 import { fmt } from "@/lib/fmt";
 import { dataEvents } from "@/lib/dataEvents";
 import { 
-  ClipboardText, Scissors, UsersThree, TrendUp, ArrowsClockwise, 
-  Receipt, Warning, CalendarCheck, ChartBar, BookOpen, ArrowRight, Plus 
+  Scissors, UsersThree, TrendUp, ArrowsClockwise, 
+  Receipt, Warning, CalendarCheck, ChartBar, ArrowRight, Plus 
 } from "@phosphor-icons/react";
 import { EmptyState } from "@/components/EmptyState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -211,10 +211,10 @@ export default function Dashboard() {
 
       {/* Main Stats Grid */}
       <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-5">
-        <StatCard icon={Receipt} label="Monthly Revenue" value={`₹${fmt(data.monthly_total || 0)}`} sub={`${data.monthly_bills_count || 0} invoices this month`} trend={[10, 20, 15, 30, 25, 45, 40]} />
-        <StatCard icon={TrendUp} label="Total Assets" value={`₹${fmt(data.total_amount || 0)}`} sub="Cumulative gross value" color="var(--info)" trend={[5, 15, 25, 20, 35, 45, 55]} />
-        <StatCard icon={UsersThree} label="Customer Base" value={data.total_customers || 0} sub="Active digital relationships" color="var(--success)" />
-        <StatCard icon={ClipboardText} label="Active Orders" value={data.active_orders_count || 0} sub="Currently in operational pipeline" color="var(--warning)" />
+        <StatCard icon={Receipt} label="Total Revenue" value={`₹${fmt(data.total_revenue || 0)}`} sub="All-time gross revenue" trend={data.revenue_trend} />
+        <StatCard icon={TrendUp} label="Total Pending" value={`₹${fmt(totalPending || 0)}`} sub="Outstanding receivables" color="var(--info)" />
+        <StatCard icon={UsersThree} label="Customer Base" value={data.unique_customers || 0} sub="Unique customer records" color="var(--success)" />
+        <StatCard icon={Scissors} label="Tailoring Queue" value={data.tailoring_pending_count || 0} sub="Pending tailoring orders" color="var(--warning)" />
       </div>
 
       {/* Operations & Finance Breakdown */}

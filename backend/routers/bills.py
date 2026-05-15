@@ -333,9 +333,9 @@ async def create_bill(req: CreateBillRequest, db = Depends(get_db), current_user
     fabric_only_total = 0
     addon_only_total = 0
     for item in req.items:
-        fabric_only_total += round((item.price - item.price * item.discount / 100) * item.qty, 0)
-        addon_only_total += round(sum(float(a.get("price", 0)) for a in (item.addons or [])), 0)
-    grand_total = fabric_only_total + addon_only_total
+        fabric_only_total += round_money((item.price - item.price * item.discount / 100) * item.qty)
+        addon_only_total += round_money(sum(float(a.get("price", 0)) for a in (item.addons or [])))
+    grand_total = round_money(fabric_only_total + addon_only_total)
 
     # No hard block: amount_paid may be less than, equal to, or greater than grand_total.
     # Any amount received marks the section as Settled; pending stores the actual difference.
@@ -345,7 +345,7 @@ async def create_bill(req: CreateBillRequest, db = Depends(get_db), current_user
     running_discount = 0
 
     for idx, item in enumerate(req.items):
-        item_total = round((item.price - item.price * item.discount / 100) * item.qty, 0)
+        item_total = round_money((item.price - item.price * item.discount / 100) * item.qty)
 
         # Resolve per-item tailoring fields sent from NewBill frontend
         item_article_type  = item.article_type    or "N/A"
@@ -358,14 +358,14 @@ async def create_bill(req: CreateBillRequest, db = Depends(get_db), current_user
 
         # Resolve addon fields from line item
         item_addons = item.addons or []
-        item_addon_amount   = round(sum(float(a.get("price", 0)) for a in item_addons), 0)
+        item_addon_amount   = round_money(sum(float(a.get("price", 0)) for a in item_addons))
         item_addon_desc     = ", ".join(a.get("name", "") for a in item_addons) if item_addons else "N/A"
         item_addon_pay_mode = "Pending" if item_addon_amount > 0 else "N/A"
         item_addon_pending  = item_addon_amount if item_addon_amount > 0 else 0
 
         # is_settled=True with amount_paid=0 must NOT mark fabric as Settled —
         # doing so hides the bill from the Settlements page permanently.
-        effective_settled = req.is_settled and req.amount_paid > 0
+        effective_settled = req.is_settled
 
         base_doc = {
             "id": str(uuid.uuid4()),
@@ -416,11 +416,11 @@ async def create_bill(req: CreateBillRequest, db = Depends(get_db), current_user
             # Pro-rata fabric payment only over fabric_only_total (addons handled separately below)
             fabric_diff = fabric_only_total - req.amount_paid
             if idx == len(req.items) - 1:
-                item_discount = fabric_diff - running_discount
-                item_paid = req.amount_paid - running_paid
+                item_discount = round_money(fabric_diff - running_discount)
+                item_paid = round_money(req.amount_paid - running_paid)
             else:
-                item_discount = round(item_total * (fabric_diff / fabric_only_total), 0) if fabric_only_total > 0 else 0
-                item_paid = round(item_total * (req.amount_paid / fabric_only_total), 0) if fabric_only_total > 0 else 0
+                item_discount = round_money(item_total * (fabric_diff / fabric_only_total)) if fabric_only_total > 0 else 0
+                item_paid = round_money(item_total * (req.amount_paid / fabric_only_total)) if fabric_only_total > 0 else 0
                 running_discount += item_discount
                 running_paid += item_paid
 

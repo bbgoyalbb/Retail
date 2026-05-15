@@ -122,27 +122,29 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
     if (refFilter  !== "All" && entry.ref  !== refFilter)  return false;
     if (nameFilter !== "All" && entry.name !== nameFilter) return false;
     return viewMode === "pending" ? !isFullyTallied(entry) : isFullyTallied(entry);
-  }), [localEntries, refFilter, nameFilter, viewMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }), [localEntries, refFilter, nameFilter, viewMode]);
 
   const grandTotal = useMemo(() => visibleEntries.reduce((s, e) => s + (e.total || 0), 0), [visibleEntries]);
 
-  const NUMERIC_SORT_KEYS = new Set(["fabric", "tailoring", "embroidery", "addon", "advance", "total"]);
-  const sorted = useMemo(() => [...visibleEntries].sort((a, b) => {
-    let va = a[sortKey];
-    let vb = b[sortKey];
-    if (NUMERIC_SORT_KEYS.has(sortKey)) {
-      const na = parseFloat(va) || 0;
-      const nb = parseFloat(vb) || 0;
-      return sortDir === "asc" ? na - nb : nb - na;
-    }
-    va = va ?? "";
-    vb = vb ?? "";
-    if (typeof va === "number" && typeof vb === "number") {
-      return sortDir === "asc" ? va - vb : vb - va;
-    }
-    const cmp = String(va).localeCompare(String(vb));
-    return sortDir === "asc" ? cmp : -cmp;
-  }), [visibleEntries, sortKey, sortDir]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sorted = useMemo(() => {
+    const NUMERIC_SORT_KEYS = new Set(["fabric", "tailoring", "embroidery", "addon", "advance", "total"]);
+    return [...visibleEntries].sort((a, b) => {
+      let va = a[sortKey];
+      let vb = b[sortKey];
+      if (NUMERIC_SORT_KEYS.has(sortKey)) {
+        const na = parseFloat(va) || 0;
+        const nb = parseFloat(vb) || 0;
+        return sortDir === "asc" ? na - nb : nb - na;
+      }
+      va = va ?? "";
+      vb = vb ?? "";
+      if (typeof va === "number" && typeof vb === "number") {
+        return sortDir === "asc" ? va - vb : vb - va;
+      }
+      const cmp = String(va).localeCompare(String(vb));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [visibleEntries, sortKey, sortDir]);
 
   // Row-level unique key: date + ref
   const rowKey = (entry) => `${entry.date}__${entry.ref}`;

@@ -428,6 +428,8 @@ export default function JobWork() {
     });
   };
 
+  const closeDialog = useCallback(() => setDialog(null), []);
+
   return (
     <div data-testid="jobwork-page" className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex items-center justify-between gap-4">
@@ -500,7 +502,7 @@ export default function JobWork() {
         </CardContent>
       </Card>
 
-      {dialog && <MoveDialog title={dialog.title} fields={dialog.fields} onConfirm={dialog.onConfirm} onCancel={() => setDialog(null)} />}
+      {dialog && <MoveDialog title={dialog.title} fields={dialog.fields} onConfirm={dialog.onConfirm} onCancel={closeDialog} />}
 
       {tab === "tailoring" ? (
         <div className="space-y-6">
@@ -549,5 +551,4 @@ export default function JobWork() {
       )}
     </div>
   );
-}
 }

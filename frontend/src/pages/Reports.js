@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 // CSS-variable-aware chart colours — respond to dark/light mode
-const getChartColors = () => {
+const getChartColors = (_theme) => {
   const s = getComputedStyle(document.documentElement);
   return [
     s.getPropertyValue("--brand").trim()       || "#C86B4D",
@@ -88,7 +88,7 @@ export default function Reports() {
   const { toast } = useToast();
   const chartRef = useRef(null);
   const [chartWidth, setChartWidth] = useState(800);
-  const COLORS = useMemo(() => getChartColors(), [theme]);
+  const COLORS = useMemo(() => getChartColors(theme), [theme]);
   const [tab, setTab] = useState("revenue");
   const [period, setPeriod] = useState("daily");
   const [dateFrom, setDateFrom] = useState("");

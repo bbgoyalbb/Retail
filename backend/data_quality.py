@@ -20,12 +20,9 @@ def round_money_precise(value) -> Decimal:
 
 def determine_payment_status(pending_amount: float, received_amount: float) -> str:
     pending_amount = round_money(pending_amount)
-    received_amount = round_money(received_amount)
-    if received_amount > 0:
+    if pending_amount <= PENNY_TOLERANCE:
         return "Settled"
-    if pending_amount > 0:
-        return "Pending"
-    return "N/A"
+    return "Pending"
 
 
 def build_payment_mode_label(payment_modes: List[str], pending_amount: float, received_amount: float) -> str:
