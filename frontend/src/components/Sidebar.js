@@ -4,6 +4,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/context/AuthContext";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { getDaybookPendingCount, getPublicSettings, BACKEND_URL } from "@/api";
+import { Badge } from "@/components/ui/badge";
 import {
   House, Receipt, Kanban,
   BookOpen, UsersThree,
