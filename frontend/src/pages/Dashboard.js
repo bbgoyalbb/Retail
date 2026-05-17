@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { getDashboard } from "@/api";
 import { fmt } from "@/lib/fmt";
@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-function Sparkline({ data, color = "var(--success)", width = 60, height = 24 }) {
+const Sparkline = memo(function Sparkline({ data, color = "var(--success)", width = 60, height = 24 }) {
   if (!data || data.length < 2) return <div style={{ width, height }} />;
   
   const max = Math.max(...data);
@@ -38,9 +38,9 @@ function Sparkline({ data, color = "var(--success)", width = 60, height = 24 }) 
       />
     </svg>
   );
-}
+});
 
-function StatCard({ icon: Icon, label, value, sub, color = "var(--brand)", trend }) {
+const StatCard = memo(function StatCard({ icon: Icon, label, value, sub, color = "var(--brand)", trend }) {
   return (
     <Card className="overflow-hidden relative group hover:shadow-md transition-all duration-300 border-l-4" style={{ borderLeftColor: color }}>
       <CardContent className="p-5">
@@ -64,7 +64,7 @@ function StatCard({ icon: Icon, label, value, sub, color = "var(--brand)", trend
       </CardContent>
     </Card>
   );
-}
+});
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -94,10 +94,18 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(() => fetchData(true), 5 * 60 * 1000);
-    const handler = () => fetchData(true);
+    let lastFetch = Date.now();
+    const INTERVAL_MS = 5 * 60 * 1000;
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && Date.now() - lastFetch >= INTERVAL_MS) {
+        lastFetch = Date.now();
+        fetchData(true);
+      }
+    };
+    const handler = () => { lastFetch = Date.now(); fetchData(true); };
+    document.addEventListener("visibilitychange", handleVisibility);
     dataEvents.addEventListener("dashboard", handler);
-    return () => { clearInterval(interval); dataEvents.removeEventListener("dashboard", handler); };
+    return () => { document.removeEventListener("visibilitychange", handleVisibility); dataEvents.removeEventListener("dashboard", handler); };
   }, [fetchData]);
 
   if (loading) {

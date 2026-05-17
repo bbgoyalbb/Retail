@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, lazy, Suspense, memo, useCallback, useMemo } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
 import BackToTop from "@/components/BackToTop";
@@ -86,7 +86,7 @@ function RequireRole({ roles, path, children }) {
   return children;
 }
 
-function PageLoader() {
+const PageLoader = memo(function PageLoader() {
   return (
     <div className="space-y-6 animate-pulse">
       <div className="h-8 w-56 bg-[var(--border-subtle)] rounded-sm" />
@@ -96,9 +96,9 @@ function PageLoader() {
       <div className="h-64 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm" />
     </div>
   );
-}
+});
 
-function OfflineBanner() {
+const OfflineBanner = memo(function OfflineBanner() {
   const [offline, setOffline] = useState(!navigator.onLine);
   useEffect(() => {
     const on = () => setOffline(false);
@@ -117,7 +117,7 @@ function OfflineBanner() {
       ⚠ No internet connection — some features may not work
     </div>
   );
-}
+});
 
 function AppShell() {
   const contentRef = useRef(null);
@@ -129,6 +129,7 @@ function AppShell() {
   const { user, loading } = useAuth();
   const location = useLocation();
   const { toast } = useToast();
+  const pageTitle = useMemo(() => PAGE_TITLES[location.pathname] ?? "Retail Book", [location.pathname]);
 
   useEffect(() => {
     const handleError = (e) => {
@@ -166,10 +167,10 @@ function AppShell() {
     return () => clearTimeout(t);
   }, [location.pathname]);
 
-  const handleSetOpen = (v) => {
+  const handleSetOpen = useCallback((v) => {
     setSidebarOpen(v);
     try { localStorage.setItem("sidebar_open", String(v)); } catch {}
-  };
+  }, []);
 
   // Auto-close sidebar on mobile whenever the route changes or a modal opens
   useEffect(() => {
@@ -209,7 +210,7 @@ function AppShell() {
         <Sidebar open={sidebarOpen} setOpen={handleSetOpen} />
         <BackToTop />
         <main className="flex-1 overflow-hidden min-w-0 flex flex-col relative">
-          <MobileTopBar title={PAGE_TITLES[location.pathname] ?? "Retail Book"} onMenuClick={() => handleSetOpen(!sidebarOpen)} />
+          <MobileTopBar title={pageTitle} onMenuClick={() => handleSetOpen(!sidebarOpen)} />
           <MobileBottomTabBar onOpenSidebar={() => handleSetOpen(true)} />
           <div ref={contentRef} className="flex-1 overflow-y-auto p-4 pt-[calc(4rem+var(--offline-banner-h,0px))] pb-20 md:p-6 md:pt-[calc(1.5rem+var(--offline-banner-h,0px))] md:pb-6 lg:p-8 lg:pt-[calc(2rem+var(--offline-banner-h,0px))] page-in custom-scrollbar">
             <div className="max-w-[1400px] mx-auto w-full">

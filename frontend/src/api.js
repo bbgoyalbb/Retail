@@ -50,7 +50,25 @@ api.interceptors.response.use(
   }
 );
 
-export const getDashboard = () => api.get("/dashboard");
+let _dashboardCache = null;
+let _dashboardCacheTime = 0;
+let _dashboardPromise = null;
+const DASHBOARD_CACHE_TTL = 60000; // 1 min
+export const getDashboard = (force = false) => {
+  const now = Date.now();
+  if (!force && _dashboardCache && now - _dashboardCacheTime < DASHBOARD_CACHE_TTL) {
+    return Promise.resolve(_dashboardCache);
+  }
+  if (_dashboardPromise) return _dashboardPromise;
+  _dashboardPromise = api.get("/dashboard").then(res => {
+    _dashboardCache = res;
+    _dashboardCacheTime = Date.now();
+    _dashboardPromise = null;
+    return res;
+  }).catch(err => { _dashboardPromise = null; throw err; });
+  return _dashboardPromise;
+};
+export const invalidateDashboardCache = () => { _dashboardCache = null; };
 let _customersCache = null;
 let _customersCacheTime = 0;
 const CUSTOMERS_CACHE_TTL = 60000;
@@ -305,6 +323,7 @@ export const uploadLogo = (formData) => api.post("/upload/logo", formData, {
 });
 
 export const invalidateAllCaches = () => {
+  invalidateDashboardCache();
   invalidateCustomersCache();
   invalidateItemsCache();
   invalidateAdvancesCache();

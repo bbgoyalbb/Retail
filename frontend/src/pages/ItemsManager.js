@@ -144,6 +144,41 @@ const computeFabric = (price, qty, disc) =>
   Math.round((price - price * (disc || 0) / 100) * qty * 100) / 100;
 const computePending = (total, received) => Math.round((total - (received || 0)) * 100) / 100;
 
+// ─── Pure helpers (module-level — stable references, no React deps) ───────────
+const isOrderSettled = (group) => group.items.every(item => {
+  const checks = [
+    [item.fabric_amount,     item.fabric_pay_mode],
+    [item.tailoring_amount,  item.tailoring_pay_mode],
+    [item.embroidery_amount, item.embroidery_pay_mode],
+    [item.addon_amount,      item.addon_pay_mode],
+  ];
+  return checks.every(([amt, mode]) => !amt || Number(amt) === 0 || String(mode || "").startsWith("Settled"));
+});
+
+const buildGrouped = (items, advList) => {
+  const g = {};
+  items.forEach(item => {
+    if (!g[item.ref]) g[item.ref] = {
+      ref: item.ref, name: item.name, date: item.date, items: [],
+      totals: { fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0, total: 0, received: 0, pending: 0 },
+    };
+    const gr = g[item.ref];
+    gr.items.push(item);
+    gr.totals.fabric      += item.fabric_amount || 0;
+    gr.totals.tailoring   += item.tailoring_amount || 0;
+    gr.totals.embroidery  += item.embroidery_amount || 0;
+    gr.totals.addon       += item.addon_amount || 0;
+    gr.totals.total       += (item.fabric_amount || 0) + (item.tailoring_amount || 0) + (item.embroidery_amount || 0) + (item.addon_amount || 0);
+    gr.totals.received    += (item.fabric_received || 0) + (item.tailoring_received || 0) + (item.embroidery_received || 0) + (item.addon_received || 0);
+    if (!String(item.fabric_pay_mode || "").startsWith("Settled"))     gr.totals.pending += item.fabric_pending || 0;
+    if (!String(item.tailoring_pay_mode || "").startsWith("Settled"))  gr.totals.pending += item.tailoring_pending || 0;
+    if (!String(item.embroidery_pay_mode || "").startsWith("Settled")) gr.totals.pending += item.embroidery_pending || 0;
+    if (!String(item.addon_pay_mode || "").startsWith("Settled"))      gr.totals.pending += item.addon_pending || 0;
+  });
+  advList.forEach(adv => { if (g[adv.ref]) g[adv.ref].totals.advance += adv.amount || 0; });
+  return g;
+};
+
 // ─── Main page ────────────────────────────────────────────────
 export default function ItemsManager() {
   const searchRef = useRef(null);
@@ -312,44 +347,6 @@ export default function ItemsManager() {
   }, [toast]);
 
   useEffect(() => { loadData(1); }, [loadData]);
-
-  // Settled = every section with amount > 0 has pay_mode starting with "Settled"
-  const isOrderSettled = (group) => {
-    return group.items.every(item => {
-      const checks = [
-        [item.fabric_amount,     item.fabric_pay_mode],
-        [item.tailoring_amount,  item.tailoring_pay_mode],
-        [item.embroidery_amount, item.embroidery_pay_mode],
-        [item.addon_amount,      item.addon_pay_mode],
-      ];
-      return checks.every(([amt, mode]) => !amt || Number(amt) === 0 || String(mode || "").startsWith("Settled"));
-    });
-  };
-
-  // Helper: build grouped map from a flat items array
-  const buildGrouped = (items, advList) => {
-    const g = {};
-    items.forEach(item => {
-      if (!g[item.ref]) g[item.ref] = {
-        ref: item.ref, name: item.name, date: item.date, items: [],
-        totals: { fabric: 0, tailoring: 0, embroidery: 0, addon: 0, advance: 0, total: 0, received: 0, pending: 0 },
-      };
-      const gr = g[item.ref];
-      gr.items.push(item);
-      gr.totals.fabric      += item.fabric_amount || 0;
-      gr.totals.tailoring   += item.tailoring_amount || 0;
-      gr.totals.embroidery  += item.embroidery_amount || 0;
-      gr.totals.addon       += item.addon_amount || 0;
-      gr.totals.total       += (item.fabric_amount || 0) + (item.tailoring_amount || 0) + (item.embroidery_amount || 0) + (item.addon_amount || 0);
-      gr.totals.received    += (item.fabric_received || 0) + (item.tailoring_received || 0) + (item.embroidery_received || 0) + (item.addon_received || 0);
-      if (!String(item.fabric_pay_mode || "").startsWith("Settled"))     gr.totals.pending += item.fabric_pending || 0;
-      if (!String(item.tailoring_pay_mode || "").startsWith("Settled"))  gr.totals.pending += item.tailoring_pending || 0;
-      if (!String(item.embroidery_pay_mode || "").startsWith("Settled")) gr.totals.pending += item.embroidery_pending || 0;
-      if (!String(item.addon_pay_mode || "").startsWith("Settled"))      gr.totals.pending += item.addon_pending || 0;
-    });
-    advList.forEach(adv => { if (g[adv.ref]) g[adv.ref].totals.advance += adv.amount || 0; });
-    return g;
-  };
 
   const grouped = useMemo(() => buildGrouped(allItems, advances), [allItems, advances]);
   const searchGrouped = useMemo(() => buildGrouped(searchResults, advances), [searchResults, advances]);

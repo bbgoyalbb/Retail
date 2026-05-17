@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/context/AuthContext";
@@ -66,6 +66,14 @@ export default function Sidebar({ open, setOpen }) {
     return () => clearInterval(timer);
   }, []);
 
+  const filteredNavItems = useMemo(() => NAV_ITEMS.filter(item => {
+    if (item.adminOnly && user?.role !== "admin") return false;
+    if (item.managerOnly && !["admin","manager"].includes(user?.role)) return false;
+    const allowed = user?.allowed_pages ?? [];
+    if (allowed.length > 0 && item.path && !allowed.includes(item.path)) return false;
+    return true;
+  }), [user?.role, user?.allowed_pages]);
+
   const handleLogout = () => setConfirmLogout(true);
   const logoutTrapRef = useFocusTrap(confirmLogout);
 
@@ -90,7 +98,7 @@ export default function Sidebar({ open, setOpen }) {
   }, []);
 
   // Keyboard navigation for sidebar
-  const handleNavKeyDown = (e, items, currentIndex) => {
+  const handleNavKeyDown = useCallback((e, items, currentIndex) => {
     const navItems = items.filter(item => item.type !== "section");
     if (navItems.length === 0) return;
     
@@ -112,7 +120,7 @@ export default function Sidebar({ open, setOpen }) {
       e.preventDefault();
       navigate(navItems[navItems.length - 1].path);
     }
-  };
+  }, [navigate]);
 
   return (
     <>
@@ -134,6 +142,7 @@ export default function Sidebar({ open, setOpen }) {
           ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           ${collapsed ? 'lg:w-[60px]' : 'w-[240px]'}
         `}
+        style={{ willChange: 'transform' }}
       >
         {/* Logo */}
         <div className={`border-b border-[var(--border-subtle)] flex items-center justify-between ${collapsed ? 'p-3' : 'px-3 py-3'}`}>
@@ -169,14 +178,7 @@ export default function Sidebar({ open, setOpen }) {
           className={`flex-1 py-3 overflow-y-auto overflow-x-hidden ${collapsed ? 'px-1.5 space-y-1' : 'px-3 space-y-0.5'}`}
         >
           {(() => {
-            const filteredItems = NAV_ITEMS.filter(item => {
-              if (item.adminOnly && user?.role !== "admin") return false;
-              if (item.managerOnly && !["admin","manager"].includes(user?.role)) return false;
-              const allowed = user?.allowed_pages ?? [];
-              if (allowed.length > 0 && item.path && !allowed.includes(item.path)) return false;
-              return true;
-            });
-            return filteredItems.map((item, idx) => {
+            return filteredNavItems.map((item, idx) => {
             if (item.type === "section") {
               return collapsed ? (
                 // Visual divider in collapsed mode instead of text label
@@ -198,7 +200,7 @@ export default function Sidebar({ open, setOpen }) {
                   window.dispatchEvent(ev);
                   if (!ev.defaultPrevented) { navigate(item.path); setOpen(false); }
                 }}
-                onKeyDown={(e) => handleNavKeyDown(e, filteredItems, idx)}
+                onKeyDown={(e) => handleNavKeyDown(e, filteredNavItems, idx)}
                 className={`
                   group relative w-full flex items-center text-sm rounded-sm transition-all duration-150 active:scale-[0.97]
                   ${collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2 text-left'}

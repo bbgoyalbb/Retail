@@ -193,10 +193,10 @@ export default function NewBill() {
       });
   }, [toast]);
 
-  const grandTotal = items.reduce((sum, item) => {
+  const grandTotal = useMemo(() => items.reduce((sum, item) => {
     const addonTotal = (item.addon?.items || []).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
     return sum + item.total + addonTotal;
-  }, 0);
+  }, 0), [items]);
 
   // Get default article type (extracted for dependency clarity)
   const defaultArticleType = articleTypes[0] || "Shirt";

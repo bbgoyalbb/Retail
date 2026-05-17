@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { PencilSimple, Trash, Scissors, Plus } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +7,7 @@ import { cn } from "@/lib/utils";
 /**
  * BillLineItemRow - Displays a single item in the bill with actions
  */
-export default function BillLineItemRow({ 
+const BillLineItemRow = memo(function BillLineItemRow({ 
   item, 
   index, 
   isEditing, 
@@ -129,4 +130,6 @@ export default function BillLineItemRow({
       </div>
     </div>
   );
-}
+});
+
+export default BillLineItemRow;
