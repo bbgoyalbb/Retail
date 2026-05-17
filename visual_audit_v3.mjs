@@ -21,7 +21,6 @@ import http from 'http';
 
 // ── Config ────────────────────────────────────────────────────────
 const BASE    = 'http://localhost:3000';
-const API     = 'http://localhost:8001';
 const OUT_ROOT = 'D:/Retail Code/Retail/audit_screenshots/v3';
 
 const VIEWPORTS = [
@@ -437,31 +436,17 @@ async function auditViewport(browser, token, vp) {
   await scrollMain(p, 1600);
   await shot(p, outDir, '07_orderstatus_grid_rows');
   await scrollMain(p, 0);
-  // Date filter (read-only filter — no data write)
-  const fromDate = p.locator('input[type="date"]').first();
-  if (await fromDate.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await fromDate.fill('2026-04-01');
-    await p.waitForTimeout(200);
-    await tapText(p, 'Apply Filters');
-    await p.waitForTimeout(800);
-    await shot(p, outDir, '07_orderstatus_date_filtered');
-    await scrollMain(p, 800);
-    await shot(p, outDir, '07_orderstatus_date_filtered_grid');
-    await fromDate.fill('');
-    await tapText(p, 'Apply Filters');
-    await p.waitForTimeout(500);
-  }
-  // Customer filter
+  // Customer filter (select — read-only, then click the testid filter button)
   const custSel = p.locator('select').first();
   const custOpts = await custSel.locator('option').count().catch(() => 0);
   if (custOpts > 1) {
     await custSel.selectOption({ index: 1 });
-    await tapText(p, 'Apply Filters');
+    await p.locator('[data-testid="order-status-filter-btn"]').click({ timeout: 3000 }).catch(() => {});
     await p.waitForTimeout(700);
     await scrollMain(p, 800);
     await shot(p, outDir, '07_orderstatus_customer_filtered');
     await custSel.selectOption({ index: 0 });
-    await tapText(p, 'Apply Filters');
+    await p.locator('[data-testid="order-status-filter-btn"]').click({ timeout: 3000 }).catch(() => {});
     await p.waitForTimeout(500);
   }
   await scrollMain(p, 0);
@@ -604,12 +589,12 @@ async function auditViewport(browser, token, vp) {
       if (tabs) tabs.scrollLeft = 0;
     });
   }
-  for (const tab of ['Export Data', 'Backup & Restore', 'Data Audit']) {
+  for (const tab of ['Export Data', 'Cloud Backup', 'Data Integrity']) {
     await tapText(p, tab);
     await p.waitForTimeout(600);
-    await shot(p, outDir, `11_data_${tab.toLowerCase().replace(/[& ]+/g, '_')}`);
+    await shot(p, outDir, `11_data_${tab.toLowerCase().replace(/[\s&]+/g, '_')}`);
     await scrollMain(p, 400);
-    await shot(p, outDir, `11_data_${tab.toLowerCase().replace(/[& ]+/g, '_')}_scrolled`);
+    await shot(p, outDir, `11_data_${tab.toLowerCase().replace(/[\s&]+/g, '_')}_scrolled`);
     await scrollMain(p, 0);
   }
 
@@ -641,8 +626,9 @@ async function auditViewport(browser, token, vp) {
   await p.waitForTimeout(500);
   await shot(p, outDir, '12_users_permissions_modal');
   await closeModal(p);
-  // Add User modal (read-only — open and screenshot, then escape without submitting)
-  await p.locator('button:has-text("Add User"), button:has([data-icon="user-plus"])').last().tap({ timeout: 3000 }).catch(() => {});
+  // Add Personnel modal (read-only — open and screenshot, then escape without submitting)
+  // Button text is "Add Personnel" (not "Add User") — uses UserPlus icon
+  await p.locator('button:has-text("Add Personnel"), button:has([data-icon="user-plus"])').last().tap({ timeout: 3000 }).catch(() => {});
   await p.waitForTimeout(600);
   await shot(p, outDir, '12_users_add_modal_empty');
   await closeModal(p);
