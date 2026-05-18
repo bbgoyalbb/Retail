@@ -152,10 +152,11 @@ export function TailoringConfigurator({
     const original = assignments[idx];
     
     // Create split parts as new assignment rows
+    // Track original DB item ID so backend can save correctly
+    const originalDbItemId = original._original_item_id || original.item_id;
+    
     const splitAssignments = splits.map((sp, i) => ({
-      item_id: mode === "create" 
-        ? `${original.item_id}_split_${i}_${Date.now()}` 
-        : `${original.item_id}_split_${i}_${Date.now()}`,
+      item_id: `${original.item_id}_split_${i}_${Date.now()}`,
       barcode: original.barcode,
       qty: parseFloat(sp.qty) || 0,
       article_type: sp.article_type || original.article_type,
@@ -163,7 +164,7 @@ export function TailoringConfigurator({
       order_no: "",
       delivery_date: "",
       selected: true,
-      _original: original._original
+      _original_item_id: originalDbItemId
     }));
     
     // Replace original with split parts
@@ -187,8 +188,9 @@ export function TailoringConfigurator({
     setSaving(true);
     try {
       // Build payload for save
+      // Use original DB item ID for split items so backend can find them
       const payload = sel.map(a => ({
-        item_id: a.item_id,
+        item_id: a._original_item_id || a.item_id,
         barcode: a.barcode,
         qty: a.qty,
         article_type: a.article_type,
