@@ -42,7 +42,8 @@ export function AddOnConfigurator({
         price: a.price || a.amount || ""
       })),
       addon_amount: item.addon_amount || item.addon?.addon_amount || 0,
-      _original: item
+      _original: item,
+      _original_item_id: item.id || item._id
     }));
     setAssignments(normalized);
   }, [items, addonOptions.length]); // addonOptions.length to trigger once loaded
@@ -81,8 +82,9 @@ export function AddOnConfigurator({
     setSaving(true);
     try {
       // Build payload - each assignment includes item_id and its addons
+      // Use original DB item ID for proper backend lookup
       const payload = assignments.map(a => ({
-        item_id: a.item_id,
+        item_id: a._original_item_id || a.item_id,
         addons: a.addons.filter(x => parseFloat(x.price) > 0).map(x => ({
           name: x.name,
           price: parseFloat(x.price)
