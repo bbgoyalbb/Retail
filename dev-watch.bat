@@ -74,7 +74,7 @@ echo     URL: http://localhost:%FRONTEND_PORT%/
 echo     Note: Uses react-scripts directly (bypasses craco issues)
 echo     Note: Source map warnings for html5-qrcode are normal
 echo.
-start "Frontend Dev Server" cmd /k "cd /d "%ROOT%frontend" && set "PORT=%FRONTEND_PORT%" && set "BROWSER=none" && echo [Frontend] Starting dev server on port %FRONTEND_PORT%... && npx react-scripts start"
+start "Frontend Dev Server" cmd /k "cd /d "%ROOT%frontend" && set "PORT=%FRONTEND_PORT%" && set "BROWSER=none" && echo [Frontend] Starting dev server on port %FRONTEND_PORT%... && yarn start"
 
 echo.
 echo ==========================================
