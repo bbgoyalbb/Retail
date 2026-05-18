@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Bug, X, PaperPlaneRight, CheckCircle, Warning, ClipboardText } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { submitBugReport } from "@/api";
@@ -14,60 +14,63 @@ export function BugReportButton() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [consoleLogs, setConsoleLogs] = useState([]);
+  const [logs, setLogs] = useState([]);
   const [showSuccess, setShowSuccess] = useState(false);
+  const logsRef = useRef([]);
   const { toast } = useToast();
 
   // Capture console logs
   useEffect(() => {
-    const logs = [];
-    const originalConsole = {
-      log: console.log,
-      error: console.error,
-      warn: console.warn,
-    };
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
 
-    // Override console methods to capture logs
     console.log = (...args) => {
-      logs.push({ type: "log", message: args.map(a => String(a)).join(" "), timestamp: new Date().toISOString() });
-      if (logs.length > 50) logs.shift(); // Keep last 50
-      originalConsole.log.apply(console, args);
+      const msg = args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ");
+      const entry = { type: "log", message: msg.slice(0, 500), timestamp: new Date().toISOString() };
+      logsRef.current = [...logsRef.current.slice(-49), entry];
+      setLogs(logsRef.current);
+      originalLog.apply(console, args);
     };
 
     console.error = (...args) => {
-      logs.push({ type: "error", message: args.map(a => String(a)).join(" "), timestamp: new Date().toISOString() });
-      if (logs.length > 50) logs.shift();
-      originalConsole.error.apply(console, args);
+      const msg = args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ");
+      const entry = { type: "error", message: msg.slice(0, 500), timestamp: new Date().toISOString() };
+      logsRef.current = [...logsRef.current.slice(-49), entry];
+      setLogs(logsRef.current);
+      originalError.apply(console, args);
     };
 
     console.warn = (...args) => {
-      logs.push({ type: "warn", message: args.map(a => String(a)).join(" "), timestamp: new Date().toISOString() });
-      if (logs.length > 50) logs.shift();
-      originalConsole.warn.apply(console, args);
+      const msg = args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ");
+      const entry = { type: "warn", message: msg.slice(0, 500), timestamp: new Date().toISOString() };
+      logsRef.current = [...logsRef.current.slice(-49), entry];
+      setLogs(logsRef.current);
+      originalWarn.apply(console, args);
     };
 
-    // Also capture global errors
     const handleError = (event) => {
-      logs.push({
+      const entry = {
         type: "error",
         message: `Global Error: ${event.message} at ${event.filename}:${event.lineno}`,
         timestamp: new Date().toISOString(),
-      });
+      };
+      logsRef.current = [...logsRef.current.slice(-49), entry];
+      setLogs(logsRef.current);
     };
 
     window.addEventListener("error", handleError);
 
     return () => {
-      console.log = originalConsole.log;
-      console.error = originalConsole.error;
-      console.warn = originalConsole.warn;
+      console.log = originalLog;
+      console.error = originalError;
+      console.warn = originalWarn;
       window.removeEventListener("error", handleError);
     };
   }, []);
 
   const handleOpen = useCallback(() => {
     setIsOpen(true);
-    setConsoleLogs([...logs]); // Capture current logs
     setShowSuccess(false);
     setTitle("");
     setDescription("");
@@ -107,7 +110,7 @@ export function BugReportButton() {
         description: description.trim(),
         page: window.location.pathname + window.location.search,
         userAgent: navigator.userAgent,
-        consoleLogs: consoleLogs.slice(-20), // Send last 20 logs
+        consoleLogs: logsRef.current.slice(-20), // Send last 20 logs
         username,
         timestamp: new Date().toISOString(),
       };
@@ -138,61 +141,7 @@ export function BugReportButton() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [title, description, consoleLogs, toast]);
-
-  // Storage for logs (module-level)
-  const [logs, setLogs] = useState([]);
-
-  // Capture console logs effect
-  useEffect(() => {
-    const capturedLogs = [];
-
-    const originalLog = console.log;
-    const originalError = console.error;
-    const originalWarn = console.warn;
-
-    console.log = (...args) => {
-      const msg = args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ");
-      capturedLogs.push({ type: "log", message: msg.slice(0, 500), timestamp: new Date().toISOString() });
-      if (capturedLogs.length > 50) capturedLogs.shift();
-      setLogs([...capturedLogs]);
-      originalLog.apply(console, args);
-    };
-
-    console.error = (...args) => {
-      const msg = args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ");
-      capturedLogs.push({ type: "error", message: msg.slice(0, 500), timestamp: new Date().toISOString() });
-      if (capturedLogs.length > 50) capturedLogs.shift();
-      setLogs([...capturedLogs]);
-      originalError.apply(console, args);
-    };
-
-    console.warn = (...args) => {
-      const msg = args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ");
-      capturedLogs.push({ type: "warn", message: msg.slice(0, 500), timestamp: new Date().toISOString() });
-      if (capturedLogs.length > 50) capturedLogs.shift();
-      setLogs([...capturedLogs]);
-      originalWarn.apply(console, args);
-    };
-
-    const handleError = (event) => {
-      capturedLogs.push({
-        type: "error",
-        message: `Global Error: ${event.message} at ${event.filename}:${event.lineno}`,
-        timestamp: new Date().toISOString(),
-      });
-      setLogs([...capturedLogs]);
-    };
-
-    window.addEventListener("error", handleError);
-
-    return () => {
-      console.log = originalLog;
-      console.error = originalError;
-      console.warn = originalWarn;
-      window.removeEventListener("error", handleError);
-    };
-  }, []);
+  }, [title, description, toast]);
 
   if (showSuccess) {
     return (
@@ -292,16 +241,16 @@ export function BugReportButton() {
               </div>
 
               {/* Console Logs Preview */}
-              {logs.filter(l => l.type === "error").length > 0 && (
+              {logsRef.current.filter(l => l.type === "error").length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm">
                     <Warning size={16} className="text-destructive" />
                     <span className="font-medium text-destructive">
-                      {logs.filter(l => l.type === "error").length} error(s) detected in this session
+                      {logsRef.current.filter(l => l.type === "error").length} error(s) detected in this session
                     </span>
                   </div>
                   <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 max-h-32 overflow-y-auto">
-                    {logs
+                    {logsRef.current
                       .filter(l => l.type === "error")
                       .slice(-3)
                       .map((log, i) => (
