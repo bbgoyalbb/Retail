@@ -56,7 +56,7 @@ function RequireRole({ roles, path, children }) {
   
   if (roleBlocked || pageBlocked) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-in zoom-in-95 duration-300">
+      <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
         <div className="w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center mb-8 relative">
           <ShieldCheck size={48} weight="duotone" className="text-destructive" />
           <div className="absolute -bottom-1 -right-1 bg-background p-1.5 rounded-full border border-destructive/20 shadow-lg">
@@ -73,10 +73,10 @@ function RequireRole({ roles, path, children }) {
           </p>
           
           <div className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button variant="outline" onClick={() => navigate(-1)} className="h-11 px-8 font-black uppercase tracking-widest text-[10px] rounded-xl gap-2 transition-all active:scale-95">
+            <Button variant="outline" onClick={() => navigate(-1)} className="h-11 px-8 font-black uppercase tracking-widest text-[10px] rounded-xl gap-2 transition-colors active:scale-95">
               <ArrowLeft size={16} weight="bold" /> Return to Previous Sector
             </Button>
-            <Button onClick={() => navigate("/")} className="h-11 px-8 font-black uppercase tracking-widest text-[10px] rounded-xl gap-2 shadow-lg shadow-primary/20 transition-all active:scale-95">
+            <Button onClick={() => navigate("/")} className="h-11 px-8 font-black uppercase tracking-widest text-[10px] rounded-xl gap-2 shadow-lg shadow-primary/20 transition-colors active:scale-95">
               Dashboard Base
             </Button>
           </div>

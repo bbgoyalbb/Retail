@@ -27,7 +27,7 @@ function SortableHeader({ label, sortKey, currentKey, dir, onSort }) {
       <div className="flex items-center gap-1">
         {label}
         {isActive && (
-          <span className="text-primary animate-in zoom-in duration-300">
+          <span className="text-primary">
             {dir === "asc" ? "↑" : "↓"}
           </span>
         )}
@@ -40,7 +40,7 @@ function SortableHeader({ label, sortKey, currentKey, dir, onSort }) {
 function TallyIndicator({ isTallied }) {
   return (
     <div className={cn(
-      "w-10 h-10 md:w-8 md:h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300",
+      "w-10 h-10 md:w-8 md:h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors duration-150",
       isTallied
         ? 'bg-success text-white shadow-lg shadow-success/20'
         : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary'
@@ -58,7 +58,7 @@ function TallyButton({ isTallied, onClick, hasAmount, label, loading }) {
       onClick={onClick}
       disabled={loading}
       className={cn(
-        "min-w-10 min-h-10 md:min-w-0 md:min-h-0 md:w-8 md:h-8 rounded-full flex items-center justify-center transition-all duration-300",
+        "min-w-10 min-h-10 md:min-w-0 md:min-h-0 md:w-8 md:h-8 rounded-full flex items-center justify-center transition-colors duration-150",
         isTallied
           ? 'bg-success text-white hover:opacity-90 shadow-md shadow-success/20'
           : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
@@ -220,7 +220,7 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
 
   return (
     <Card className="border-none shadow-xl shadow-black/5 overflow-hidden bg-background min-h-[400px]">
-      <CardHeader className="px-4 sm:px-6 py-4 border-b border-border/50 bg-background/50 backdrop-blur-md flex flex-row items-center justify-between space-y-0">
+      <CardHeader className="px-4 sm:px-6 py-4 border-b border-border/50 bg-background/50 flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center gap-4 min-w-0">
           <div className="flex flex-col min-w-0">
             <CardTitle className="text-sm font-black uppercase tracking-wider text-muted-foreground leading-none mb-1.5 truncate">
@@ -254,7 +254,7 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
 
       <CardContent className="p-0">
         {visibleEntries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-in zoom-in-95 duration-500">
+          <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
             <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-6">
               {viewMode === "pending" ? <Check size={40} className="text-success opacity-40" weight="duotone" /> : <Warning size={40} className="text-muted-foreground opacity-40" weight="duotone" />}
             </div>
@@ -283,7 +283,7 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
               return (
                 <div
                   key={entry.id || entry.ref}
-                  className="p-5 space-y-4 animate-in fade-in duration-300"
+                  className="p-5 space-y-4"
                   onTouchStart={e => { swipeStartX.current = e.touches[0].clientX; }}
                   onTouchEnd={e => {
                     if (swipeStartX.current === null || anyUpdating) return;
@@ -402,7 +402,7 @@ function DaybookTable({ entries, onCategoryTally, loading, dateFilter, refFilter
                     // Date divider
                     if (showDateDividers && entry.date !== lastDate) {
                       rows.push(
-                        <tr key={`date-label-${entry.date}`} className="bg-muted/50 backdrop-blur-md sticky top-0 z-10 shadow-sm">
+                        <tr key={`date-label-${entry.date}`} className="bg-muted/50 sticky top-0 z-10 shadow-sm">
                           <td colSpan={9} className="px-4 py-3 border-y border-border/50">
                             <div className="flex items-center gap-2">
                               <div className="h-2 w-2 rounded-full bg-primary/80" />
@@ -579,14 +579,14 @@ export default function Daybook() {
   })();
 
   return (
-    <div data-testid="daybook-page" className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div data-testid="daybook-page" className="space-y-8 pb-12">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Daybook</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium line-clamp-2">Daily transaction reconciliation and tallying engine</p>
         </div>
-        <Button variant="outline" size="icon" onClick={() => loadData()} disabled={loading} className="rounded-full shadow-sm hover:rotate-180 transition-transform duration-500">
+        <Button variant="outline" size="icon" onClick={() => loadData()} disabled={loading} className="rounded-full shadow-sm hover:rotate-180 transition-transform duration-300">
           <ArrowsClockwise size={20} className={loading ? "animate-spin text-primary" : ""} />
         </Button>
       </div>

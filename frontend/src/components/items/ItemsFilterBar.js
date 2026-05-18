@@ -40,7 +40,7 @@ export default function ItemsFilterBar({
   const datePresets = useMemo(() => SEARCH_DATE_PRESETS, []);
 
   return (
-    <div className="flex-shrink-0 bg-background border-b border-border/50 backdrop-blur-md sticky top-0 z-20">
+    <div className="flex-shrink-0 bg-background border-b border-border/50 sticky top-0 z-20">
       {/* Row 1: sort left + tabs right */}
       <div className="flex items-center gap-2 px-4 py-3">
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -63,7 +63,7 @@ export default function ItemsFilterBar({
               key={t.k}
               onClick={() => { setSettleTab(t.k); setSelectedRefs(new Set()); }}
               className={cn(
-                "px-4 py-1 text-[11px] font-semibold rounded-full transition-all whitespace-nowrap flex-shrink-0",
+                "px-4 py-1 text-[11px] font-semibold rounded-full transition-colors whitespace-nowrap flex-shrink-0",
                 settleTab === t.k 
                   ? "bg-primary text-primary-foreground shadow-sm" 
                   : "text-muted-foreground hover:text-foreground hover:bg-background/50"
@@ -85,7 +85,7 @@ export default function ItemsFilterBar({
             value={nameFilter}
             onChange={e => setNameFilter(e.target.value)}
             placeholder="Search name, barcode, ref, article, karigar..."
-            className="w-full pl-9 pr-8 h-9 text-xs border border-border/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-muted/20 transition-all"
+            className="w-full pl-9 pr-8 h-9 text-xs border border-border/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-muted/20 transition-colors"
           />
           {nameFilter && (
             <button 
@@ -128,7 +128,7 @@ export default function ItemsFilterBar({
         {message && (
           <Badge 
             variant={message.type === "success" ? "success" : "destructive"}
-            className="h-9 px-3 animate-in fade-in slide-in-from-right-2 duration-300"
+            className="h-9 px-3"
           >
             {message.text}
           </Badge>
@@ -137,14 +137,14 @@ export default function ItemsFilterBar({
 
       {/* Filter panel */}
       {showFilters && (
-        <div className="px-4 pb-4 border-t border-border/50 pt-3 space-y-4 animate-in slide-in-from-top-2 duration-200">
+        <div className="px-4 pb-4 border-t border-border/50 pt-3 space-y-4">
           <div className="flex flex-wrap gap-1.5">
             {datePresets.map(p => (
               <button
                 key={p.label}
                 onClick={() => { setSearchDateFrom(p.from); setSearchDateTo(p.to); }}
                 className={cn(
-                  "px-3 py-1 text-[10px] font-bold rounded-md border transition-all uppercase tracking-wider",
+                  "px-3 py-1 text-[10px] font-bold rounded-md border transition-colors uppercase tracking-wider",
                   searchDateFrom === p.from && searchDateTo === p.to
                     ? "bg-primary text-primary-foreground border-primary shadow-sm"
                     : "border-border/50 text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5"
@@ -168,7 +168,7 @@ export default function ItemsFilterBar({
               <select
                 value={searchCustomer}
                 onChange={e => setSearchCustomer(e.target.value)}
-                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors outline-none"
               >
                 <option value="All">All Customers</option>
                 {customers.map(c => <option key={c} value={c}>{c}</option>)}
@@ -187,7 +187,7 @@ export default function ItemsFilterBar({
               <select
                 value={searchStatus}
                 onChange={e => setSearchStatus(e.target.value)}
-                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors outline-none"
               >
                 {["All", "N/A", "Awaiting Order", "Pending", "Stitched", "Delivered"].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -197,7 +197,7 @@ export default function ItemsFilterBar({
               <select
                 value={searchPayment}
                 onChange={e => setSearchPayment(e.target.value)}
-                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors outline-none"
               >
                 {["All", "Pending", "Settled"].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -209,7 +209,7 @@ export default function ItemsFilterBar({
                 value={searchMinAmt}
                 onChange={e => setSearchMinAmt(e.target.value)}
                 placeholder="0"
-                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors outline-none"
               />
             </FilterField>
 
@@ -219,7 +219,7 @@ export default function ItemsFilterBar({
                 value={searchMaxAmt}
                 onChange={e => setSearchMaxAmt(e.target.value)}
                 placeholder="∞"
-                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+                className="w-full h-8 px-2 text-xs border border-border/50 rounded-md bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors outline-none"
               />
             </FilterField>
           </div>

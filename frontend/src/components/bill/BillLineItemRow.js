@@ -24,7 +24,7 @@ const BillLineItemRow = memo(function BillLineItemRow({
     <div 
       data-testid={`bill-item-row-${index}`}
       className={cn(
-        "group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-all duration-300",
+        "group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-colors duration-150",
         isEditing 
           ? "border-primary bg-primary/[0.03] shadow-md ring-1 ring-primary/20" 
           : "border-border/50 bg-card hover:border-primary/30 hover:shadow-lg hover:shadow-black/5"
@@ -84,7 +84,7 @@ const BillLineItemRow = memo(function BillLineItemRow({
           size="icon"
           onClick={() => onOpenTailoring(index)}
           className={cn(
-            "h-10 w-10 rounded-xl transition-all duration-300",
+            "h-10 w-10 rounded-xl transition-colors duration-150",
             tailoringActive ? "bg-info hover:bg-info/90 shadow-info/20" : "text-muted-foreground hover:text-info hover:bg-info/5 hover:border-info/30"
           )}
           title={tailoringActive ? "Edit Tailoring" : "Add Tailoring"}
@@ -97,7 +97,7 @@ const BillLineItemRow = memo(function BillLineItemRow({
           size="icon"
           onClick={() => onOpenAddon(index)}
           className={cn(
-            "h-10 w-10 rounded-xl transition-all duration-300",
+            "h-10 w-10 rounded-xl transition-colors duration-150",
             addonActive ? "bg-success hover:bg-success/90 shadow-success/20" : "text-muted-foreground hover:text-success hover:bg-success/5 hover:border-success/30"
           )}
           title={addonActive ? "Edit Add-ons" : "Add Add-ons"}
@@ -110,7 +110,7 @@ const BillLineItemRow = memo(function BillLineItemRow({
           size="icon"
           onClick={() => onEdit(index)}
           className={cn(
-            "h-10 w-10 rounded-xl transition-all duration-300",
+            "h-10 w-10 rounded-xl transition-colors duration-150",
             isEditing ? "bg-primary shadow-primary/20" : "text-muted-foreground hover:text-primary hover:bg-primary/5 hover:border-primary/30"
           )}
           title="Edit Details"
@@ -122,7 +122,7 @@ const BillLineItemRow = memo(function BillLineItemRow({
           variant="outline"
           size="icon"
           onClick={() => onRemove(index)}
-          className="h-10 w-10 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/5 hover:border-destructive/30 transition-all duration-300"
+          className="h-10 w-10 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/5 hover:border-destructive/30 transition-colors duration-150"
           title="Remove Article"
         >
           <Trash size={18} />

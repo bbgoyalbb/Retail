@@ -60,7 +60,7 @@ export default function ItemInputForm({
           <button
             data-testid="scan-barcode-btn"
             onClick={onOpenScanner}
-            className="absolute right-1 top-1/2 -translate-y-1/2 p-2.5 text-primary hover:bg-primary/10 rounded-lg active:scale-90 transition-all"
+            className="absolute right-1 top-1/2 -translate-y-1/2 p-2.5 text-primary hover:bg-primary/10 rounded-lg active:scale-90 transition-colors"
             title="Scan with camera"
             type="button"
           >

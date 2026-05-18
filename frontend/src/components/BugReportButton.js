@@ -145,7 +145,7 @@ export function BugReportButton() {
 
   if (showSuccess) {
     return (
-      <div className="fixed bottom-6 right-6 z-[200] animate-in fade-in slide-in-from-bottom-4">
+      <div className="fixed bottom-6 right-6 z-[200]">
         <div className="bg-success text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3">
           <CheckCircle size={24} weight="bold" />
           <div>
@@ -166,7 +166,7 @@ export function BugReportButton() {
           "fixed bottom-6 right-6 z-[150] h-14 w-14 rounded-full shadow-2xl",
           "bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600",
           "text-white border-2 border-white/20",
-          "transition-all duration-300 hover:scale-110 hover:shadow-orange-500/30",
+          "transition-transform duration-150 hover:scale-110 hover:shadow-orange-500/30",
           "flex items-center justify-center"
         )}
         title="Report a Bug"
@@ -177,11 +177,11 @@ export function BugReportButton() {
       {/* Modal */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[200] bg-black/60 flex items-end sm:items-center justify-center p-4"
           onClick={handleClose}
         >
           <div
-            className="bg-card w-full max-w-lg rounded-2xl shadow-2xl border border-border/50 overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300"
+            className="bg-card w-full max-w-lg rounded-2xl shadow-2xl border border-border/50 overflow-hidden animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -224,7 +224,7 @@ export function BugReportButton() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g., 'Split button not working'"
-                  className="w-full h-10 px-3 rounded-md border border-border/50 bg-background focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all outline-none"
+                  className="w-full h-10 px-3 rounded-md border border-border/50 bg-background focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors outline-none"
                 />
               </div>
 

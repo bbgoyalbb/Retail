@@ -22,7 +22,7 @@ export default function BackToTop() {
   return (
     <button
       onClick={handleClick}
-      className="fixed bottom-6 right-6 z-50 p-2.5 bg-[var(--brand)] text-white rounded-full shadow-lg hover:bg-[var(--brand-hover)] transition-all duration-200 hover:translate-y-[-2px]"
+      className="fixed bottom-6 right-6 z-50 p-2.5 bg-[var(--brand)] text-white rounded-full shadow-lg hover:bg-[var(--brand-hover)] transition-transform duration-150 hover:translate-y-[-2px]"
       title="Back to top"
     >
       <ArrowUp size={18} weight="bold" />

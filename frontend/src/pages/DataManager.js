@@ -318,7 +318,7 @@ export default function DataManager() {
               <div
                 data-testid="import-drop-zone"
                 className={cn(
-                  "relative border-2 border-dashed rounded-[2rem] p-16 text-center transition-all duration-500 group cursor-pointer overflow-hidden",
+                  "relative border-2 border-dashed rounded-[2rem] p-16 text-center transition-colors duration-200 group cursor-pointer overflow-hidden",
                   dragActive ? 'border-primary bg-primary/5 scale-[0.99]' : 'border-border hover:border-primary/50 hover:bg-muted/30'
                 )}
                 onDragEnter={handleDrag}

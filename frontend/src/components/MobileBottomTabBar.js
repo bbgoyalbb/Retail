@@ -52,7 +52,7 @@ export default function MobileBottomTabBar({ onOpenSidebar }) {
   return (
     <nav 
       data-testid="mobile-bottom-tab-bar"
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-md border-t border-border/50 animate-in slide-in-from-bottom-2 duration-300"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/90 border-t border-border/50"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="flex items-center justify-around h-16 px-2">
@@ -65,13 +65,13 @@ export default function MobileBottomTabBar({ onOpenSidebar }) {
               key={tab.key}
               onClick={() => handleClick(tab)}
               className={cn(
-                "relative flex flex-col items-center justify-center flex-1 h-full min-w-0 transition-all duration-300 active:scale-90",
+                "relative flex flex-col items-center justify-center flex-1 h-full min-w-0 transition-colors duration-100 active:scale-90",
                 active ? "text-primary" : "text-muted-foreground opacity-60 hover:opacity-100"
               )}
               aria-label={tab.label}
             >
               {active && (
-                <div className="absolute top-1 w-8 h-1 bg-primary rounded-full animate-in zoom-in-50 duration-300" />
+                <div className="absolute top-1 w-8 h-1 bg-primary rounded-full" />
               )}
               <Icon 
                 size={22} 

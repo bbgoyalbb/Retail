@@ -14,11 +14,11 @@ export default function MobileTopBar({ title, onMenuClick }) {
   }, []);
 
   return (
-    <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-16 bg-card/80 backdrop-blur-md border-b border-border/50 flex items-center px-4 gap-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+    <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-16 bg-card/90 border-b border-border/50 flex items-center px-4 gap-4 shadow-sm">
       <button
         onClick={onMenuClick}
         aria-label="Open menu"
-        className="w-10 h-10 flex items-center justify-center rounded-xl bg-muted/30 text-foreground active:scale-90 transition-all"
+        className="w-10 h-10 flex items-center justify-center rounded-xl bg-muted/30 text-foreground active:scale-90 transition-colors"
       >
         <List size={22} weight="bold" />
       </button>
