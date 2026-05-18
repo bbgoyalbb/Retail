@@ -138,11 +138,12 @@ export default function Sidebar({ open, setOpen }) {
         data-testid="sidebar"
         className={`
           fixed lg:static inset-y-0 left-0 z-40 bg-[var(--surface)] border-r border-[var(--border-subtle)]
-          flex flex-col transition-all duration-200 flex-shrink-0
+          flex flex-col flex-shrink-0
+          transition-transform duration-150 lg:transition-[width,transform] lg:duration-150
           ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           ${collapsed ? 'lg:w-[60px]' : 'w-[240px]'}
         `}
-        style={{ willChange: 'transform' }}
+        style={{ willChange: 'transform, width' }}
       >
         {/* Logo */}
         <div className={`border-b border-[var(--border-subtle)] flex items-center justify-between ${collapsed ? 'p-3' : 'px-3 py-3'}`}>
@@ -202,13 +203,7 @@ export default function Sidebar({ open, setOpen }) {
                   if (!ev.defaultPrevented) { navigate(item.path); setOpen(false); }
                 }}
                 onKeyDown={(e) => handleNavKeyDown(e, filteredNavItems, idx)}
-                className={`
-                  group relative w-full flex items-center text-sm rounded-sm transition-all duration-150 active:scale-[0.97]
-                  ${collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2 text-left'}
-                  ${isActive
-                    ? 'bg-[var(--brand)] text-white font-medium'
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg)] hover:text-[var(--text-primary)]'
-                  }`}
+                className={`group relative w-full flex items-center text-sm rounded-sm transition-colors duration-100 active:scale-[0.97] ${collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2 text-left'} ${isActive ? 'bg-[var(--brand)] text-white font-medium' : 'text-[var(--text-secondary)] hover:bg-[var(--bg)] hover:text-[var(--text-primary)]'}`}
               >
                 <Icon size={20} weight={isActive ? "fill" : "regular"} className="flex-shrink-0" />
                 {/* Custom tooltip for collapsed mode */}
