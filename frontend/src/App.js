@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import ShortcutHelpModal from "@/components/ShortcutHelpModal";
 import { Toaster } from "@/components/ui/toaster";
+import { BugReportButton } from "@/components/BugReportButton";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { getPublicSettings, BACKEND_URL } from "@/api";
@@ -247,6 +248,7 @@ function AppShell() {
           </div>
         </main>
         <Toaster />
+        <BugReportButton />
       </div>
     </ErrorBoundary>
   );

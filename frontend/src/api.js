@@ -347,4 +347,7 @@ export const updateUser = (username, data) => api.put(`/auth/users/${username}`,
 export const deleteUser = (username) => api.delete(`/auth/users/${username}`);
 export const listAuditLogs = (params) => api.get("/audit-logs", { params });
 
+// Bug Reporting
+export const submitBugReport = (data) => api.post("/bug-report", data);
+
 export default api;

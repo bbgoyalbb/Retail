@@ -253,6 +253,7 @@ export default function NewBill() {
       }
       setDupWarning(null);
       setItems(prev => [...prev, {
+        id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         barcode,
         qty: parseFloat(qty),
         price: parseFloat(price),
