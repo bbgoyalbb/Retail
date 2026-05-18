@@ -1,10 +1,10 @@
 import axios from "axios";
 
 // In production (build_and_run.bat), React is served by FastAPI on the same port —
-// use current origin. In dev (port 3000), point explicitly to the backend port 8001.
-export const BACKEND_URL = window.location.port === "3000"
-  ? `http://${window.location.hostname}:8001`
-  : window.location.origin;
+// use current origin. In dev mode (any port except 8001), point to backend port 8001.
+export const BACKEND_URL = window.location.port === "8001"
+  ? window.location.origin
+  : `http://${window.location.hostname}:8001`;
 
 const api = axios.create({ baseURL: `${BACKEND_URL}/api` });
 
