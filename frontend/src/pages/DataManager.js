@@ -155,23 +155,23 @@ export default function DataManager() {
   };
 
   return (
-    <div data-testid="data-manager-page" className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div data-testid="data-manager-page" className="space-y-8 pb-12">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Data Management</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium line-clamp-2">Control information flow, synchronization, and database integrity</p>
         </div>
-        <Button variant="outline" size="icon" onClick={loadStats} className="rounded-full shadow-sm hover:rotate-180 transition-transform duration-500">
+        <Button variant="outline" size="icon" onClick={loadStats} className="rounded-full shadow-sm hover:rotate-180 transition-transform duration-300">
           <ArrowsClockwise size={20} className="text-primary" />
         </Button>
       </div>
 
       {/* DB Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-card border-none shadow-lg shadow-black/5 overflow-hidden group hover:shadow-xl transition-all duration-300">
+        <Card className="bg-card border-none shadow-lg shadow-black/5 overflow-hidden group hover:shadow-xl transition-all duration-150">
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="p-3 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 transition-transform duration-300">
+            <div className="p-3 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 transition-transform duration-150">
               <Database size={24} weight="duotone" />
             </div>
             <div>
@@ -180,9 +180,9 @@ export default function DataManager() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-card border-none shadow-lg shadow-black/5 overflow-hidden group hover:shadow-xl transition-all duration-300">
+        <Card className="bg-card border-none shadow-lg shadow-black/5 overflow-hidden group hover:shadow-xl transition-all duration-150">
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="p-3 rounded-2xl bg-success/10 text-success group-hover:scale-110 transition-transform duration-300">
+            <div className="p-3 rounded-2xl bg-success/10 text-success group-hover:scale-110 transition-transform duration-150">
               <ChartBar size={24} weight="duotone" />
             </div>
             <div>
@@ -237,7 +237,7 @@ export default function DataManager() {
       <div className="grid grid-cols-1 gap-8">
         {/* Import Tab */}
         {tab === "import" && (
-          <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden">
             <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
             <CardHeader className="p-8 pb-4">
               <div className="flex items-center gap-4">
@@ -329,7 +329,7 @@ export default function DataManager() {
               >
                 <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="relative z-10 space-y-4">
-                  <div className="w-20 h-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-500">
+                  <div className="w-20 h-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-200">
                     <FileXls size={40} weight="duotone" />
                   </div>
                   <h4 className="text-xl font-black uppercase tracking-tight text-foreground">
@@ -357,7 +357,7 @@ export default function DataManager() {
 
         {/* Export Tab */}
         {tab === "export" && (
-          <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden">
             <div className="absolute top-0 left-0 w-1.5 h-full bg-success" />
             <CardHeader className="p-8 pb-4">
               <div className="flex items-center gap-4">
@@ -406,7 +406,7 @@ export default function DataManager() {
 
         {/* Backup & Restore Tab */}
         {tab === "backup" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Backup */}
             <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-success" />
@@ -461,7 +461,7 @@ export default function DataManager() {
                   onDrop={(e) => handleDrop(e, handleRestore)}
                   onClick={() => document.getElementById('restore-file-input')?.click()}
                 >
-                  <div className="w-12 h-12 rounded-xl bg-warning/10 text-warning flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-500">
+                  <div className="w-12 h-12 rounded-xl bg-warning/10 text-warning flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-200">
                     <ArrowsClockwise size={24} weight="duotone" className={restoring ? "animate-spin" : ""} />
                   </div>
                   <p className="text-xs font-black uppercase tracking-tight text-foreground">
@@ -479,7 +479,7 @@ export default function DataManager() {
                 </div>
 
                 {restoreConfirm && (
-                  <div className="p-4 bg-destructive/5 border border-destructive/20 rounded-2xl space-y-4 animate-in shake duration-500">
+                  <div className="p-4 bg-destructive/5 border border-destructive/20 rounded-2xl space-y-4">
                     <div className="flex items-center gap-3">
                       <Warning size={18} className="text-destructive" weight="fill" />
                       <p className="text-[11px] font-black uppercase tracking-widest text-destructive">Destructive Operation Confirm</p>
@@ -513,7 +513,7 @@ export default function DataManager() {
 
         {/* Audit Tab */}
         {tab === "audit" && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="space-y-8">
             <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-warning" />
               <CardHeader className="p-8 pb-4">
@@ -628,7 +628,7 @@ export default function DataManager() {
                 </Card>
 
                 <Card className="border-none shadow-xl shadow-black/5 overflow-hidden bg-background">
-                  <CardHeader className="px-6 py-4 border-b border-border/50 bg-background/50 backdrop-blur-md">
+                  <CardHeader className="px-6 py-4 border-b border-border/50 bg-background/50">
                     <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Sequence Anomalies</CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">

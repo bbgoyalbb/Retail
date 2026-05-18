@@ -262,14 +262,14 @@ export default function LabourPayments() {
   };
 
   return (
-    <div data-testid="labour-page" className="space-y-8 pb-24 lg:pb-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div data-testid="labour-page" className="space-y-8 pb-24 lg:pb-8">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Labour Payments</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium line-clamp-2">Settle accounts for tailoring and embroidery services</p>
         </div>
-        <Button variant="outline" size="icon" onClick={() => loadData(true)} disabled={loading} className="rounded-full shadow-sm hover:rotate-180 transition-transform duration-500">
+        <Button variant="outline" size="icon" onClick={() => loadData(true)} disabled={loading} className="rounded-full shadow-sm hover:rotate-180 transition-transform duration-300">
           <ArrowsClockwise size={20} className={loading ? "animate-spin text-primary" : ""} />
         </Button>
       </div>
@@ -363,7 +363,7 @@ export default function LabourPayments() {
                   {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
                 </div>
               ) : items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-in zoom-in-95 duration-500">
+                <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
                   <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-6">
                     {viewMode === "unpaid" ? <CheckCircle size={40} className="text-success opacity-40" weight="duotone" /> : <Warning size={40} className="text-muted-foreground opacity-40" weight="duotone" />}
                   </div>
@@ -515,7 +515,7 @@ export default function LabourPayments() {
                           >
                             <td className="px-4 py-4 text-center">
                               <div className={cn(
-                                "p-1.5 rounded-full bg-background border border-border/50 text-muted-foreground transition-all duration-300",
+                                "p-1.5 rounded-full bg-background border border-border/50 text-muted-foreground transition-all duration-150",
                                 expandedDates[dateGroup.date] && "rotate-90 bg-primary/10 text-primary border-primary/20"
                               )}>
                                 <CaretRight size={14} weight="bold" />
@@ -591,7 +591,7 @@ export default function LabourPayments() {
                                         <PencilSimple size={14} weight="bold" />
                                       </Button>
                                       {deleteConfirm?.payment_id === payment.payment_id ? (
-                                        <div className="flex items-center gap-1 animate-in slide-in-from-right-2">
+                                        <div className="flex items-center gap-1">
                                           <Button variant="destructive" size="sm" onClick={() => handleDeletePayment(payment)} className="h-7 px-2 text-[10px] font-black uppercase tracking-widest">Delete</Button>
                                           <Button variant="outline" size="sm" onClick={() => setDeleteConfirm(null)} className="h-7 px-2 text-[10px] font-black uppercase tracking-widest">Cancel</Button>
                                         </div>
@@ -739,8 +739,8 @@ export default function LabourPayments() {
 
       {/* Mobile Sticky Action Bar */}
       {viewMode === "unpaid" && selected.length > 0 && (
-        <div className="lg:hidden fixed bottom-[72px] left-4 right-4 z-40 animate-in slide-in-from-bottom-8 duration-500">
-          <Card className="bg-background/80 backdrop-blur-xl border-primary/20 shadow-2xl overflow-hidden">
+        <div className="lg:hidden fixed bottom-[72px] left-4 right-4 z-40">
+          <Card className="bg-background/80 border-primary/20 shadow-2xl overflow-hidden">
             <div className="p-4 flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-[9px] uppercase tracking-[0.2em] font-black text-muted-foreground opacity-60">Net Allocation</p>

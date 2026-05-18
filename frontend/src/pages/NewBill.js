@@ -459,7 +459,7 @@ export default function NewBill() {
   const billStep = customerName.trim() === "" ? 0 : items.length === 0 ? 1 : 2;
 
   return (
-    <div data-testid="new-bill-page" className="space-y-8 pb-32 lg:pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div data-testid="new-bill-page" className="space-y-8 pb-32 lg:pb-12">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Checkout</h1>
@@ -537,7 +537,7 @@ export default function NewBill() {
                       placeholder="Name or ID..." 
                     />
                     {showSuggestions && nameSuggestions.length > 0 && (
-                      <Card className="absolute z-50 left-0 top-full mt-2 shadow-2xl animate-in fade-in zoom-in-95 duration-200 min-w-[320px] w-max max-w-[480px]">
+                      <Card className="absolute z-50 left-0 top-full mt-2 shadow-2xl min-w-[320px] w-max max-w-[480px]">
                         <div className="relative">
                           <div className="max-h-64 overflow-y-auto p-1">
                             {nameSuggestions.map(c => (
@@ -698,7 +698,7 @@ export default function NewBill() {
 
       {/* Mobile sticky summary bar - visible only on small screens */}
       <div 
-        className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-muted-foreground/10 p-4 pb-[env(safe-area-inset-bottom,16px)] shadow-2xl z-50 animate-in slide-in-from-bottom-full duration-500"
+        className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-muted-foreground/10 p-4 pb-[env(safe-area-inset-bottom,16px)] shadow-2xl z-50"
       >
         <div className="flex items-center justify-between gap-6">
           <div className="flex-1 min-w-0">

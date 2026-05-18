@@ -73,10 +73,10 @@ export default function LoginPage() {
           <div className="absolute -bottom-40 -left-40 w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl" />
         </div>
 
-        <div className="relative w-full max-w-sm space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+        <div className="relative w-full max-w-sm space-y-8">
           {/* Brand mark */}
           <div className="flex flex-col items-center text-center">
-            <div className="w-24 h-24 rounded-3xl bg-primary/5 p-1 mb-6 shadow-2xl shadow-primary/10 border border-primary/10 transition-transform hover:scale-105 duration-500 overflow-hidden flex items-center justify-center">
+            <div className="w-24 h-24 rounded-3xl bg-primary/5 p-1 mb-6 shadow-2xl shadow-primary/10 border border-primary/10 transition-transform hover:scale-105 duration-200 overflow-hidden flex items-center justify-center">
               {(() => { const src = theme === "dark" ? (firmLogoDark || firmLogo) : firmLogo; return src ? (
                 <img src={src} alt={firmName} className="w-full h-full object-contain p-2" />
               ) : (
@@ -93,11 +93,11 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <Card className="border-none shadow-2xl shadow-black/10 bg-card/50 backdrop-blur-xl overflow-hidden relative">
+          <Card className="border-none shadow-2xl shadow-black/10 bg-card/50 overflow-hidden relative">
             <div className="absolute top-0 left-0 w-full h-1 bg-primary" />
             <CardHeader className="pb-4 pt-8">
               {sessionExpired && (
-                <div className="mb-6 p-4 rounded-xl bg-warning/10 border border-warning/20 flex items-center gap-3 animate-in shake duration-500">
+                <div className="mb-6 p-4 rounded-xl bg-warning/10 border border-warning/20 flex items-center gap-3">
                   <div className="p-1.5 rounded-full bg-warning text-white">
                     <ArrowsClockwise size={12} weight="bold" />
                   </div>
@@ -183,7 +183,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent" />
         
         <div className="absolute inset-0 flex items-center justify-center p-20">
-          <div className="relative w-full max-w-lg aspect-square border border-primary/10 rounded-[4rem] flex items-center justify-center animate-in zoom-in-95 duration-1000">
+          <div className="relative w-full max-w-lg aspect-square border border-primary/10 rounded-[4rem] flex items-center justify-center">
             <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full" />
             <div className="relative text-center space-y-6 p-12">
               <div className="w-16 h-1 bg-primary mx-auto rounded-full mb-8" />

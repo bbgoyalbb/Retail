@@ -42,7 +42,7 @@ const Sparkline = memo(function Sparkline({ data, color = "var(--success)", widt
 
 const StatCard = memo(function StatCard({ icon: Icon, label, value, sub, color = "var(--brand)", trend }) {
   return (
-    <Card className="overflow-hidden relative group hover:shadow-md transition-all duration-300 border-l-4" style={{ borderLeftColor: color }}>
+    <Card className="overflow-hidden relative group hover:shadow-md transition-all duration-150 border-l-4" style={{ borderLeftColor: color }}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -51,7 +51,7 @@ const StatCard = memo(function StatCard({ icon: Icon, label, value, sub, color =
             {sub && <p className="text-[10px] text-muted-foreground mt-1.5 line-clamp-1 font-medium">{sub}</p>}
           </div>
           <div className="flex flex-col items-end gap-3">
-            <div className="p-2.5 rounded-lg flex-shrink-0 group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: `${color}10` }}>
+            <div className="p-2.5 rounded-lg flex-shrink-0 group-hover:scale-110 transition-transform duration-150" style={{ backgroundColor: `${color}10` }}>
               <Icon size={20} weight="duotone" style={{ color }} />
             </div>
             {trend && (
@@ -110,7 +110,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div className="space-y-3">
             <Skeleton className="h-9 w-48" />
@@ -128,7 +128,7 @@ export default function Dashboard() {
   }
 
   if (fetchError || !data) return (
-    <div className="flex flex-col items-center justify-center py-32 gap-6 animate-in zoom-in-95 duration-300">
+    <div className="flex flex-col items-center justify-center py-32 gap-6">
       <div className="p-6 rounded-full bg-destructive/10 text-destructive">
         <Warning size={48} weight="duotone" />
       </div>
@@ -146,7 +146,7 @@ export default function Dashboard() {
   const totalPending = (data.fabric_pending_amount || 0) + (data.tailoring_pending_amount || 0) + (data.embroidery_pending_amount || 0) + (data.addon_pending_amount || 0);
 
   return (
-    <div data-testid="dashboard-page" className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div data-testid="dashboard-page" className="space-y-8 pb-12">
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
@@ -171,7 +171,7 @@ export default function Dashboard() {
           <CardContent className="p-0">
             <div className="flex flex-col sm:flex-row sm:items-center p-6 gap-6 sm:gap-12">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-2xl bg-primary/10 transition-transform group-hover:rotate-12 duration-300">
+                <div className="p-3 rounded-2xl bg-primary/10 transition-transform group-hover:rotate-12 duration-150">
                   <CalendarCheck size={24} className="text-primary" weight="duotone" />
                 </div>
                 <div className="flex flex-col">
@@ -202,7 +202,7 @@ export default function Dashboard() {
       {/* Overdue Alert */}
       {(data.overdue_orders_count ?? 0) > 0 && (
         <div className="relative group cursor-pointer" onClick={() => navigate('/order-status?overdue=1')}>
-          <div className="absolute -inset-0.5 bg-destructive/20 rounded-xl blur opacity-30 group-hover:opacity-100 transition duration-500" />
+          <div className="absolute -inset-0.5 bg-destructive/20 rounded-xl blur opacity-30 group-hover:opacity-100 transition duration-200" />
           <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 px-6 py-4 bg-destructive/[0.03] border border-destructive/20 rounded-xl transition-all">
             <div className="flex items-center gap-4 flex-1">
               <div className="p-2 rounded-full bg-destructive/10">

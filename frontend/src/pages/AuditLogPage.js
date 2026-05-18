@@ -103,7 +103,7 @@ export default function AuditLogPage() {
   const goPage = (n) => { setPage(n); fetchLogs(n); };
 
   return (
-    <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="space-y-8 pb-12">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="min-w-0">
@@ -151,7 +151,7 @@ export default function AuditLogPage() {
             variant="outline"
             size="icon"
             onClick={() => { setPage(0); fetchLogs(0); }}
-            className="h-10 w-10 rounded-full shadow-sm hover:rotate-180 transition-transform duration-500"
+            className="h-10 w-10 rounded-full shadow-sm hover:rotate-180 transition-transform duration-300"
           >
             <ArrowClockwise size={18} weight="bold" className={loading ? "animate-spin text-primary" : ""} />
           </Button>
@@ -160,7 +160,7 @@ export default function AuditLogPage() {
 
       {/* Filter Panel */}
       {showFilters && (
-        <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden animate-in slide-in-from-top-4 duration-300">
+        <Card className="bg-card border-none shadow-xl shadow-black/5 overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-primary" />
           <CardContent className="p-6 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
@@ -225,7 +225,7 @@ export default function AuditLogPage() {
       )}
 
       <Card className="border-none shadow-xl shadow-black/5 overflow-hidden bg-background min-h-[400px]">
-        <CardHeader className="px-6 py-4 border-b border-border/50 bg-background/50 backdrop-blur-md flex flex-row items-center justify-between space-y-0">
+        <CardHeader className="px-6 py-4 border-b border-border/50 bg-background/50 flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10 text-primary">
               <ShieldCheck size={18} weight="duotone" />
@@ -243,7 +243,7 @@ export default function AuditLogPage() {
               {[1,2,3,4,5,6,7,8].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
             </div>
           ) : logs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-in zoom-in-95 duration-500">
+            <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
               <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-6">
                 <Clock size={40} className="text-muted-foreground opacity-40" weight="duotone" />
               </div>
@@ -317,7 +317,7 @@ export default function AuditLogPage() {
 
       {/* Pagination */}
       {!loading && (logs.length > 0 || page > 0) && (
-        <div className="flex items-center justify-between gap-4 animate-in fade-in duration-700">
+        <div className="flex items-center justify-between gap-4">
           <Button
             variant="outline"
             disabled={page === 0}

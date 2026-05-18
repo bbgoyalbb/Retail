@@ -159,20 +159,20 @@ export default function OrderStatus() {
   }, [rows]);
 
   return (
-    <div data-testid="order-status-page" className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div data-testid="order-status-page" className="space-y-8 pb-12">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Order Status</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium line-clamp-2">Master tracking board for tailoring and delivery pipelines</p>
         </div>
-        <Button variant="outline" size="icon" onClick={() => { invalidateOrderStatusCache(); loadData(); }} disabled={loading} className="rounded-full shadow-sm hover:rotate-180 transition-transform duration-500">
+        <Button variant="outline" size="icon" onClick={() => { invalidateOrderStatusCache(); loadData(); }} disabled={loading} className="rounded-full shadow-sm hover:rotate-180 transition-transform duration-300">
           <ArrowsClockwise size={20} className={loading ? "animate-spin text-primary" : ""} />
         </Button>
       </div>
 
       {overdueOnly && (
-        <div className="flex items-center gap-3 p-4 bg-destructive/5 border border-destructive/20 rounded-2xl animate-in slide-in-from-top-4 duration-500">
+        <div className="flex items-center gap-3 p-4 bg-destructive/5 border border-destructive/20 rounded-2xl">
           <div className="p-2 rounded-full bg-destructive/10 text-destructive">
             <Warning size={20} weight="fill" />
           </div>
@@ -196,10 +196,10 @@ export default function OrderStatus() {
           { label: "Dispatched", value: summary.delivered, icon: Truck, color: "success" },
           { label: "Board Value", value: `₹${fmt(summary.amount)}`, icon: Wallet, color: "primary", isCurrency: true },
         ].map((stat, i) => (
-          <Card key={i} className="bg-card border-none shadow-lg shadow-black/5 overflow-hidden group hover:shadow-xl transition-all duration-300">
+          <Card key={i} className="bg-card border-none shadow-lg shadow-black/5 overflow-hidden group hover:shadow-xl transition-all duration-150">
             <CardContent className="p-5 flex flex-col items-start gap-4">
               <div className={cn(
-                "p-2.5 rounded-xl transition-transform group-hover:scale-110 duration-300",
+                "p-2.5 rounded-xl transition-transform group-hover:scale-110 duration-150",
                 stat.color === "primary" ? "bg-primary/10 text-primary" :
                 stat.color === "warning" ? "bg-warning/10 text-warning" :
                 stat.color === "info" ? "bg-info/10 text-info" : "bg-success/10 text-success"
@@ -290,7 +290,7 @@ export default function OrderStatus() {
       </Card>
 
       <Card className="border-none shadow-xl shadow-black/5 overflow-hidden bg-background min-h-[400px]">
-        <CardHeader className="px-6 py-4 border-b border-border/50 bg-background/50 backdrop-blur-md flex flex-row items-center justify-between space-y-0">
+        <CardHeader className="px-6 py-4 border-b border-border/50 bg-background/50 flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10 text-primary">
               <ClipboardText size={18} weight="duotone" />
@@ -322,7 +322,7 @@ export default function OrderStatus() {
               {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
             </div>
           ) : rows.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-in zoom-in-95 duration-500">
+            <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
               <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-6">
                 <Package size={40} className="text-muted-foreground opacity-40" weight="duotone" />
               </div>
@@ -340,7 +340,7 @@ export default function OrderStatus() {
                 const isOverdue = hasUndelivered && row.latest_delivery_date && row.latest_delivery_date !== "N/A" && row.latest_delivery_date < today;
                 return (
                   <div key={row._id || row.order_no} className={cn(
-                    "p-6 space-y-4 animate-in fade-in duration-300 relative",
+                    "p-6 space-y-4 relative",
                     isOverdue && "bg-destructive/[0.02]"
                   )}>
                     {isOverdue && <div className="absolute top-0 left-0 w-1 h-full bg-destructive" />}
@@ -382,7 +382,7 @@ export default function OrderStatus() {
                       </div>
                       {hasUndelivered && (
                         deliverConfirm === row.order_no ? (
-                          <div className="flex items-center gap-1 animate-in slide-in-from-right-2">
+                          <div className="flex items-center gap-1">
                             <Button size="sm" onClick={() => handleDeliver(row.order_no)} disabled={delivering === row.order_no} className="h-8 px-3 font-black uppercase tracking-widest text-[9px] bg-destructive hover:bg-destructive/90">Confirm</Button>
                             <Button size="sm" variant="outline" onClick={() => setDeliverConfirm(null)} className="h-8 px-3 font-black uppercase tracking-widest text-[9px]">Cancel</Button>
                           </div>
@@ -468,7 +468,7 @@ export default function OrderStatus() {
                     </td>
                     <td className="px-4 py-4">
                       {editingDelivery?.order_no === row.order_no ? (
-                        <div className="flex items-center gap-2 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center gap-2">
                           <div className="w-36">
                             <DatePickerInput
                               value={editingDelivery.value}
@@ -504,7 +504,7 @@ export default function OrderStatus() {
                     <td className="px-4 py-4 text-right">
                       {hasUndelivered && (
                         deliverConfirm === row.order_no ? (
-                          <div className="flex items-center gap-1 animate-in slide-in-from-right-2">
+                          <div className="flex items-center gap-1">
                             <Button size="sm" onClick={() => handleDeliver(row.order_no)} disabled={delivering === row.order_no} className="h-8 px-3 font-black uppercase tracking-widest text-[10px] bg-destructive hover:bg-destructive/90">Confirm</Button>
                             <Button size="sm" variant="outline" onClick={() => setDeliverConfirm(null)} className="h-8 px-3 font-black uppercase tracking-widest text-[10px]">Cancel</Button>
                           </div>

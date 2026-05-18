@@ -24,8 +24,8 @@ function MoveDialog({ title, onConfirm, onCancel, fields }) {
   }, [onCancel]);
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200" data-testid="move-dialog">
-      <Card className="max-w-md w-full shadow-2xl border-none animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4" data-testid="move-dialog">
+      <Card className="max-w-md w-full shadow-2xl border-none animate-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
         <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
           <CardTitle className="text-xl font-black uppercase tracking-tight text-primary">{title}</CardTitle>
           <Button variant="ghost" size="icon" onClick={onCancel} className="rounded-full">
@@ -438,7 +438,7 @@ export default function JobWork() {
   const closeDialog = useCallback(() => setDialog(null), []);
 
   return (
-    <div data-testid="jobwork-page" className="space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div data-testid="jobwork-page" className="space-y-6 pb-12">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-heading text-3xl sm:text-4xl font-black tracking-tight text-primary truncate">Production Pipeline</h1>

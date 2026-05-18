@@ -30,7 +30,7 @@ const getChartColors = (_theme) => {
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload) return null;
   return (
-    <div className="bg-card border border-border p-3 rounded-xl shadow-xl backdrop-blur-md">
+    <div className="bg-card border border-border p-3 rounded-xl shadow-xl">
       <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">{label}</p>
       <div className="space-y-1.5">
         {payload.map((p, i) => (
@@ -154,7 +154,7 @@ export default function Reports() {
   }, [period, dateFrom, dateTo, tab, toast, refreshKey]);
 
   return (
-    <div data-testid="reports-page" className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div data-testid="reports-page" className="space-y-8 pb-12">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="min-w-0">
@@ -280,7 +280,7 @@ export default function Reports() {
             </div>
 
             {/* Tab Content */}
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div>
               {tab === "revenue" && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <Card className="border-none shadow-xl shadow-black/5 overflow-hidden">

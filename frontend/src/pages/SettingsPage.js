@@ -163,7 +163,7 @@ export default function SettingsPage() {
   if (!settings) {
     if (loadError) {
       return (
-        <div className="flex flex-col items-center justify-center py-32 gap-6 animate-in zoom-in-95 duration-300">
+        <div className="flex flex-col items-center justify-center py-32 gap-6">
           <div className="p-6 rounded-full bg-destructive/10 text-destructive">
             <Warning size={48} weight="duotone" />
           </div>
@@ -178,7 +178,7 @@ export default function SettingsPage() {
       );
     }
     return (
-      <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="space-y-8">
         <div className="flex items-center justify-between">
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-10 w-32" />
@@ -195,7 +195,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div data-testid="settings-page" className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div data-testid="settings-page" className="space-y-8 pb-12">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
@@ -225,7 +225,7 @@ export default function SettingsPage() {
           <div className="absolute top-0 left-0 w-full h-1.5 bg-primary" />
           <CardHeader className="pb-4 pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-primary/10 text-primary transition-transform group-hover:rotate-12 duration-300">
+              <div className="p-2.5 rounded-xl bg-primary/10 text-primary transition-transform group-hover:rotate-12 duration-150">
                 <Storefront size={22} weight="duotone" />
               </div>
               <div className="flex flex-col">
