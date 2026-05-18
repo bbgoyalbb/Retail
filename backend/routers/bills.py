@@ -353,6 +353,9 @@ async def create_bill(req: CreateBillRequest, db = Depends(get_db), current_user
         item_delivery_date = item.delivery_date   or "N/A"
         item_emb_status    = item.embroidery_status or "N/A"
 
+        # Calculate tailoring and labour amounts based on article type
+        tail_amt, labour_amt = TAILORING_RATES.get(item_article_type, (0, 0)) if item_article_type != "N/A" else (0, 0)
+
         # If an order_no was already set on the line, tailoring starts as Pending
         item_tailoring_status = "Pending" if item_order_no != "N/A" else tailoring_status
 
@@ -381,12 +384,12 @@ async def create_bill(req: CreateBillRequest, db = Depends(get_db), current_user
             "article_type": item_article_type,
             "order_no": item_order_no,
             "delivery_date": item_delivery_date,
-            "tailoring_amount": 0,
+            "tailoring_amount": tail_amt,
             "embroidery_status": item_emb_status,
             "embroidery_amount": 0,
             "addon_desc": item_addon_desc,
             "addon_amount": item_addon_amount,
-            "labour_amount": 0,
+            "labour_amount": labour_amt,
             "labour_paid": "N/A",
             "labour_pay_date": "N/A",
             "labour_payment_mode": "N/A",

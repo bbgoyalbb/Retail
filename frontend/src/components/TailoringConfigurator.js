@@ -22,7 +22,7 @@ function SplitForm({ item, articleTypes, onConfirm, onCancel }) {
     <div className="space-y-6">
       <div className="space-y-3">
         {splits.map((sp, i) => (
-          <div key={i} className="flex gap-2 items-center animate-in slide-in-from-left-2 duration-200">
+          <div key={i} className="flex gap-2 items-center">
             <select
               value={sp.article_type}
               onChange={e => update(i, "article_type", e.target.value)}
@@ -261,11 +261,11 @@ export function TailoringConfigurator({
 
   return (
     <div 
-      className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300"
+      className="fixed inset-0 z-[150] bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <Card 
-        className="w-full sm:max-w-4xl max-h-[94vh] flex flex-col shadow-2xl border-border/50 animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300 overflow-hidden"
+        className="w-full sm:max-w-4xl max-h-[94vh] flex flex-col shadow-2xl border-border/50 animate-in zoom-in-95 duration-150 overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         <CardHeader className="px-6 py-5 border-b border-border/50 bg-info/[0.03] shrink-0">
@@ -411,11 +411,11 @@ export function TailoringConfigurator({
       {/* Split sub-modal */}
       {splitItem && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300"
+          className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
           onClick={() => setSplitItem(null)}
         >
           <Card 
-            className="max-w-md w-full shadow-2xl border-border/50 animate-in zoom-in-95 duration-300 overflow-hidden"
+            className="max-w-md w-full shadow-2xl border-border/50 animate-in zoom-in-95 duration-150 overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             <CardHeader className="px-6 py-5 border-b border-border/50 bg-primary/[0.03]">
