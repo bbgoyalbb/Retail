@@ -73,7 +73,7 @@ async def _build_daybook_entries(db, date_filter: Optional[str] = None):
 
     categories = [
         ("fabric",     "fabric_pay_date",     "fabric_received",     "fabric_pay_mode",     "tally_fabric"),
-        ("tailoring",  "tailoring_pay_date",  "tailoring_received",  "tailoring_pay_mode",  "tailoring"),
+        ("tailoring",  "tailoring_pay_date",  "tailoring_received",  "tailoring_pay_mode",  "tally_tailoring"),
         ("embroidery", "embroidery_pay_date", "embroidery_received", "embroidery_pay_mode", "tally_embroidery"),
         ("addon",      "addon_pay_date",      "addon_received",      "addon_pay_mode",      "tally_addon"),
     ]
@@ -93,11 +93,6 @@ async def _build_daybook_entries(db, date_filter: Optional[str] = None):
             e[cat_name]  += received
             e["total"]   += received
             e["tally_status"][cat_name] = item.get(tally_field, False)
-            
-            # Debug: log tailoring tally status for specific refs
-            if ref in ["07/120426", "03/010426", "01/040426"] and cat_name == "tailoring" and received > 0:
-                print(f"DEBUG DAYBOOK BUILD: ref={ref}, date={pay_date}, tailoring_received={received}, tally_tailoring={item.get(tally_field)}")
-            
             mode = item.get(mode_field, "")
             if mode:
                 e["modes"][cat_name] = mode
@@ -131,13 +126,6 @@ async def _build_daybook_entries(db, date_filter: Optional[str] = None):
 @router.get("/daybook")
 async def get_daybook(db = Depends(get_db), date_filter: Optional[str] = None, current_user: dict = Depends(get_current_user_dep)):
     entries = await _build_daybook_entries(db, date_filter)
-    
-    # Debug: log entries with untallied tailoring for specific refs
-    debug_refs = ["07/120426", "03/010426", "01/040426"]
-    for e in entries:
-        if e["ref"] in debug_refs and e["tailoring"] > 0:
-            print(f"DEBUG DAYBOOK: date={e['date']}, ref={e['ref']}, tailoring={e['tailoring']}, tally_tailoring={e['tally_status']['tailoring']}, date_filter={date_filter}")
-    
     return {"entries": entries}
 
 @router.get("/daybook/dates")
@@ -199,9 +187,6 @@ async def tally_entries(req: TallyRequest, db = Depends(get_db), current_user: d
 
     refs = req.entry_ids
     
-    # Debug logging
-    print(f"DEBUG TALLY: action={req.action}, category={req.category}, date={req.date}, refs={refs}")
-    
     # CRITICAL: Date is REQUIRED to prevent accidental mass tally/untally across all dates
     if not req.date:
         raise HTTPException(status_code=400, detail="Date is required for tally operations to prevent accidental mass updates")
@@ -220,43 +205,13 @@ async def tally_entries(req: TallyRequest, db = Depends(get_db), current_user: d
     elif req.category in date_field_map:
         tally_field, pay_date_field = date_field_map[req.category]
         item_query = {"ref": {"$in": refs}, pay_date_field: req.date}
-        
-        # Debug: log current database state before update
-        current_items = await db.items.find(item_query, {"_id": 0, "ref": 1, tally_field: 1, pay_date_field: 1}).to_list(10)
-        print(f"DEBUG TALLY BEFORE: category={req.category}, date={req.date}, refs={refs}")
-        for item in current_items:
-            print(f"  ref={item['ref']}, {pay_date_field}={item.get(pay_date_field)}, {tally_field}={item.get(tally_field)}")
-        
-        result = await db.items.update_many(item_query, {"$set": {tally_field: tally_value}})
-        print(f"DEBUG TALLY RESULT: matched={result.matched_count}, modified={result.modified_count}")
+        await db.items.update_many(item_query, {"$set": {tally_field: tally_value}})
 
     # Audit log the tally action
     await audit_log(db, req.action, current_user, "daybook", ",".join(req.entry_ids[:10]),  # Limit to first 10 refs
                     {"category": req.category, "date": req.date, "count": len(req.entry_ids)})
 
     return {"message": f"{len(req.entry_ids)} entries {req.action}ed"}
-
-@router.post("/daybook/normalize-tally-status")
-async def normalize_tally_status(db = Depends(get_db), current_user: dict = Depends(get_current_user_dep)):
-    """Normalize tally status by setting None values to False."""
-    if current_user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Only admins can run this fix")
-    
-    tally_fields = ["tally_fabric", "tally_tailoring", "tally_embroidery", "tally_addon"]
-    
-    updates = []
-    for field in tally_fields:
-        result = await db.items.update_many({field: None}, {"$set": {field: False}})
-        if result.modified_count > 0:
-            updates.append({field: result.modified_count})
-    
-    result = await db.advances.update_many({"tally": None}, {"$set": {"tally": False}})
-    if result.modified_count > 0:
-        updates.append({"tally": result.modified_count})
-    
-    await audit_log(db, "normalize_tally_status", current_user, "daybook", "batch_fix", {"updates": updates})
-    
-    return {"message": f"Normalized {len(updates)} tally fields", "details": updates}
 
 # ==========================================
 # LABOUR PAYMENTS
