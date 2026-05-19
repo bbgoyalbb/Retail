@@ -65,7 +65,7 @@ async def _build_daybook_entries(db, date_filter: Optional[str] = None):
     _DAYBOOK_PROJ = {
         "_id": 0, "ref": 1, "name": 1,
         "fabric_pay_date": 1,     "fabric_received": 1,     "fabric_pay_mode": 1,     "tally_fabric": 1,
-        "tailoring_pay_date": 1,  "tailoring_received": 1,  "tailoring_pay_mode": 1,  "tailoring_tailoring": 1,
+        "tailoring_pay_date": 1,  "tailoring_received": 1,  "tailoring_pay_mode": 1,  "tally_tailoring": 1,
         "embroidery_pay_date": 1, "embroidery_received": 1, "embroidery_pay_mode": 1, "tally_embroidery": 1,
         "addon_pay_date": 1,      "addon_received": 1,      "addon_pay_mode": 1,      "tally_addon": 1,
     }
@@ -162,7 +162,6 @@ async def get_daybook_pending_count(db = Depends(get_db), current_user: dict = D
     
     # Apply the exact same logic as frontend isFullyTallied
     count = 0
-    pending_entries = []
     for entry in entries:
         ts = entry.get("tally_status", {})
         # Check each category - if amount > 0 and not tallied, entry is pending
@@ -172,17 +171,6 @@ async def get_daybook_pending_count(db = Depends(get_db), current_user: dict = D
            (entry.get("addon", 0) > 0 and not ts.get("addon")) or \
            (entry.get("advance", 0) != 0 and not ts.get("advance")):
             count += 1
-            pending_entries.append({
-                "date": entry.get("date"),
-                "ref": entry.get("ref"),
-                "tailoring": entry.get("tailoring"),
-                "tally_tailoring": ts.get("tailoring")
-            })
-    
-    # Debug logging
-    print(f"DEBUG PENDING COUNT: total={count}, first 5 pending entries:")
-    for e in pending_entries[:5]:
-        print(f"  date={e['date']}, ref={e['ref']}, tailoring={e['tailoring']}, tally_tailoring={e['tally_tailoring']}")
     
     return {"count": count}
 
