@@ -207,16 +207,14 @@ export default function NewBill() {
     return sum + item.total + addonTotal + tailoringTotal;
   }, 0), [items, tailoringRates]);
 
-  // Get default article type (extracted for dependency clarity)
-  const defaultArticleType = articleTypes[0] || "Shirt";
-
+  // Get default article type - always N/A so user must explicitly select
   const defaultTailoring = useMemo(() => ({
     enabled: false,
     order_no: "",
     delivery_date: "",
-    article_type: defaultArticleType,
+    article_type: "N/A",
     embroidery_status: "Not Required",
-  }), [defaultArticleType]);
+  }), []);
 
   const defaultAddon = useMemo(() => ({
     enabled: false,
@@ -760,7 +758,7 @@ function TailoringModal({ items, setItems, customerName, articleTypes, onClose }
     qty: item.qty,
     tailoring: item.tailoring || {
       enabled: false,
-      article_type: articleTypes[0] || "Shirt",
+      article_type: "N/A",
       embroidery_status: "Not Required",
       order_no: "",
       delivery_date: ""

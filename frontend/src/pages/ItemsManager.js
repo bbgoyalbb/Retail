@@ -213,6 +213,8 @@ export default function ItemsManager() {
   const [sidebarOpen, setSidebarOpen]   = useState(false);
   const [selectedRefs, setSelectedRefs] = useState(new Set());
   const [detailOpen, setDetailOpen]     = useState(false); // mobile toggle
+  const scrollRef = useRef(null); // Ref for scrollable order list
+  const savedScrollPos = useRef(0); // Save scroll position before modal opens
 
   // Close detail pane when no orders are selected
   useEffect(() => {
@@ -678,7 +680,7 @@ export default function ItemsManager() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar">
             {loading && (
               <div className="p-4 space-y-3">
                 {Array.from({length:8}).map((_,i)=>(
@@ -778,8 +780,8 @@ export default function ItemsManager() {
                         </div>
 
                         <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/row:opacity-100 transition-all sm:translate-x-2 group-hover/row:translate-x-0" onClick={e => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-info hover:bg-info/10" onClick={() => setTailoringGroup(group)} title="Tailoring"><Scissors size={14} weight="bold"/></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/10" onClick={() => setAddonGroup(group)} title="Add-on"><Tag size={14} weight="bold"/></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-info hover:bg-info/10" onClick={() => { savedScrollPos.current = scrollRef.current?.scrollTop || 0; setTailoringGroup(group); }} title="Tailoring"><Scissors size={14} weight="bold"/></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/10" onClick={() => { savedScrollPos.current = scrollRef.current?.scrollTop || 0; setAddonGroup(group); }} title="Add-on"><Tag size={14} weight="bold"/></Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted/50" onClick={() => setInvoiceRef(group.ref)} title="Invoice"><Printer size={14} weight="bold"/></Button>
                         </div>
                       </div>
@@ -1165,7 +1167,13 @@ export default function ItemsManager() {
       {tailoringGroup && (
         <TailoringOverlay
           group={tailoringGroup}
-          onClose={() => setTailoringGroup(null)}
+          onClose={() => {
+            setTailoringGroup(null);
+            // Restore scroll position after modal closes
+            setTimeout(() => {
+              if (scrollRef.current) scrollRef.current.scrollTop = savedScrollPos.current;
+            }, 0);
+          }}
           onSuccess={() => { invalidateItemsCache(); loadData(1); }}
         />
       )}
@@ -1174,7 +1182,13 @@ export default function ItemsManager() {
       {addonGroup && (
         <AddOnOverlay
           group={addonGroup}
-          onClose={() => setAddonGroup(null)}
+          onClose={() => {
+            setAddonGroup(null);
+            // Restore scroll position after modal closes
+            setTimeout(() => {
+              if (scrollRef.current) scrollRef.current.scrollTop = savedScrollPos.current;
+            }, 0);
+          }}
           onSuccess={() => loadData(1)}
         />
       )}

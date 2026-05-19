@@ -11,7 +11,7 @@ const EMB_OPTIONS = ["Not Required", "Required"];
 
 // ─── Split Form Sub-component ─────────────────────────────────
 function SplitForm({ item, articleTypes, onConfirm, onCancel }) {
-  const [splits, setSplits] = useState([{ article_type: articleTypes[0] || "Shirt", qty: "" }]);
+  const [splits, setSplits] = useState([{ article_type: "N/A", qty: "" }]);
   const used = splits.reduce((s, sp) => s + (parseFloat(sp.qty) || 0), 0);
   const rem = Math.round((item.qty - used) * 100) / 100;
   const valid = Math.abs(rem) < 0.01 && splits.some(s => parseFloat(s.qty) > 0);
@@ -28,7 +28,8 @@ function SplitForm({ item, articleTypes, onConfirm, onCancel }) {
               onChange={e => update(i, "article_type", e.target.value)}
               className="flex-1 h-9 px-3 text-xs border border-border/50 rounded-lg bg-muted/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
             >
-              {articleTypes.map(t => <option key={t} value={t}>{t}</option>)}
+              <option value="N/A">N/A</option>
+              {articleTypes.filter(t => t !== "N/A").map(t => <option key={t} value={t}>{t}</option>)}
             </select>
             <div className="relative w-32">
               <input
@@ -58,7 +59,7 @@ function SplitForm({ item, articleTypes, onConfirm, onCancel }) {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setSplits(p => [...p, { article_type: articleTypes[0] || "Shirt", qty: "" }])}
+          onClick={() => setSplits(p => [...p, { article_type: "N/A", qty: "" }])}
           className="h-8 gap-2 text-[10px] font-bold uppercase tracking-widest border-primary/20 text-primary hover:bg-primary/5"
         >
           <Plus size={14} weight="bold" /> Add Garment
@@ -117,7 +118,7 @@ export function TailoringConfigurator({
       item_id: item.id || item._id || `temp_${Date.now()}_${Math.random()}`,
       barcode: item.barcode,
       qty: item.qty,
-      article_type: item.tailoring?.article_type || item.article_type || articleTypes[0] || "Shirt",
+      article_type: item.tailoring?.article_type || "N/A",
       embroidery_status: item.tailoring?.embroidery_status || item.embroidery_status || "Not Required",
       order_no: item.tailoring?.order_no || "",
       delivery_date: item.tailoring?.delivery_date || "",
@@ -128,6 +129,33 @@ export function TailoringConfigurator({
     }));
     setAssignments(normalized);
   }, [items, articleTypes]);
+
+  // Copy order_no and delivery_date from first selected item to all other selected items
+  const copyToAll = () => {
+    const firstSelected = assignments.find(a => a.selected);
+    if (!firstSelected) {
+      setMsg({ type: "error", text: "Please select at least one item with values to copy" });
+      return;
+    }
+    if (!firstSelected.order_no || !firstSelected.delivery_date) {
+      setMsg({ type: "error", text: "Please fill Order No and Delivery Date in the first selected item" });
+      return;
+    }
+    
+    const newAssignments = assignments.map(a => 
+      a.selected ? { ...a, order_no: firstSelected.order_no, delivery_date: firstSelected.delivery_date } : a
+    );
+    setAssignments(newAssignments);
+    setMsg({ type: "success", text: `Copied to ${newAssignments.filter(a => a.selected).length} items` });
+    setTimeout(() => setMsg(null), 2000);
+    
+    if (mode === "create" && onChange) {
+      onChange(newAssignments.map(({ _original, ...rest }) => ({
+        ...rest,
+        _original_item_id: rest._original_item_id
+      })));
+    }
+  };
 
   const update = (i, f, v) => {
     const newAssignments = assignments.map((a, j) => j === i ? { ...a, [f]: v } : a);
@@ -359,7 +387,8 @@ export function TailoringConfigurator({
                           onChange={e => update(i, "article_type", e.target.value)}
                           className="w-full h-8 px-2 text-[11px] font-bold border border-border/50 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary bg-muted/20 transition-all outline-none"
                         >
-                          {articleTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                          <option value="N/A">N/A</option>
+                          {articleTypes.filter(t => t !== "N/A").map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </td>
                       <td className="px-4 py-3.5">
@@ -390,10 +419,20 @@ export function TailoringConfigurator({
           )}
         </div>
 
-        <CardContent className="px-6 py-4 border-t border-border/50 bg-muted/30 shrink-0 flex justify-end items-center gap-3">
-          <Button variant="ghost" onClick={onClose} className="h-10 text-[10px] font-black uppercase tracking-widest px-6">
-            Cancel
+        <CardContent className="px-6 py-4 border-t border-border/50 bg-muted/30 shrink-0 flex justify-between items-center gap-3">
+          <Button 
+            variant="outline" 
+            onClick={copyToAll} 
+            disabled={assignments.filter(a => a.selected).length < 2}
+            className="h-10 text-[10px] font-black uppercase tracking-widest px-4 gap-2"
+            title="Copy Order No and Delivery Date from first selected item to all other selected items"
+          >
+            <Plus size={14} weight="bold" /> Copy to All Selected
           </Button>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" onClick={onClose} className="h-10 text-[10px] font-black uppercase tracking-widest px-6">
+              Cancel
+            </Button>
           <Button 
             onClick={handleSave} 
             disabled={saving || assignments.length === 0}
