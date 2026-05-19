@@ -128,11 +128,10 @@ async def get_daybook(db = Depends(get_db), date_filter: Optional[str] = None, c
     entries = await _build_daybook_entries(db, date_filter)
     
     # Debug: log entries with untallied tailoring for specific refs
-    if date_filter:
-        debug_refs = ["07/120426", "03/010426", "01/040426"]
-        for e in entries:
-            if e["ref"] in debug_refs and e["tailoring"] > 0:
-                print(f"DEBUG DAYBOOK: date={e['date']}, ref={e['ref']}, tailoring={e['tailoring']}, tally_tailoring={e['tally_status']['tailoring']}")
+    debug_refs = ["07/120426", "03/010426", "01/040426"]
+    for e in entries:
+        if e["ref"] in debug_refs and e["tailoring"] > 0:
+            print(f"DEBUG DAYBOOK: date={e['date']}, ref={e['ref']}, tailoring={e['tailoring']}, tally_tailoring={e['tally_status']['tailoring']}, date_filter={date_filter}")
     
     return {"entries": entries}
 
