@@ -21,8 +21,8 @@ _daybook_dates_cache: list = []
 _daybook_dates_cache_time: float = 0.0
 _DAYBOOK_DATES_TTL: float = 60.0
 
-@router.get("/daybook")
-async def get_daybook(db = Depends(get_db), date_filter: Optional[str] = None, current_user: dict = Depends(get_current_user_dep)):
+async def _build_daybook_entries(db, date_filter: Optional[str] = None):
+    """Helper function to build daybook entries - shared between endpoints."""
     # Default to last 12 months when no date filter specified (prevents unbounded scans)
     if not date_filter or date_filter == "All":
         twelve_months_ago = (datetime.now(timezone.utc) - timedelta(days=365)).strftime("%Y-%m-%d")
@@ -65,7 +65,7 @@ async def get_daybook(db = Depends(get_db), date_filter: Optional[str] = None, c
     _DAYBOOK_PROJ = {
         "_id": 0, "ref": 1, "name": 1,
         "fabric_pay_date": 1,     "fabric_received": 1,     "fabric_pay_mode": 1,     "tally_fabric": 1,
-        "tailoring_pay_date": 1,  "tailoring_received": 1,  "tailoring_pay_mode": 1,  "tally_tailoring": 1,
+        "tailoring_pay_date": 1,  "tailoring_received": 1,  "tailoring_pay_mode": 1,  "tailoring_tailoring": 1,
         "embroidery_pay_date": 1, "embroidery_received": 1, "embroidery_pay_mode": 1, "tally_embroidery": 1,
         "addon_pay_date": 1,      "addon_received": 1,      "addon_pay_mode": 1,      "tally_addon": 1,
     }
@@ -73,7 +73,7 @@ async def get_daybook(db = Depends(get_db), date_filter: Optional[str] = None, c
 
     categories = [
         ("fabric",     "fabric_pay_date",     "fabric_received",     "fabric_pay_mode",     "tally_fabric"),
-        ("tailoring",  "tailoring_pay_date",  "tailoring_received",  "tailoring_pay_mode",  "tally_tailoring"),
+        ("tailoring",  "tailoring_pay_date",  "tailoring_received",  "tailoring_pay_mode",  "tailoring"),
         ("embroidery", "embroidery_pay_date", "embroidery_received", "embroidery_pay_mode", "tally_embroidery"),
         ("addon",      "addon_pay_date",      "addon_received",      "addon_pay_mode",      "tally_addon"),
     ]
@@ -121,7 +121,12 @@ async def get_daybook(db = Depends(get_db), date_filter: Optional[str] = None, c
         if mode:
             e["modes"]["advance"] = mode
 
-    return {"entries": list(entries.values())}
+    return list(entries.values())
+
+@router.get("/daybook")
+async def get_daybook(db = Depends(get_db), date_filter: Optional[str] = None, current_user: dict = Depends(get_current_user_dep)):
+    entries = await _build_daybook_entries(db, date_filter)
+    return {"entries": entries}
 
 @router.get("/daybook/dates")
 async def get_daybook_dates(db = Depends(get_db), current_user: dict = Depends(get_current_user_dep)):
@@ -150,74 +155,21 @@ async def get_daybook_dates(db = Depends(get_db), current_user: dict = Depends(g
 @router.get("/daybook/pending-count")
 async def get_daybook_pending_count(db = Depends(get_db), current_user: dict = Depends(get_current_user_dep)):
     """Return the number of untallied payment entries across all dates.
-    Matches the daybook logic exactly: groups by date+ref+name and checks if fully tallied.
+    Uses the exact same logic as the daybook endpoint and frontend isFullyTallied.
     """
-    _nc = {"$ne": True}
+    # Reuse the daybook logic by calling the helper without date filter
+    entries = await _build_daybook_entries(db, date_filter=None)
     
-    # Process each category separately like daybook does
-    categories = [
-        ("fabric",     "fabric_pay_date",     "fabric_received",     "tally_fabric"),
-        ("tailoring",  "tailoring_pay_date",  "tailoring_received",  "tailoring"),
-        ("embroidery", "embroidery_pay_date", "embroidery_received", "embroidery"),
-        ("addon",      "addon_pay_date",      "addon_received",      "addon"),
-    ]
-    
-    # Build a pipeline for each category to get (date, ref, name) with amounts and tally status
-    category_pipelines = []
-    for cat_name, date_field, received_field, tally_field in categories:
-        pipeline = [
-            {"$match": {"cancelled": _nc, date_field: {"$nin": [None, "", "N/A"]}, received_field: {"$gt": 0}}},
-            {"$project": {
-                "date": f"${date_field}",
-                "ref": 1,
-                "name": 1,
-                "amount": f"${received_field}",
-                "tally": f"${tally_field}",
-                "cat": cat_name,
-            }}
-        ]
-        category_pipelines.append(db.items.aggregate(pipeline).to_list(2000))
-    
-    # Get all category results and advances in parallel
-    results = await asyncio.gather(*category_pipelines, db.advances.find({"tally": {"$ne": True}}, {"_id": 0}).to_list(500))
-    
-    # Build entries dict like daybook does: key = (date, ref, name)
-    entries = {}
-    for cat_result in results[:-1]:  # All category results
-        for item in cat_result:
-            key = (item["date"], item["ref"], item.get("name", ""))
-            if key not in entries:
-                entries[key] = {"date": key[0], "ref": key[1], "name": key[2], "tally_status": {}, "amounts": {}}
-            entries[key]["tally_status"][item["cat"]] = item.get("tally", False)
-            entries[key]["amounts"][item["cat"]] = item.get("amount", 0)
-    
-    # Process advances
-    for adv in results[-1]:  # Last result is advances
-        amount = adv.get("amount", 0)
-        if not amount:
-            continue
-        adv_date = adv.get("date", "")
-        if not adv_date:
-            continue
-        key = (adv_date, adv.get("ref", ""), adv.get("name", ""))
-        if key not in entries:
-            entries[key] = {"date": key[0], "ref": key[1], "name": key[2], "tally_status": {}, "amounts": {}}
-        entries[key]["tally_status"]["advance"] = adv.get("tally", False)
-        entries[key]["amounts"]["advance"] = amount
-    
-    # Count entries that are not fully tallied (matching frontend isFullyTallied logic)
-    # isFullyTallied: returns false if any category with amount > 0 is not tallied
+    # Apply the exact same logic as frontend isFullyTallied
     count = 0
-    for entry in entries.values():
-        ts = entry["tally_status"]
-        amts = entry["amounts"]
-        # Entry is fully tallied only if all categories with amount > 0 are tallied
-        fully_tallied = True
-        for cat in amts:
-            if amts[cat] > 0 and not ts.get(cat, False):
-                fully_tallied = False
-                break
-        if not fully_tallied:
+    for entry in entries:
+        ts = entry.get("tally_status", {})
+        # Check each category - if amount > 0 and not tallied, entry is pending
+        if (entry.get("fabric", 0) > 0 and not ts.get("fabric")) or \
+           (entry.get("tailoring", 0) > 0 and not ts.get("tailoring")) or \
+           (entry.get("embroidery", 0) > 0 and not ts.get("embroidery")) or \
+           (entry.get("addon", 0) > 0 and not ts.get("addon")) or \
+           (entry.get("advance", 0) != 0 and not ts.get("advance")):
             count += 1
     
     return {"count": count}
