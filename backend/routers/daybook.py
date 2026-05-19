@@ -162,7 +162,6 @@ async def get_daybook_pending_count(db = Depends(get_db), current_user: dict = D
     
     # Apply the exact same logic as frontend isFullyTallied
     count = 0
-    pending_entries = []
     for entry in entries:
         ts = entry.get("tally_status", {})
         # Check each category - if amount > 0 and not tallied, entry is pending
@@ -172,29 +171,6 @@ async def get_daybook_pending_count(db = Depends(get_db), current_user: dict = D
            (entry.get("addon", 0) > 0 and not ts.get("addon")) or \
            (entry.get("advance", 0) != 0 and not ts.get("advance")):
             count += 1
-            pending_entries.append({
-                "date": entry.get("date"),
-                "ref": entry.get("ref"),
-                "fabric": entry.get("fabric"),
-                "tailoring": entry.get("tailoring"),
-                "embroidery": entry.get("embroidery"),
-                "addon": entry.get("addon"),
-                "advance": entry.get("advance"),
-                "tally_status": ts
-            })
-    
-    # Log for debugging
-    print(f"DEBUG: Total entries: {len(entries)}, Pending count: {count}")
-    print(f"DEBUG: All pending entries (date, ref, untallied_cats):")
-    for e in pending_entries:
-        untallied = []
-        ts = e["tally_status"]
-        if e["fabric"] > 0 and not ts["fabric"]: untallied.append("fabric")
-        if e["tailoring"] > 0 and not ts["tailoring"]: untallied.append("tailoring")
-        if e["embroidery"] > 0 and not ts["embroidery"]: untallied.append("embroidery")
-        if e["addon"] > 0 and not ts["addon"]: untallied.append("addon")
-        if e["advance"] != 0 and not ts["advance"]: untallied.append("advance")
-        print(f"  {e['date']} | {e['ref']} | {untallied}")
     
     return {"count": count}
 
@@ -210,28 +186,25 @@ async def tally_entries(req: TallyRequest, db = Depends(get_db), current_user: d
     }
 
     refs = req.entry_ids
+    
+    # CRITICAL: Date is REQUIRED to prevent accidental mass tally/untally across all dates
+    if not req.date:
+        raise HTTPException(status_code=400, detail="Date is required for tally operations to prevent accidental mass updates")
+    
     if req.category == "advance":
-        adv_query = {"ref": {"$in": refs}}
-        if req.date:
-            adv_query["date"] = req.date
+        adv_query = {"ref": {"$in": refs}, "date": req.date}
         await db.advances.update_many(adv_query, {"$set": {"tally": tally_value}})
     elif req.category == "all":
         coros = []
         for cat, (tally_field, pay_date_field) in date_field_map.items():
-            item_query = {"ref": {"$in": refs}}
-            if req.date:
-                item_query[pay_date_field] = req.date
+            item_query = {"ref": {"$in": refs}, pay_date_field: req.date}
             coros.append(db.items.update_many(item_query, {"$set": {tally_field: tally_value}}))
-        adv_query = {"ref": {"$in": refs}}
-        if req.date:
-            adv_query["date"] = req.date
+        adv_query = {"ref": {"$in": refs}, "date": req.date}
         coros.append(db.advances.update_many(adv_query, {"$set": {"tally": tally_value}}))
         await asyncio.gather(*coros)
     elif req.category in date_field_map:
         tally_field, pay_date_field = date_field_map[req.category]
-        item_query = {"ref": {"$in": refs}}
-        if req.date:
-            item_query[pay_date_field] = req.date
+        item_query = {"ref": {"$in": refs}, pay_date_field: req.date}
         await db.items.update_many(item_query, {"$set": {tally_field: tally_value}})
 
     # Audit log the tally action
@@ -239,6 +212,29 @@ async def tally_entries(req: TallyRequest, db = Depends(get_db), current_user: d
                     {"category": req.category, "date": req.date, "count": len(req.entry_ids)})
 
     return {"message": f"{len(req.entry_ids)} entries {req.action}ed"}
+
+@router.post("/daybook/fix-untallied-tailoring")
+async def fix_untallied_tailoring(db = Depends(get_db), current_user: dict = Depends(get_current_user_dep)):
+    """Temporary endpoint to fix the 27 untallied tailoring entries from April 2026."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can run this fix")
+    
+    # Fix the specific entries identified in debug output
+    april_refs = [
+        "03/010426", "01/040426", "01/050426", "13/050426", "06/030426", "07/030426", "07/080426",
+        "07/120426", "04/020426", "10/120426", "06/150426", "07/150426", "09/030426", "11/030426",
+        "08/030426", "05/120426", "02/140426", "03/140426", "05/140426", "02/110426", "01/060426",
+        "02/060426", "03/060426", "01/140426", "01/120426", "02/120426", "08/150426"
+    ]
+    
+    result = await db.items.update_many(
+        {"ref": {"$in": april_refs}, "tailoring_received": {"$gt": 0}},
+        {"$set": {"tally_tailoring": True}}
+    )
+    
+    await audit_log(db, "fix_untallied_tailoring", current_user, "daybook", "batch_fix", {"count": result.modified_count})
+    
+    return {"message": f"Fixed {result.modified_count} untallied tailoring entries"}
 
 # ==========================================
 # LABOUR PAYMENTS
