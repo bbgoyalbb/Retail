@@ -150,42 +150,72 @@ async def get_daybook_dates(db = Depends(get_db), current_user: dict = Depends(g
 @router.get("/daybook/pending-count")
 async def get_daybook_pending_count(db = Depends(get_db), current_user: dict = Depends(get_current_user_dep)):
     """Return the number of untallied payment entries across all dates.
-    Counts unique entries (by ref+date) that have at least one untallied category,
-    matching the frontend logic where isFullyTallied checks all categories.
+    Matches the daybook logic exactly: groups by date+ref+name and checks if fully tallied.
     """
     _nc = {"$ne": True}
-    # Count items with any untallied category (matching frontend isFullyTallied logic)
-    items_pipeline = [
-        {"$match": {"cancelled": _nc}},
-        {"$project": {
-            "ref": 1,
-            "date": {"$ifNull": ["$fabric_pay_date", "$tailoring_pay_date", "$embroidery_pay_date", "$addon_pay_date"]},
-            "fabric": {"$ifNull": ["$fabric_received", 0]},
-            "tailoring": {"$ifNull": ["$tailoring_received", 0]},
-            "embroidery": {"$ifNull": ["$embroidery_received", 0]},
-            "addon": {"$ifNull": ["$addon_received", 0]},
-            "tally_fabric": 1,
-            "tally_tailoring": 1,
-            "tally_embroidery": 1,
-            "tally_addon": 1,
-        }},
-        {"$addFields": {
-            "has_fabric": {"$and": [{"$gt": ["$fabric", 0]}, {"$ne": ["$tally_fabric", True]}]},
-            "has_tailoring": {"$and": [{"$gt": ["$tailoring", 0]}, {"$ne": ["$tally_tailoring", True]}]},
-            "has_embroidery": {"$and": [{"$gt": ["$embroidery", 0]}, {"$ne": ["$tally_embroidery", True]}]},
-            "has_addon": {"$and": [{"$gt": ["$addon", 0]}, {"$ne": ["$tally_addon", True]}]},
-            "is_pending": {"$or": ["$has_fabric", "$has_tailoring", "$has_embroidery", "$has_addon"]},
-        }},
-        {"$match": {"is_pending": True}},
-        {"$group": {"_id": {"ref": "$ref", "date": "$date"}}},
-        {"$count": "n"}
+    
+    # Process each category separately like daybook does
+    categories = [
+        ("fabric",     "fabric_pay_date",     "fabric_received",     "tally_fabric"),
+        ("tailoring",  "tailoring_pay_date",  "tailoring_received",  "tailoring"),
+        ("embroidery", "embroidery_pay_date", "embroidery_received", "embroidery"),
+        ("addon",      "addon_pay_date",      "addon_received",      "addon"),
     ]
-    items_res, adv_count = await asyncio.gather(
-        db.items.aggregate(items_pipeline).to_list(1),
-        db.advances.count_documents({"tally": {"$ne": True}}),
-    )
-    items_count = items_res[0]["n"] if items_res else 0
-    count = items_count + adv_count
+    
+    # Build a pipeline for each category to get (date, ref, name) with amounts and tally status
+    category_pipelines = []
+    for cat_name, date_field, received_field, tally_field in categories:
+        pipeline = [
+            {"$match": {"cancelled": _nc, date_field: {"$nin": [None, "", "N/A"]}, received_field: {"$gt": 0}}},
+            {"$project": {
+                "date": f"${date_field}",
+                "ref": 1,
+                "name": 1,
+                "amount": f"${received_field}",
+                "tally": f"${tally_field}",
+                "cat": cat_name,
+            }}
+        ]
+        category_pipelines.append(db.items.aggregate(pipeline).to_list(2000))
+    
+    # Get all category results and advances in parallel
+    results = await asyncio.gather(*category_pipelines, db.advances.find({"tally": {"$ne": True}}, {"_id": 0}).to_list(500))
+    
+    # Build entries dict like daybook does: key = (date, ref, name)
+    entries = {}
+    for cat_result in results[:-1]:  # All category results
+        for item in cat_result:
+            key = (item["date"], item["ref"], item.get("name", ""))
+            if key not in entries:
+                entries[key] = {"date": key[0], "ref": key[1], "name": key[2], "tally_status": {}}
+            entries[key]["tally_status"][item["cat"]] = item.get("tally", False)
+    
+    # Process advances
+    for adv in results[-1]:  # Last result is advances
+        amount = adv.get("amount", 0)
+        if not amount:
+            continue
+        adv_date = adv.get("date", "")
+        if not adv_date:
+            continue
+        key = (adv_date, adv.get("ref", ""), adv.get("name", ""))
+        if key not in entries:
+            entries[key] = {"date": key[0], "ref": key[1], "name": key[2], "tally_status": {}}
+        entries[key]["tally_status"]["advance"] = adv.get("tally", False)
+    
+    # Count entries that are not fully tallied (matching frontend isFullyTallied logic)
+    count = 0
+    for entry in entries.values():
+        ts = entry["tally_status"]
+        # Check if all active categories are tallied
+        fully_tallied = True
+        for cat in ts:
+            if not ts[cat]:
+                fully_tallied = False
+                break
+        if not fully_tallied:
+            count += 1
+    
     return {"count": count}
 
 @router.post("/daybook/tally")
