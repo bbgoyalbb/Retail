@@ -215,6 +215,7 @@ export default function ItemsManager() {
   const [detailOpen, setDetailOpen]     = useState(false); // mobile toggle
   const scrollRef = useRef(null); // Ref for scrollable order list
   const savedScrollPos = useRef(0); // Save scroll position before modal opens
+  const savedPage = useRef(1); // Save current page number before modal opens
 
   // Close detail pane when no orders are selected
   useEffect(() => {
@@ -780,8 +781,8 @@ export default function ItemsManager() {
                         </div>
 
                         <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/row:opacity-100 transition-all sm:translate-x-2 group-hover/row:translate-x-0" onClick={e => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-info hover:bg-info/10" onClick={() => { savedScrollPos.current = scrollRef.current?.scrollTop || 0; setTailoringGroup(group); }} title="Tailoring"><Scissors size={14} weight="bold"/></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/10" onClick={() => { savedScrollPos.current = scrollRef.current?.scrollTop || 0; setAddonGroup(group); }} title="Add-on"><Tag size={14} weight="bold"/></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-info hover:bg-info/10" onClick={() => { savedScrollPos.current = scrollRef.current?.scrollTop || 0; savedPage.current = itemsPage; setTailoringGroup(group); }} title="Tailoring"><Scissors size={14} weight="bold"/></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/10" onClick={() => { savedScrollPos.current = scrollRef.current?.scrollTop || 0; savedPage.current = itemsPage; setAddonGroup(group); }} title="Add-on"><Tag size={14} weight="bold"/></Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted/50" onClick={() => setInvoiceRef(group.ref)} title="Invoice"><Printer size={14} weight="bold"/></Button>
                         </div>
                       </div>
@@ -1174,7 +1175,17 @@ export default function ItemsManager() {
               if (scrollRef.current) scrollRef.current.scrollTop = savedScrollPos.current;
             }, 0);
           }}
-          onSuccess={() => { invalidateItemsCache(); loadData(1); }}
+          onSuccess={async () => {
+            invalidateItemsCache();
+            // Reload all pages up to the saved page to restore full list
+            for (let p = 1; p <= savedPage.current; p++) {
+              await loadData(p);
+            }
+            // Restore scroll position after all pages loaded
+            setTimeout(() => {
+              if (scrollRef.current) scrollRef.current.scrollTop = savedScrollPos.current;
+            }, 100);
+          }}
         />
       )}
 
@@ -1189,7 +1200,16 @@ export default function ItemsManager() {
               if (scrollRef.current) scrollRef.current.scrollTop = savedScrollPos.current;
             }, 0);
           }}
-          onSuccess={() => loadData(1)}
+          onSuccess={async () => {
+            // Reload all pages up to the saved page to restore full list
+            for (let p = 1; p <= savedPage.current; p++) {
+              await loadData(p);
+            }
+            // Restore scroll position after all pages loaded
+            setTimeout(() => {
+              if (scrollRef.current) scrollRef.current.scrollTop = savedScrollPos.current;
+            }, 100);
+          }}
         />
       )}
     </div>
