@@ -215,6 +215,13 @@ async def tally_entries(req: TallyRequest, db = Depends(get_db), current_user: d
     elif req.category in date_field_map:
         tally_field, pay_date_field = date_field_map[req.category]
         item_query = {"ref": {"$in": refs}, pay_date_field: req.date}
+        
+        # Debug: log current database state before update
+        current_items = await db.items.find(item_query, {"_id": 0, "ref": 1, tally_field: 1, pay_date_field: 1}).to_list(10)
+        print(f"DEBUG TALLY BEFORE: category={req.category}, date={req.date}, refs={refs}")
+        for item in current_items:
+            print(f"  ref={item['ref']}, {pay_date_field}={item.get(pay_date_field)}, {tally_field}={item.get(tally_field)}")
+        
         result = await db.items.update_many(item_query, {"$set": {tally_field: tally_value}})
         print(f"DEBUG TALLY RESULT: matched={result.matched_count}, modified={result.modified_count}")
 
