@@ -236,6 +236,28 @@ async def tally_entries(req: TallyRequest, db = Depends(get_db), current_user: d
 
     return {"message": f"{len(req.entry_ids)} entries {req.action}ed"}
 
+@router.post("/daybook/normalize-tally-status")
+async def normalize_tally_status(db = Depends(get_db), current_user: dict = Depends(get_current_user_dep)):
+    """Normalize tally status by setting None values to False."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can run this fix")
+    
+    tally_fields = ["tally_fabric", "tally_tailoring", "tally_embroidery", "tally_addon"]
+    
+    updates = []
+    for field in tally_fields:
+        result = await db.items.update_many({field: None}, {"$set": {field: False}})
+        if result.modified_count > 0:
+            updates.append({field: result.modified_count})
+    
+    result = await db.advances.update_many({"tally": None}, {"$set": {"tally": False}})
+    if result.modified_count > 0:
+        updates.append({"tally": result.modified_count})
+    
+    await audit_log(db, "normalize_tally_status", current_user, "daybook", "batch_fix", {"updates": updates})
+    
+    return {"message": f"Normalized {len(updates)} tally fields", "details": updates}
+
 # ==========================================
 # LABOUR PAYMENTS
 # ==========================================
