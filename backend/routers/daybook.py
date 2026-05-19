@@ -93,6 +93,11 @@ async def _build_daybook_entries(db, date_filter: Optional[str] = None):
             e[cat_name]  += received
             e["total"]   += received
             e["tally_status"][cat_name] = item.get(tally_field, False)
+            
+            # Debug: log tailoring tally status for specific refs
+            if ref in ["07/120426", "03/010426", "01/040426"] and cat_name == "tailoring" and received > 0:
+                print(f"DEBUG DAYBOOK BUILD: ref={ref}, date={pay_date}, tailoring_received={received}, tally_tailoring={item.get(tally_field)}")
+            
             mode = item.get(mode_field, "")
             if mode:
                 e["modes"][cat_name] = mode
