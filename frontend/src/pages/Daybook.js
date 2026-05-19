@@ -559,6 +559,7 @@ export default function Daybook() {
   const handleCategoryTally = async (ref, date, category, action) => {
     await tallyEntries({ entry_ids: [ref], date, category, action });
     invalidateDaybookPendingCache();
+    dataEvents.dispatchEvent(new Event("daybook"));
   };
 
   const summaryStats = (() => {

@@ -4,6 +4,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/context/AuthContext";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { getDaybookPendingCount, getPublicSettings, BACKEND_URL } from "@/api";
+import { dataEvents } from "@/lib/dataEvents";
 import { Badge } from "@/components/ui/badge";
 import {
   House, Receipt, Kanban,
@@ -63,7 +64,12 @@ export default function Sidebar({ open, setOpen }) {
     const fetch = () => getDaybookPendingCount().then(r => setDaybookPending(r.data?.count || 0)).catch(() => {});
     fetch();
     const timer = setInterval(fetch, 60000);
-    return () => clearInterval(timer);
+    const handler = () => fetch();
+    dataEvents.addEventListener("daybook", handler);
+    return () => {
+      clearInterval(timer);
+      dataEvents.removeEventListener("daybook", handler);
+    };
   }, []);
 
   const filteredNavItems = useMemo(() => NAV_ITEMS.filter(item => {
